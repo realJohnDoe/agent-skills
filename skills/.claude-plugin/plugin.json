@@ -1,0 +1,9 @@
+{
+  "name": "maintenance",
+  "description": "Recurring maintenance passes that run over several repositories at once",
+  "author": { "name": "realJohnDoe", "url": "https://github.com/realJohnDoe" },
+  "homepage": "https://github.com/realJohnDoe/agent-skills",
+  "repository": "https://github.com/realJohnDoe/agent-skills",
+  "license": "MIT",
+  "skills": "./"
+}

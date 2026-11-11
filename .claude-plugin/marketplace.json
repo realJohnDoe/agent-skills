@@ -1,0 +1,14 @@
+{
+  "name": "agent-skills",
+  "description": "Agent skills shared across realJohnDoe's repositories",
+  "owner": { "name": "realJohnDoe", "url": "https://github.com/realJohnDoe" },
+  "plugins": [
+    {
+      "name": "maintenance",
+      "source": "./skills",
+      "description": "Recurring maintenance passes that run over several repositories at once",
+      "category": "development",
+      "homepage": "https://github.com/realJohnDoe/agent-skills"
+    }
+  ]
+}
