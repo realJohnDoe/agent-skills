@@ -4,7 +4,7 @@ Claude Code skills shared across my repositories, as one plugin in a marketplace
 
 ```
 /plugin marketplace add realJohnDoe/agent-skills
-/plugin install maintenance@agent-skills
+/plugin install joes-workshop@agent-skills
 ```
 
 | Skill | What it does |

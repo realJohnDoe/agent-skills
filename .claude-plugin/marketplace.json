@@ -4,7 +4,7 @@
   "owner": { "name": "realJohnDoe", "url": "https://github.com/realJohnDoe" },
   "plugins": [
     {
-      "name": "maintenance",
+      "name": "joes-workshop",
       "source": "./skills",
       "description": "Recurring maintenance passes that run over several repositories at once",
       "category": "development",
