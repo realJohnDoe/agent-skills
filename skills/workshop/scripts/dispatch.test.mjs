@@ -86,7 +86,10 @@ const world = ({ digestIssues = [], digestComments = {}, digestLabels = [{ name:
       issue(3, "Tracemap haiku task", ["haiku"], { created_at: "2026-09-15T00:00:00Z" }),
       issue(4, "Tracemap sonnet task", ["sonnet"], { created_at: "2026-10-20T00:00:00Z" }),
     ],
-    prs: [pr(8, "Bump x from 1 to 2", { user: { login: "dependabot[bot]" }, runs: green, mergeable: true })],
+    prs: [
+      pr(8, "Bump x from 1 to 2", { user: { login: "dependabot[bot]" }, runs: green, mergeable: true }),
+      pr(9, "Tracemap red", { runs: red, mergeable: true, created_at: "2026-11-01T00:00:00Z" }),
+    ],
     labels: [{ name: "haiku" }, { name: "sonnet" }],
   }),
   user: { login: "workshop-bot" },
@@ -140,16 +143,19 @@ describe("dispatch dry run over two repos", () => {
     assert.deepEqual(res.plan.repos, [M, T]);
   });
 
-  test("one session cap across repos: follow-ups first, then the oldest issues anywhere", () => {
+  test("one session cap across repos: newest follow-ups first, then the oldest issues anywhere", () => {
     assert.deepEqual(
       res.plan.sessions.map((s) => [s.kind, s.repo, s.pr ?? s.issue]),
       [
+        ["followup", T, 9],
         ["followup", M, 21],
         ["dispatch", T, 3],
-        ["dispatch", M, 10],
       ],
     );
-    assert.deepEqual(res.plan.deferred, [`${T}: tracemap#4 Tracemap sonnet task`]);
+    assert.deepEqual(res.plan.deferred, [
+      `${M}: meridian#10 Meridian sonnet task`,
+      `${T}: tracemap#4 Tracemap sonnet task`,
+    ]);
   });
 
   test("each session works in its own worktree of its repo's clone", () => {
@@ -159,7 +165,7 @@ describe("dispatch dry run over two repos", () => {
       assert.ok(s.prompt.includes(`git -C ${clone} worktree add`), s.prompt);
       assert.ok(s.prompt.includes(s.worktree));
     }
-    const [followup, dispatch] = res.plan.sessions;
+    const [, followup, dispatch] = res.plan.sessions;
     assert.ok(followup.prompt.includes("- CI failing: build: https://ci/1"));
     assert.ok(dispatch.prompt.includes("Label the PR `automerge`"));
   });
@@ -177,7 +183,7 @@ describe("dispatch dry run over two repos", () => {
     assert.equal(res.plan.digest.repo, DIGEST);
     assert.match(body, /\*\*Review:\*\* \[realJohnDoe\/tracemap#8\]/);
     assert.match(body, /\*\*Decide:\*\* \[realJohnDoe\/meridian#13\]/);
-    assert.match(body, /## Queue[^]*\[realJohnDoe\/tracemap#4\]/);
+    assert.match(body, /## Queue[^]*\[realJohnDoe\/meridian#10\][^]*\[realJohnDoe\/tracemap#4\]/);
     assert.match(body, /\[realJohnDoe\/meridian#12\]\(\S+\) Meridian untriaged \(no tier label/);
     assert.match(body, /\[realJohnDoe\/meridian#11\]\(\S+\) Meridian waits on 10 \(blocked by realJohnDoe\/meridian#10\)/);
   });
@@ -204,7 +210,8 @@ describe("dispatch apply", () => {
   test("claims each session in its own repo", () => {
     assert.equal(writes("POST", `repos/${M}/issues/21/comments`).length, 1);
     assert.equal(writes("POST", `repos/${T}/issues/3/assignees`).length, 1);
-    assert.equal(writes("POST", `repos/${M}/issues/10/assignees`).length, 1);
+    assert.equal(writes("POST", `repos/${T}/issues/9/comments`).length, 1);
+    assert.equal(writes("POST", `repos/${M}/issues/10/assignees`).length, 0);
     assert.equal(writes("POST", `repos/${T}/issues/4/assignees`).length, 0);
   });
 

@@ -61,8 +61,9 @@ const LABELS = {
   [AUTOMERGE]: "0e8a16",
 };
 const days = (iso) => (TODAY - new Date(iso)) / 864e5;
-const byAge = (a, b) =>
-  a.created.localeCompare(b.created) || a.repo.localeCompare(b.repo);
+const byRepo = (a, b) => a.repo.localeCompare(b.repo);
+const oldestFirst = (a, b) => a.created.localeCompare(b.created) || byRepo(a, b);
+const newestFirst = (a, b) => b.created.localeCompare(a.created) || byRepo(a, b);
 
 main(() => {
   const { digest: DIGEST, repos } = loadConfig();
@@ -83,10 +84,11 @@ main(() => {
   const plans = repos.map((r) => planRepo(r, since));
   const pick = (k) => plans.flatMap((p) => p[k]);
 
-  // Follow-ups first: finishing beats starting. Within each, oldest work first,
+  // Follow-ups first: finishing beats starting. Follow-ups go newest PR first and
+  // dispatches oldest issue first, as in Meridian, each across every repo
   // whichever repo it is in.
-  const followups = pick("followups").sort(byAge);
-  const dispatches = pick("dispatches").sort(byAge);
+  const followups = pick("followups").sort(newestFirst);
+  const dispatches = pick("dispatches").sort(oldestFirst);
   const sessions = [...followups, ...dispatches].slice(0, MAX_SESSIONS);
   const queue = dispatches.slice(Math.max(0, MAX_SESSIONS - followups.length));
   const automerge = pick("automerge");
