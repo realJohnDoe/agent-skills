@@ -1,9 +1,9 @@
 ---
-name: workshop
+name: dispatcher
 description: Run the daily workshop over several repositories at once: dispatch tier-labelled issues to subagent sessions, follow up on red or conflicting PRs, merge `automerge` PRs, and keep one shared digest of what waits on the maintainer. Also pauses, drains and resumes it. Use when the daily dispatcher fires, when asked to run, pause, resume or configure the workshop, or to add a repo to it.
 ---
 
-# Workshop
+# Dispatcher
 
 One scheduled run a day moves open work forward in every repo listed in [`workshop.json`](workshop.json), and the maintainer's part comes down to one twice-weekly digest issue in the `digest` repo, which also says why anything isn't moving. The scripts live in `scripts/` next to this file: run them with `node <this skill's directory>/scripts/<name>.mjs`.
 
