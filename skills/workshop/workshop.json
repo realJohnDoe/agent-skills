@@ -1,0 +1,8 @@
+{
+  "digest": "realJohnDoe/agent-skills",
+  "repos": [
+    { "repo": "realJohnDoe/meridian" },
+    { "repo": "realJohnDoe/tracemap" },
+    { "repo": "realJohnDoe/structra" }
+  ]
+}
