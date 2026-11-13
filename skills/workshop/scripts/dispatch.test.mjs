@@ -266,6 +266,13 @@ describe("pause over two repos", () => {
     assert.match(res.writes.at(-1).body.body, /workshop-snapshot/);
   });
 
+  test("stops on a repo it can't push to before writing anything", () => {
+    const res = run("pause.mjs", [], fixture, { apply: true, noPush: [T] });
+    assert.equal(res.status, 1);
+    assert.match(res.stderr, /realJohnDoe\/tracemap: can't push/);
+    assert.deepEqual(res.writes, []);
+  });
+
   test("without a digest the workshop runs normally", () => {
     const res = run("pause.mjs", [], world());
     assert.equal(res.plan.state, "normal");

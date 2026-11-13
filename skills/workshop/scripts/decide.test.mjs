@@ -280,6 +280,10 @@ describe("prVerdict", () => {
         "conflicts with main after 2 follow-up(s)",
       );
       assert.equal(
+        prVerdict(pr({ mergeable: false, comments: marks, base: "trunk" })).why,
+        "conflicts with trunk after 2 follow-up(s)",
+      );
+      assert.equal(
         prVerdict(pr({ comments: [...marks, human("2026-11-11T00:00:00Z")] })).why,
         "unanswered review after 2 follow-up(s)",
       );

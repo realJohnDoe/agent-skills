@@ -5,7 +5,7 @@
 // Prints {state, plan}. state is normal | drain | paused | resume. Without --apply
 // nothing is written; with it, drain/resume carry out the plan and post their marker
 // comment last, so a crash is retried and a second firing in the same state does nothing.
-import { isDigest, linkedIssues, marked } from "./decide.mjs";
+import { FAILED, isDigest, linkedIssues, marked } from "./decide.mjs";
 import {
   FOOTER,
   PAUSE_LABEL,
@@ -17,6 +17,7 @@ import {
   main,
   names,
   post,
+  preflight,
 } from "./lib.mjs";
 
 const APPLY = flag("--apply");
@@ -29,6 +30,7 @@ const tiered = (x) => names(x).some((l) => TIERS.includes(l));
 
 main(() => {
   const { digest: DIGEST, repos } = loadConfig();
+  preflight(repos);
 
   // --- State: the label on either open digest; marker comments on the newest (the draft)
   const digests = all(`repos/${DIGEST}/issues?state=open&per_page=100`)
@@ -78,9 +80,7 @@ main(() => {
           .find((i) => i && tiered(i));
         if (!issue || [...names(p), ...names(issue)].includes("opus")) continue; // opus PRs stay open for review
         const runs = api(`repos/${repo}/commits/${p.head.sha}/check-runs?per_page=100`).check_runs;
-        const red = runs.some((x) =>
-          ["failure", "timed_out", "startup_failure"].includes(x.conclusion),
-        );
+        const red = runs.some((x) => FAILED.includes(x.conclusion));
         const conflict = api(`repos/${repo}/pulls/${p.number}`).mergeable === false;
         if (red || conflict)
           r.defer.push(pr_(p, conflict ? `conflicts with ${base}` : "CI red"));

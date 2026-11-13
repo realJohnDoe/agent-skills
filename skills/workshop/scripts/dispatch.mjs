@@ -369,6 +369,7 @@ function planRepo({ repo, name, path }, since) {
       comments: all(`repos/${repo}/issues/${pr.number}/comments?per_page=100`),
       reviewComments: all(`repos/${repo}/pulls/${pr.number}/comments?per_page=100`),
       reviews: all(`repos/${repo}/pulls/${pr.number}/reviews?per_page=100`),
+      base,
       today: TODAY,
       maxFollowups: MAX_FOLLOWUPS,
       staleDays: STALE_DAYS,
@@ -523,7 +524,7 @@ function planRepo({ repo, name, path }, since) {
       const closes = linkedIssues(pr.body).map(
         (n) => `${ref(n)} · ${names(api(`repos/${repo}/issues/${n}`)).join(", ")}`,
       );
-      return `- [${name}#${pr.number}](${pr.html_url}) ${pr.title}${closes.length ? ` (closes ${closes.join("; ")})` : ""}`;
+      return `- [${ref(pr.number)}](${pr.html_url}) ${pr.title}${closes.length ? ` (closes ${closes.join("; ")})` : ""}`;
     });
 
   const have = all(`repos/${repo}/labels?per_page=100`).map((l) => l.name);
