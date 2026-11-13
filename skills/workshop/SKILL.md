@@ -18,6 +18,19 @@ One scheduled run a day moves open work forward in every repo listed in [`worksh
 6. Don't subscribe to PR activity, yours or the sessions'. Tomorrow's run is the follow-up. Don't open PRs or issues yourself beyond what the script writes and what the subagents open.
 7. If `sessions`, `automerge` and `digest.replies` are all empty, stop. Post nothing.
 
+### Dry run
+
+When the prompt asks for a dry run (for example the first run of a new scheduled task, or after adding a repo), **write nothing**. Never pass `--apply`, start no subagents, relay no replies, and post no comments, issues or labels. Instead:
+
+1. Run `node scripts/pause.mjs` and report its `state`. If it is `drain` or `resume`, also report what its plan would defer, unassign, close or mark ready.
+2. Run `node scripts/dispatch.mjs` (with `--followups-only` if the state is `drain`) and report the plan as a short summary for the user:
+   - the configured repos, and the labels each would get created (`missingLabels`);
+   - each session with its repo, kind, issue or PR, and tier, then what's left over (`deferred`);
+   - the PRs that would be merged (`automerge`);
+   - the digest counts, whether it would be published, and the replies that would be relayed;
+   - the digest body as it would be written.
+3. Stop. If a script fails, report its error as it is: a repo that isn't checked out or can't be pushed to is exactly what a dry run is for finding.
+
 Each repo's own rules (how to build and check, PR template, label meanings beyond the ones below) stay in that repo's `CLAUDE.md` and docs. The session prompts point there, and nothing in this skill is specific to one repo.
 
 ## Configuring
