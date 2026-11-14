@@ -1,20 +1,3 @@
 {
-  "digest": "realJohnDoe/agent-skills",
-  "repos": [
-    {
-      "repo": "realJohnDoe/meridian"
-    },
-    {
-      "repo": "realJohnDoe/tracemap"
-    },
-    {
-      "repo": "realJohnDoe/structra"
-    },
-    {
-      "repo": "realJohnDoe/kenpo-notes"
-    },
-    {
-      "repo": "realJohnDoe/rentenluecke"
-    }
-  ]
+  "digest": "realJohnDoe/agent-skills"
 }

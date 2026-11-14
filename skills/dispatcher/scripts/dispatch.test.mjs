@@ -102,18 +102,23 @@ const world = ({ digestIssues = [], digestComments = {}, digestLabels = [{ name:
   ...extra,
 });
 
-// Runs a workshop script against `fixture` with both repos checked out.
+// Runs a workshop script against `fixture` with both repos checked out (attached),
+// except those in `missing`. The checkouts folder also holds a plain folder and a
+// clone without an origin, which discovery must skip.
 const run = (script, args, fixture, { apply = false, missing = [], noPush = [] } = {}) => {
   const dir = mkdtempSync(join(tmpdir(), "workshop-test-"));
   const checkouts = join(dir, "checkouts");
   const remotes = {};
   for (const repo of [M, T]) {
     const name = repo.split("/")[1];
-    if (!missing.includes(repo)) mkdirSync(join(checkouts, name), { recursive: true });
+    if (missing.includes(repo)) continue;
+    mkdirSync(join(checkouts, name, ".git"), { recursive: true });
     remotes[join(checkouts, name)] = `https://github.com/${repo}.git`;
   }
+  mkdirSync(join(checkouts, "notes"), { recursive: true });
+  mkdirSync(join(checkouts, "scratch", ".git"), { recursive: true });
   writeFileSync(join(dir, "fixture.json"), JSON.stringify(fixture));
-  writeFileSync(join(dir, "workshop.json"), JSON.stringify({ digest: DIGEST, repos: [{ repo: M }, { repo: T }] }));
+  writeFileSync(join(dir, "workshop.json"), JSON.stringify({ digest: DIGEST }));
   const log = join(dir, "writes.jsonl");
   writeFileSync(log, "");
   const res = spawnSync(
@@ -142,6 +147,7 @@ describe("dispatch dry run over two repos", () => {
     assert.equal(res.status, 0, res.stderr);
     assert.equal(res.plan.applied, false);
     assert.deepEqual(res.plan.repos, [M, T]);
+    assert.match(res.plan.digest.body, /\nRepos covered: realJohnDoe\/meridian, realJohnDoe\/tracemap\.\n/);
   });
 
   test("one session cap across repos: newest follow-ups first, then the oldest issues anywhere", () => {
@@ -230,21 +236,35 @@ describe("dispatch apply", () => {
   });
 });
 
-describe("dispatch stops on a repo it can't work on", () => {
-  test("not checked out", () => {
+describe("the repos are the ones attached", () => {
+  test("a repo that isn't attached isn't covered, and the digest says which are", () => {
     const res = run("dispatch.mjs", [], world(), { missing: [T] });
+    assert.equal(res.status, 0, res.stderr);
+    assert.deepEqual(res.plan.repos, [M]);
+    assert.match(res.plan.digest.body, /\nRepos covered: realJohnDoe\/meridian\.\n/);
+  });
+  test("--repos naming a repo that isn't attached stops the run", () => {
+    const res = run("dispatch.mjs", ["--repos", T], world(), { missing: [T] });
     assert.equal(res.status, 1);
-    assert.match(res.stderr, /realJohnDoe\/tracemap: not checked out at /);
+    assert.match(res.stderr, /--repos names repos not checked out under .*: realjohndoe\/tracemap/);
     assert.equal(res.stdout, "");
   });
+  test("no attached repo stops the run", () => {
+    const res = run("dispatch.mjs", [], world(), { missing: [M, T] });
+    assert.equal(res.status, 1);
+    assert.match(res.stderr, /No GitHub clone under /);
+  });
+});
+
+describe("dispatch stops on a repo it can't work on", () => {
   test("can't be pushed to", () => {
     const res = run("dispatch.mjs", [], world(), { apply: true, noPush: [M] });
     assert.equal(res.status, 1);
     assert.match(res.stderr, /realJohnDoe\/meridian: can't push/);
     assert.deepEqual(res.writes, []);
   });
-  test("--repos limits the run to one configured repo", () => {
-    const res = run("dispatch.mjs", ["--repos", M], world(), { missing: [T] });
+  test("--repos limits the run to one attached repo", () => {
+    const res = run("dispatch.mjs", ["--repos", M], world());
     assert.equal(res.status, 0, res.stderr);
     assert.deepEqual(res.plan.repos, [M]);
   });

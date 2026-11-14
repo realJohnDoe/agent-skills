@@ -150,7 +150,7 @@ main(() => {
   const render = (start, mergedLines, prev) =>
     `<!-- digest-since: ${start} -->\n\n${NOTE}${
       [...asks, ...info].join("\n") || "Nothing is waiting on the maintainer.\n"
-    }${prev ? `\nPrevious digest: #${prev}.\n` : ""}${
+    }\nRepos covered: ${repos.map((r) => r.repo).join(", ")}.\n${prev ? `\nPrevious digest: #${prev}.\n` : ""}${
       mergedLines.length
         ? `\n<details><summary>${mergedLines.length} merged since ${start.slice(0, 10)}</summary>\n\n${mergedLines.join("\n")}\n\n</details>\n`
         : ""
