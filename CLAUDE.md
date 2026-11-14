@@ -6,7 +6,7 @@ Issues live in this repo's GitHub Issues (realJohnDoe/agent-skills). See `docs/a
 
 ### Triage labels
 
-The triage roles map onto the workshop labels (tier labels, `decision-required`, `deferred`). See `docs/agents/triage-labels.md`.
+The triage roles map onto the workshop labels (tier labels, `ready-for-agent`, `deferred`; a decision is a `## Decision needed` body section). See `docs/agents/triage-labels.md`.
 
 ### Domain docs
 

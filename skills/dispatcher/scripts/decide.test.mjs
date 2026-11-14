@@ -4,9 +4,11 @@ import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
   AWAITING_TRIAGE,
+  DECISION,
   claimState,
   isDigest,
   linkedIssues,
+  openQuestion,
   prVerdict,
   skipReason,
   tierOf,
@@ -56,10 +58,29 @@ describe("skipReason", () => {
       assert.equal(skipReason(issue({ subIssues: 2 })), null));
     test("an open PR closes it", () =>
       assert.equal(skipReason(issue({ linked: true })), null));
-    test("decision-required", () =>
-      assert.equal(skipReason(issue({ labels: ["sonnet", "decision-required"] })), null));
     test("assigned", () =>
       assert.equal(skipReason(issue({ assignees: 1 })), null));
+  });
+
+  describe("waiting on a decision", () => {
+    test("an open question without the go-ahead", () =>
+      assert.equal(skipReason(issue({ labels: ["sonnet"], question: "Which API?" })), DECISION));
+    test("even without a tier label", () =>
+      assert.equal(skipReason(issue({ labels: [], question: "Which API?" })), DECISION));
+    test("the go-ahead settles it", () =>
+      assert.equal(skipReason(issue({ question: "Which API?" })), undefined));
+    test("blocked: waits for the blocker", () =>
+      assert.equal(
+        skipReason(issue({ labels: ["sonnet"], question: "Which API?", blockers: [3] })),
+        "blocked by #3",
+      ));
+    test("deferred before the decision", () =>
+      assert.equal(
+        skipReason(issue({ labels: ["deferred"], question: "Which API?" })),
+        "`deferred`; remove the label to queue it",
+      ));
+    test("assigned before the decision", () =>
+      assert.equal(skipReason(issue({ labels: [], assignees: 1, question: "Which API?" })), null));
   });
 
   describe("not picked up, with the reason", () => {
@@ -132,6 +153,30 @@ describe("skipReason", () => {
         "`opus-plan`; start a plan session by hand",
       ));
   });
+});
+
+describe("openQuestion", () => {
+  test("the section's first paragraph, on one line", () =>
+    assert.equal(
+      openQuestion("Intro\n\n## Decision needed\n\nKeep the old\nendpoint?\n\nOptions: a, b\n\n## Notes\nx"),
+      "Keep the old endpoint?",
+    ));
+  test("the section may end the body", () =>
+    assert.equal(openQuestion("## Decision needed\nWhich API?"), "Which API?"));
+  test("settled by a Decided: line", () => {
+    assert.equal(openQuestion("## Decision needed\nWhich API?\n\n**Decided:** the new one"), undefined);
+    assert.equal(openQuestion("## Decision needed\nWhich API?\nDecided: the new one"), undefined);
+  });
+  test("a Decided: line in another section doesn't count", () =>
+    assert.equal(openQuestion("## Decision needed\nWhich API?\n## Log\nDecided: x"), "Which API?"));
+  test("no section, no body", () => {
+    assert.equal(openQuestion("## Decisions so far\nx"), undefined);
+    assert.equal(openQuestion(null), undefined);
+  });
+  test("an empty section still asks", () =>
+    assert.equal(openQuestion("## Decision needed\n\n## Next\nx"), "Decision needed"));
+  test("long questions are cut", () =>
+    assert.equal(openQuestion(`## Decision needed\n${"x".repeat(300)}`).length, 200));
 });
 
 describe("prVerdict", () => {

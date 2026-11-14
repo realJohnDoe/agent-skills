@@ -41,7 +41,7 @@ const pr = (n, title, extra = {}) => ({
   created_at: "2026-10-01T00:00:00Z",
   ...extra,
 });
-const ALL_LABELS = ["haiku", "sonnet", "opus", "opus-plan", "decision-required", "deferred", "ready-for-agent", "automerge"].map(
+const ALL_LABELS = ["haiku", "sonnet", "opus", "opus-plan", "deferred", "ready-for-agent", "automerge"].map(
   (name) => ({ name }),
 );
 const green = [{ name: "build", status: "completed", conclusion: "success" }];
@@ -74,7 +74,7 @@ const world = ({ digestIssues = [], digestComments = {}, digestLabels = [{ name:
       issue(10, "Meridian sonnet task", ["sonnet", "ready-for-agent"], { created_at: "2026-10-01T00:00:00Z" }),
       issue(11, "Meridian waits on 10", ["opus", "ready-for-agent"], { body: "Blocked by: #10" }),
       issue(12, "Meridian untriaged", []),
-      issue(13, "Meridian needs a call", ["sonnet", "decision-required"]),
+      issue(13, "Meridian needs a call", ["sonnet"], { body: "## Decision needed\n\nKeep the old endpoint?\n\n## Notes\nx" }),
       issue(14, "Meridian filed by an agent", ["haiku"], { created_at: "2026-09-01T00:00:00Z" }),
     ],
     prs: [
@@ -176,16 +176,19 @@ describe("dispatch dry run over two repos", () => {
 
   test("lists the labels each repo is missing", () =>
     assert.deepEqual(res.plan.missingLabels, [
-      { repo: T, missing: ["opus", "opus-plan", "decision-required", "deferred", "automerge"] },
+      { repo: T, missing: ["opus", "opus-plan", "deferred", "automerge"] },
     ]));
 
   test("one digest naming every item's repo", () => {
     const body = res.plan.digest.body;
     assert.equal(res.plan.digest.repo, DIGEST);
     assert.match(body, /\*\*Review:\*\* \[realJohnDoe\/tracemap#8\]/);
-    assert.match(body, /\*\*Decide:\*\* \[realJohnDoe\/meridian#13\]/);
+    assert.match(
+      body,
+      /## Waiting on you[^]*\*\*Decide:\*\* \[realJohnDoe\/meridian#13\]\(\S+\) Meridian needs a call \(Keep the old endpoint\?\)[^]*\*\*Go ahead\?\*\* \[realJohnDoe\/meridian#14\]/,
+    );
     assert.match(body, /## Queue[^]*\[realJohnDoe\/meridian#10\][^]*\[realJohnDoe\/tracemap#4\]/);
-    assert.match(body, /## Triage[^]*\*\*Triage:\*\* \[realJohnDoe\/meridian#14\]\(\S+\) Meridian filed by an agent \(haiku\)/);
+    assert.match(body, /\[realJohnDoe\/meridian#14\]\(\S+\) Meridian filed by an agent \(haiku\)/);
     assert.match(body, /\[realJohnDoe\/meridian#12\]\(\S+\) Meridian untriaged \(no tier label/);
     assert.match(body, /\[realJohnDoe\/meridian#11\]\(\S+\) Meridian waits on 10 \(blocked by realJohnDoe\/meridian#10\)/);
   });
@@ -199,7 +202,7 @@ describe("dispatch apply", () => {
 
   test("creates missing labels first, in the repo missing them", () => {
     const created = writes("POST", `repos/${T}/labels`).map((w) => w.body.name);
-    assert.deepEqual(created, ["opus", "opus-plan", "decision-required", "deferred", "automerge"]);
+    assert.deepEqual(created, ["opus", "opus-plan", "deferred", "automerge"]);
     assert.equal(res.writes[0].path, `repos/${T}/labels`);
     assert.equal(writes("POST", `repos/${M}/labels`).length, 0);
   });
