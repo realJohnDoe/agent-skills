@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// The daily dispatcher's plan over every configured repo: which issues to start,
+// The daily dispatcher's plan over every attached repo: which issues to start,
 // which PRs need a follow-up session or get merged, and the one shared digest.
 // See ../SKILL.md.
-// Usage: node dispatch.mjs [--apply] [--followups-only] [--max-sessions N]
-//   [--max-followups N] [--today YYYY-MM-DD] [--repos o/r,...] [--config file]
+// Usage: node dispatch.mjs --digest owner/repo [--apply] [--followups-only]
+//   [--max-sessions N] [--max-followups N] [--today YYYY-MM-DD] [--repos o/r,...]
 //   [--checkouts dir]
 // Without --apply it is a dry run: it prints the plan and writes nothing.
 import { tmpdir } from "node:os";

@@ -5,7 +5,7 @@ description: Run the daily workshop over several repositories at once: dispatch 
 
 # Dispatcher
 
-One scheduled run a day moves open work forward in every repo attached to its session, and the maintainer's part comes down to one twice-weekly digest issue in the `digest` repo, which also says why anything isn't moving. The scripts live in `scripts/` next to this file: run them with `node <this skill's directory>/scripts/<name>.mjs`.
+One scheduled run a day moves open work forward in every repo attached to its session, and the maintainer's part comes down to one twice-weekly digest issue in **`realJohnDoe/agent-skills`** (the digest repo), which also says why anything isn't moving. The scripts live in `scripts/` next to this file: run them as `node <this skill's directory>/scripts/<name>.mjs --digest realJohnDoe/agent-skills`. Every command below needs that `--digest` flag; it's left out for brevity.
 
 ## The run
 
@@ -39,7 +39,7 @@ Each repo's own rules (how to build and check, PR template, label meanings beyon
 
 The scripts find the repos as every clone with a GitHub `origin` directly under the checkouts folder: `--checkouts`, else `$WORKSHOP_CHECKOUTS`, else the folder that holds the clone the run started in (or the working directory, when that isn't a clone). That is how a cloud session lays out its repos. A repo that isn't attached is simply not covered, so the digest ends with a `Repos covered:` line: a repo missing from it has lost its attachment. `--repos owner/a,owner/b` limits one run to some of them, and stops if one isn't attached.
 
-`workshop.json` holds only the `digest` repo, where the digest issue lives.
+To move the digest, change the repo named at the top of this file.
 
 ## What the script decides
 

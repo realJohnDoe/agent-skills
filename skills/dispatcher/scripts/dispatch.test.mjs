@@ -118,12 +118,11 @@ const run = (script, args, fixture, { apply = false, missing = [], noPush = [] }
   mkdirSync(join(checkouts, "notes"), { recursive: true });
   mkdirSync(join(checkouts, "scratch", ".git"), { recursive: true });
   writeFileSync(join(dir, "fixture.json"), JSON.stringify(fixture));
-  writeFileSync(join(dir, "workshop.json"), JSON.stringify({ digest: DIGEST }));
   const log = join(dir, "writes.jsonl");
   writeFileSync(log, "");
   const res = spawnSync(
     process.execPath,
-    [join(here, script), ...args, "--today", TODAY, "--config", join(dir, "workshop.json"), "--checkouts", checkouts, ...(apply ? ["--apply"] : [])],
+    [join(here, script), ...args, "--today", TODAY, "--digest", DIGEST, "--checkouts", checkouts, ...(apply ? ["--apply"] : [])],
     {
       encoding: "utf8",
       env: {
@@ -248,6 +247,11 @@ describe("the repos are the ones attached", () => {
     assert.equal(res.status, 1);
     assert.match(res.stderr, /--repos names repos not checked out under .*: realjohndoe\/tracemap/);
     assert.equal(res.stdout, "");
+  });
+  test("no --digest stops the run", () => {
+    const res = spawnSync(process.execPath, [join(here, "dispatch.mjs")], { encoding: "utf8" });
+    assert.equal(res.status, 1);
+    assert.match(res.stderr, /pass --digest owner\/repo/);
   });
   test("no attached repo stops the run", () => {
     const res = run("dispatch.mjs", [], world(), { missing: [M, T] });
