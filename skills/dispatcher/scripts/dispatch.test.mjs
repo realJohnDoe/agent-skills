@@ -41,7 +41,7 @@ const pr = (n, title, extra = {}) => ({
   created_at: "2026-10-01T00:00:00Z",
   ...extra,
 });
-const ALL_LABELS = ["haiku", "sonnet", "opus", "opus-plan", "decision-required", "deferred", "automerge"].map(
+const ALL_LABELS = ["haiku", "sonnet", "opus", "opus-plan", "decision-required", "deferred", "ready-for-agent", "automerge"].map(
   (name) => ({ name }),
 );
 const green = [{ name: "build", status: "completed", conclusion: "success" }];
@@ -71,10 +71,11 @@ const repoFixture = (repo, { issues, prs, labels = ALL_LABELS }) => {
 const world = ({ digestIssues = [], digestComments = {}, digestLabels = [{ name: "workshop-paused" }], extra = {} } = {}) => ({
   ...repoFixture(M, {
     issues: [
-      issue(10, "Meridian sonnet task", ["sonnet"], { created_at: "2026-10-01T00:00:00Z" }),
-      issue(11, "Meridian waits on 10", ["opus"], { body: "Blocked by: #10" }),
+      issue(10, "Meridian sonnet task", ["sonnet", "ready-for-agent"], { created_at: "2026-10-01T00:00:00Z" }),
+      issue(11, "Meridian waits on 10", ["opus", "ready-for-agent"], { body: "Blocked by: #10" }),
       issue(12, "Meridian untriaged", []),
       issue(13, "Meridian needs a call", ["sonnet", "decision-required"]),
+      issue(14, "Meridian filed by an agent", ["haiku"], { created_at: "2026-09-01T00:00:00Z" }),
     ],
     prs: [
       pr(20, "Meridian green automerge", { labels: [{ name: "automerge" }], runs: green, mergeable: true }),
@@ -83,14 +84,14 @@ const world = ({ digestIssues = [], digestComments = {}, digestLabels = [{ name:
   }),
   ...repoFixture(T, {
     issues: [
-      issue(3, "Tracemap haiku task", ["haiku"], { created_at: "2026-09-15T00:00:00Z" }),
-      issue(4, "Tracemap sonnet task", ["sonnet"], { created_at: "2026-10-20T00:00:00Z" }),
+      issue(3, "Tracemap haiku task", ["haiku", "ready-for-agent"], { created_at: "2026-09-15T00:00:00Z" }),
+      issue(4, "Tracemap sonnet task", ["sonnet", "ready-for-agent"], { created_at: "2026-10-20T00:00:00Z" }),
     ],
     prs: [
       pr(8, "Bump x from 1 to 2", { user: { login: "dependabot[bot]" }, runs: green, mergeable: true }),
       pr(9, "Tracemap red", { runs: red, mergeable: true, created_at: "2026-11-01T00:00:00Z" }),
     ],
-    labels: [{ name: "haiku" }, { name: "sonnet" }],
+    labels: [{ name: "haiku" }, { name: "sonnet" }, { name: "ready-for-agent" }],
   }),
   user: { login: "workshop-bot" },
   [`repos/${DIGEST}/issues`]: digestIssues,
@@ -184,6 +185,7 @@ describe("dispatch dry run over two repos", () => {
     assert.match(body, /\*\*Review:\*\* \[realJohnDoe\/tracemap#8\]/);
     assert.match(body, /\*\*Decide:\*\* \[realJohnDoe\/meridian#13\]/);
     assert.match(body, /## Queue[^]*\[realJohnDoe\/meridian#10\][^]*\[realJohnDoe\/tracemap#4\]/);
+    assert.match(body, /## Triage[^]*\*\*Triage:\*\* \[realJohnDoe\/meridian#14\]\(\S+\) Meridian filed by an agent \(haiku\)/);
     assert.match(body, /\[realJohnDoe\/meridian#12\]\(\S+\) Meridian untriaged \(no tier label/);
     assert.match(body, /\[realJohnDoe\/meridian#11\]\(\S+\) Meridian waits on 10 \(blocked by realJohnDoe\/meridian#10\)/);
   });

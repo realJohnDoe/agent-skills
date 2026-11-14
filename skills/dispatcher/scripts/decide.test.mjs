@@ -3,6 +3,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
+  AWAITING_TRIAGE,
   claimState,
   isDigest,
   linkedIssues,
@@ -36,7 +37,7 @@ test("isDigest matches workshop and pre-rename farm digests", () => {
 describe("skipReason", () => {
   const issue = (over = {}) => ({
     title: "Do a thing",
-    labels: ["sonnet"],
+    labels: ["sonnet", "ready-for-agent"],
     assignees: 0,
     subIssues: 0,
     linked: false,
@@ -44,7 +45,7 @@ describe("skipReason", () => {
     ...over,
   });
 
-  test("dispatchable: tier label and nothing in the way", () => {
+  test("dispatchable: tier label, ready-for-agent and nothing in the way", () => {
     assert.equal(skipReason(issue()), undefined);
   });
 
@@ -76,6 +77,13 @@ describe("skipReason", () => {
       assert.equal(
         skipReason(issue({ labels: ["opus-plan"] })),
         "`opus-plan`; start a plan session by hand",
+      ));
+    test("tier label without ready-for-agent waits for triage", () =>
+      assert.equal(skipReason(issue({ labels: ["sonnet"] })), AWAITING_TRIAGE));
+    test("ready-for-agent without a tier label still needs one", () =>
+      assert.equal(
+        skipReason(issue({ labels: ["ready-for-agent"] })),
+        "no tier label; add `haiku`, `sonnet` or `opus` to queue it",
       ));
     test("blocked, named with the given ref", () => {
       assert.equal(skipReason(issue({ blockers: [4, 7] })), "blocked by #4, #7");
@@ -110,6 +118,13 @@ describe("skipReason", () => {
       assert.equal(
         skipReason(issue({ labels: [], blockers: [3] })),
         "no tier label; add `haiku`, `sonnet` or `opus` to queue it",
+      ));
+    test("blocked before awaiting triage", () =>
+      assert.equal(skipReason(issue({ labels: ["sonnet"], blockers: [3] })), "blocked by #3"));
+    test("deferred before awaiting triage", () =>
+      assert.equal(
+        skipReason(issue({ labels: ["sonnet", "deferred"] })),
+        "`deferred`; remove the label to queue it",
       ));
     test("opus-plan before blocked", () =>
       assert.equal(

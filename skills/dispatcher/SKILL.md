@@ -14,7 +14,7 @@ One scheduled run a day moves open work forward in every repo listed in [`worksh
 2. `node scripts/dispatch.mjs` is the **dry run**: it prints the plan as JSON and writes nothing. Read it before applying.
 3. `node scripts/dispatch.mjs --apply` does what the plan says. It creates any workshop label a repo is missing (`missingLabels`), merges the `automerge` PRs, and claims what the plan starts: it assigns each dispatched issue and leaves a `workshop-dispatch` marker comment, and leaves a `workshop-followup` marker comment on each PR it follows up. Then it rewrites the draft digest and publishes it when due. It prints the same plan.
 4. For each entry in `sessions`, start one background subagent with the `Agent` tool. Give it the entry's `prompt`, take `description` from its `title`, and set `model` to its `tier`. Don't pass `isolation: "worktree"`: that would isolate this run's own checkout. The prompt already has the subagent create its own worktree (`worktree`) of its repo's clone (`checkout`) and work only there. Start them all, then wait for every one to finish before ending the run. Scheduled runs have no `create_session`, so subagents are how one run fans out.
-5. For each entry in `digest.replies` (the maintainer replying on the digest), work out which issue or PR it is about. Digest items are named `owner/repo#n`. Copy the decision onto that issue or PR in its own repo, as a comment linking the reply, and remove `decision-required` if it settles one. Skip a reply already copied there. Then comment `<!-- workshop-relayed -->` on that digest issue, with the footer, so the next run doesn't relay it again. A reply that names no item gets an answer on the digest instead.
+5. For each entry in `digest.replies` (the maintainer replying on the digest), work out which issue or PR it is about. Digest items are named `owner/repo#n`. Copy the decision onto that issue or PR in its own repo, as a comment linking the reply, and remove `decision-required` if it settles one. A `ready` reply naming **Triage** items adds `ready-for-agent` to each, but only when the reply's `author` is the digest repo's owner: that label is the maintainer's go-ahead, and nobody else's reply grants it. Skip a reply already copied there. Then comment `<!-- workshop-relayed -->` on that digest issue, with the footer, so the next run doesn't relay it again. A reply that names no item gets an answer on the digest instead.
 6. Don't subscribe to PR activity, yours or the sessions'. Tomorrow's run is the follow-up. Don't open PRs or issues yourself beyond what the script writes and what the subagents open.
 7. If `sessions`, `automerge` and `digest.replies` are all empty, stop. Post nothing.
 
@@ -44,14 +44,14 @@ A repo's clone is found at `<checkouts>/<name>`. Here checkouts is `--checkouts`
 The two decisions that change what lands on a default branch are in `scripts/decide.mjs` and pinned by `scripts/decide.test.mjs`. One is whether an issue is dispatchable (`skipReason`). The other is whether a PR waits, goes to review, is merged, or gets a follow-up (`prVerdict`).
 
 - **Dispatch**: an open issue is dispatched when it:
-  - has a `haiku`/`sonnet`/`opus` label;
+  - has a `haiku`/`sonnet`/`opus` label and the `ready-for-agent` label;
   - has no `opus-plan`, `decision-required` or `deferred` label;
   - has no assignee;
   - has no open blocker, whether native or named in the body by a `Blocked by: #n` line or a `## Blocked by` section;
   - has no sub-issues;
   - has no open PR that closes it.
 
-  Every other open issue is somewhere else in the digest (its PR, Decide, Unstick), or under **Not picked up** with its reason, so nothing is skipped silently. The reasons are no tier label, `opus-plan`, `deferred`, blocked by `owner/repo#N`, and assigned by hand.
+  Every other open issue is somewhere else in the digest (its PR, Decide, Unstick), or under **Not picked up** with its reason, so nothing is skipped silently. The reasons are no tier label, `opus-plan`, `deferred`, blocked by `owner/repo#N`, and assigned by hand. A tier-labelled issue that only lacks `ready-for-agent` is listed under Triage instead.
 - **Follow-up**: every open, non-draft PR gets one narrow session (on `opus` for Dependabot's, `sonnet` for one with no tier-labelled issue) when it:
   - conflicts with its base branch, which is checked without waiting for CI because GitHub runs none on a conflicting PR. The session merges the base in and pushes. An "unknown" mergeability is skipped until the next run.
   - has a failing check, once CI has finished;
@@ -64,6 +64,7 @@ The two decisions that change what lands on a default branch are in `scripts/dec
   - **Review**: green, quiet PRs without `automerge`, and Dependabot PRs without auto-merge.
   - **Unstick**: PRs at their follow-up cap, a follow-up with no push after 2 days, and a dispatched issue with no PR after 2 days.
   - **Decide**: open `decision-required` issues not blocked by another.
+  - **Triage**: unblocked issues with a tier label but no `ready-for-agent`, each with its tier. Agents file these, and nothing runs until the maintainer says so.
 
   Each ask says which issues it unblocks. Then comes what's coming: **Queue** (dispatchable issues past today's cap) and **Not picked up**. Blocked and `deferred` issues are only counted, in a collapsed list. Last, also collapsed, is what merged in each repo since the draft opened.
 
@@ -75,7 +76,8 @@ To re-dispatch a stuck issue, unassign it. To keep a PR out of the workshop, mar
 
 | Label | Where | Means |
 |---|---|---|
-| `haiku` / `sonnet` / `opus` | issue | The cheapest model tier that can do it well; dispatched once unblocked |
+| `haiku` / `sonnet` / `opus` | issue | The cheapest model tier that can do it well; chosen by whoever files the issue, agents included |
+| `ready-for-agent` | issue | The maintainer's go-ahead; with a tier label, dispatched once unblocked. Agents never add it, except when relaying the maintainer's own `ready` reply |
 | `opus-plan` | issue | A plan spanning several PRs; never dispatched |
 | `decision-required` | issue | The maintainer decides first; listed under Decide |
 | `deferred` | issue, PR | Parked on purpose; listed under Not picked up |

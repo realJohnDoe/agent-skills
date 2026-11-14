@@ -20,6 +20,8 @@ import {
   marked,
   prVerdict,
   skipReason,
+  AWAITING_TRIAGE,
+  READY,
   tierOf,
 } from "./decide.mjs";
 import {
@@ -58,6 +60,7 @@ const LABELS = {
   "opus-plan": "d4c5f9",
   "decision-required": "d93f0b",
   deferred: "cccccc",
+  [READY]: "0e8a16",
   [AUTOMERGE]: "0e8a16",
 };
 const days = (iso) => (TODAY - new Date(iso)) / 864e5;
@@ -95,6 +98,7 @@ main(() => {
   const review = pick("review");
   const unstick = pick("unstick");
   const decide = pick("decide");
+  const triage = pick("triage");
   const notPicked = pick("notPicked");
   const merged = pick("merged");
   const unblocksOf = new Map(plans.flatMap((p) => [...p.unblocks]));
@@ -120,6 +124,7 @@ main(() => {
     ...section("Review", review, "Review:"),
     ...section("Unstick", unstick, "Unstick:"),
     ...section("Decide", decide, "Decide:"),
+    ...section(`Triage (reply \`ready\` naming the items to add \`${READY}\`)`, triage, "Triage:"),
   ];
   // Issues that wait on another issue, a decision or the maintainer's own
   // `deferred` would repeat in every digest, so they are only counted.
@@ -183,6 +188,7 @@ main(() => {
       decide: decide.length,
       review: review.length,
       unstick: unstick.length,
+      triage: triage.length,
       queue: queue.length,
       notPicked: notPicked.length,
       merged: merged.length,
@@ -341,6 +347,7 @@ function planRepo({ repo, name, path }, since) {
     unstick: [],
     automerge: [],
     notPicked: [],
+    triage: [],
     decide: [],
     merged: [],
     unblocks: new Map(),
@@ -431,7 +438,9 @@ function planRepo({ repo, name, path }, since) {
       },
       { ref },
     );
-    if (why) out.notPicked.push(item(i, { issue: i.number, why }));
+    if (why === AWAITING_TRIAGE)
+      out.triage.push(item(i, { issue: i.number, why: tierOf(names(i)) }));
+    else if (why) out.notPicked.push(item(i, { issue: i.number, why }));
     if (why !== undefined || FOLLOWUPS_ONLY) continue;
     const tier = tierOf(names(i));
     const wt = worktree("issue", i.number);
