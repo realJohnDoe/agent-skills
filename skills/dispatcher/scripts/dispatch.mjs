@@ -13,13 +13,16 @@ import {
   AUTOMERGE,
   FOLLOWUP,
   AGENT,
-  blockedText,
   claimState,
   isDigest,
   linkedIssues,
   marked,
   prVerdict,
   skipReason,
+  AWAITING_TRIAGE,
+  DECISION,
+  openQuestion,
+  READY,
   tierOf,
 } from "./decide.mjs";
 import {
@@ -56,8 +59,8 @@ const LABELS = {
   sonnet: "0075ca",
   opus: "5319e7",
   "opus-plan": "d4c5f9",
-  "decision-required": "d93f0b",
   deferred: "cccccc",
+  [READY]: "0e8a16",
   [AUTOMERGE]: "0e8a16",
 };
 const days = (iso) => (TODAY - new Date(iso)) / 864e5;
@@ -95,6 +98,7 @@ main(() => {
   const review = pick("review");
   const unstick = pick("unstick");
   const decide = pick("decide");
+  const triage = pick("triage");
   const notPicked = pick("notPicked");
   const merged = pick("merged");
   const unblocksOf = new Map(plans.flatMap((p) => [...p.unblocks]));
@@ -111,7 +115,7 @@ main(() => {
     return `- ${ask ? `[ ] **${ask}** ` : ""}[${x.ref}](${x.url}) ${x.title}${why ? ` (${why})` : ""}`;
   };
   const section = (h, xs, ask) =>
-    xs.length ? [`## ${h}`, "", ...xs.map((x) => line(x, ask)), ""] : [];
+    xs.length ? [`## ${h}`, "", ...xs.map((x) => line(x, x.ask ?? ask)), ""] : [];
   const ANSWER =
     "Answer on the issue or PR, or reply here naming the item (e.g. `meridian#12`): the next daily run copies replies onto their issues.";
   const NOTE = `_The draft digest is rewritten by every daily run and published on Tuesdays and Fridays. ${ANSWER}_\n\n`;
@@ -119,7 +123,11 @@ main(() => {
   const asks = [
     ...section("Review", review, "Review:"),
     ...section("Unstick", unstick, "Unstick:"),
-    ...section("Decide", decide, "Decide:"),
+    // Questions first: an answer is real work, a go-ahead is a glance.
+    ...section(
+      `Waiting on you (answer a question, or reply \`ready\` naming items to add \`${READY}\`)`,
+      [...decide.map((x) => ({ ...x, ask: "Decide:" })), ...triage.map((x) => ({ ...x, ask: "Go ahead?" }))],
+    ),
   ];
   // Issues that wait on another issue, a decision or the maintainer's own
   // `deferred` would repeat in every digest, so they are only counted.
@@ -183,6 +191,7 @@ main(() => {
       decide: decide.length,
       review: review.length,
       unstick: unstick.length,
+      triage: triage.length,
       queue: queue.length,
       notPicked: notPicked.length,
       merged: merged.length,
@@ -341,6 +350,7 @@ function planRepo({ repo, name, path }, since) {
     unstick: [],
     automerge: [],
     notPicked: [],
+    triage: [],
     decide: [],
     merged: [],
     unblocks: new Map(),
@@ -428,10 +438,15 @@ function planRepo({ repo, name, path }, since) {
         subIssues: i.sub_issues_summary?.total ?? 0,
         linked: linked.has(i.number),
         blockers: blockersOf.get(i.number),
+        question: openQuestion(i.body),
       },
       { ref },
     );
-    if (why) out.notPicked.push(item(i, { issue: i.number, why }));
+    if (why === DECISION)
+      out.decide.push(item(i, { issue: i.number, why: openQuestion(i.body) }));
+    else if (why === AWAITING_TRIAGE)
+      out.triage.push(item(i, { issue: i.number, why: tierOf(names(i)) }));
+    else if (why) out.notPicked.push(item(i, { issue: i.number, why }));
     if (why !== undefined || FOLLOWUPS_ONLY) continue;
     const tier = tierOf(names(i));
     const wt = worktree("issue", i.number);
@@ -490,14 +505,6 @@ function planRepo({ repo, name, path }, since) {
           why: `dispatched ${mark.created_at.slice(0, 10)}, no PR yet; unassign to re-dispatch`,
         }),
       );
-  }
-
-  // A decision on a blocked issue can wait until its blocker is done.
-  for (const i of issues.filter((i) => names(i).includes("decision-required"))) {
-    const blockers = blockersOf.get(i.number);
-    if (blockers.length)
-      out.notPicked.push(item(i, { issue: i.number, why: blockedText(blockers, ref) }));
-    else out.decide.push(item(i, { issue: i.number }));
   }
 
   // What finishing an ask frees: the open issues waiting on it (or, for a PR, on

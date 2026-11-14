@@ -63,7 +63,7 @@ Write one issue per decision, in the repo that changes. A cross-repo decision ge
 
 - **Title:** `deps: <verb> <package> <from> → <to>`, for example `deps: replace moment with date-fns` or `deps: lift typescript <7 pin`.
 - **Body:** the verdict, the evidence from step 2 (command plus output excerpt, with the date), the gating risk, and the done-state as the repo's own build and test commands plus the specific check.
-- **Labels:** the repo's own scheme from step 1, plus `dependencies` if the repo has that label. If a label doesn't exist, name the tag in the body instead. Don't create labels.
+- **Labels:** in a repo the workshop dispatches, the `issue-conventions` skill (`../issue-conventions/SKILL.md`); otherwise the repo's own scheme from step 1. Either way, plus `dependencies` if the repo has that label. If a label doesn't exist, name the tag in the body instead. Don't create labels.
 
 ## 5. Publish the report
 

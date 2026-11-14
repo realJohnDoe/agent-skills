@@ -5,7 +5,7 @@
 // Prints {state, plan}. state is normal | drain | paused | resume. Without --apply
 // nothing is written; with it, drain/resume carry out the plan and post their marker
 // comment last, so a crash is retried and a second firing in the same state does nothing.
-import { FAILED, isDigest, linkedIssues, marked } from "./decide.mjs";
+import { FAILED, isDigest, linkedIssues, marked, openQuestion, READY } from "./decide.mjs";
 import {
   FOOTER,
   PAUSE_LABEL,
@@ -89,7 +89,7 @@ main(() => {
         .filter((i) => tiered(i) && i.assignees.length && !linked.has(i.number))
         .map((i) => ({ issue: i.number, title: i.title }));
       r.decisions = issues
-        .filter((i) => names(i).includes("decision-required"))
+        .filter((i) => openQuestion(i.body) && !names(i).includes(READY))
         .map((i) => i.number);
       r.head = api(`repos/${repo}/commits/${base}`).sha;
     } else {
