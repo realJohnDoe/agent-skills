@@ -75,14 +75,7 @@ To re-dispatch a stuck issue, unassign it. To keep a PR out of the workshop, mar
 
 ### Labels
 
-| Label | Where | Means |
-|---|---|---|
-| `haiku` / `sonnet` / `opus` | issue | The cheapest model tier that can do it well; chosen by whoever files the issue, agents included |
-| `ready-for-agent` | issue | The maintainer's go-ahead; with a tier label, dispatched once unblocked. Agents never add it, except when relaying the maintainer's own `ready` reply |
-| `opus-plan` | issue | A plan spanning several PRs; never dispatched |
-| `deferred` | issue, PR | Parked on purpose; listed under Not picked up |
-| `automerge` | PR | Merged once green and quiet |
-| `workshop-paused` | digest | Pauses every repo (below) |
+What each issue and PR label means, and who sets it, is in the `issue-conventions` skill (`../issue-conventions/SKILL.md`). Change a meaning there and in `decide.mjs` together. The one label of the workshop's own is `workshop-paused`, on the digest, which pauses every repo (below).
 
 ## Pausing
 

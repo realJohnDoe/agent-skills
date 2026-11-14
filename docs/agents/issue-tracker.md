@@ -4,7 +4,7 @@ Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all o
 
 ## Conventions
 
-Every issue an agent creates gets one model-tier label (`haiku`/`sonnet`/`opus`/`opus-plan`), plus a `## Decision needed` section in the body when a human must decide first (the question, then the options). Never `ready-for-agent`: only the maintainer adds that, and nothing is dispatched without it. The `dispatcher` skill acts on these labels; see `docs/agents/triage-labels.md`.
+Label and structure every issue as the `issue-conventions` skill says (`skills/issue-conventions/SKILL.md`).
 
 - **Create an issue**: `gh issue create --title "..." --body "..."`. Use a heredoc for multi-line bodies.
 - **Read an issue**: `gh issue view <number> --comments`, filtering comments by `jq` and also fetching labels.
