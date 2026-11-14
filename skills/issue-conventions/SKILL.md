@@ -41,7 +41,7 @@ Done when the issue has one tier label (or a decision section instead), a decisi
 
 ## Opening a PR
 
-When a task leaves pushed commits on a branch with no open PR, open one, even if nobody asked. Fill in the repo's PR template if it has one. Then use the `tracemap-pr` skill (from realJohnDoe/tracemap) to add trace maps to the description; it decides itself when none would help. Push later changes to the same PR, and refresh its description and trace maps when the PR's purpose changes.
+When a task leaves pushed commits on a branch with no open PR, open one, even if nobody asked. Fill in the repo's PR template if it has one. Then use the `tracemap-pr` skill (from realJohnDoe/tracemap) to add trace maps to the description; it decides itself when none would help, and if it can't attach them, say so in your reply. Push later changes to the same PR, and refresh its description and trace maps when the PR's purpose changes.
 
 Close the issue from the body with `Fixes #n`. Label a PR for a `haiku` or `sonnet` issue `automerge`: the dispatcher merges it once CI is green and nobody has left review feedback. A PR for an `opus` issue goes without the label and waits for review. A draft PR is outside the workshop.
 
