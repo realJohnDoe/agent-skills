@@ -39,6 +39,21 @@ Each repo's own rules (how to build and check, PR template, label meanings beyon
 
 The scripts find the repos as every clone with a GitHub `origin` directly under the checkouts folder: `--checkouts`, else `$WORKSHOP_CHECKOUTS`, else the folder that holds the clone the run started in (or the working directory, when that isn't a clone). That is how a cloud session lays out its repos. A repo that isn't attached is simply not covered, so the digest ends with a `Repos covered:` line: a repo missing from it has lost its attachment. `--repos owner/a,owner/b` limits one run to some of them, and stops if one isn't attached.
 
+A repo with Dependabot gets its non-major PRs labelled `automerge` by the shared workflow in this repo (`.github/workflows/dependabot-automerge.yml`). The repo calls it from `.github/workflows/dependabot-automerge.yml` of its own:
+
+```yaml
+name: Dependabot automerge label
+on: pull_request
+permissions:
+  pull-requests: write
+  issues: write
+jobs:
+  automerge:
+    uses: realJohnDoe/agent-skills/.github/workflows/dependabot-automerge.yml@main
+```
+
+Don't also turn on GitHub's native auto-merge there (see **Auto-merge** below).
+
 To move the digest, change the repo named at the top of this file.
 
 ## What the script decides
