@@ -1,9 +1,9 @@
 ---
-name: issue-conventions
-description: The labels and body sections the workshop dispatcher reads on issues and PRs, and what an agent sets on each. Use when creating, labelling or triaging an issue, or opening a PR, in a repo the workshop dispatches (meridian, tracemap, structra, kenpo-notes, rentenluecke, agent-skills).
+name: conventions
+description: The labels and body sections the workshop dispatcher reads on issues and PRs, what an agent sets on each, and when and how to open a PR. Use when creating, labelling, ordering or triaging an issue, or opening or updating a PR, in a repo the workshop dispatches (meridian, tracemap, structra, kenpo-notes, rentenluecke, agent-skills).
 ---
 
-# Issue conventions
+# Conventions
 
 The `dispatcher` skill reads these labels and sections to decide what an agent session starts on and what waits for the maintainer. `../dispatcher/scripts/decide.mjs` is the authority on how it reads them, and this skill is the authority on what to set. A repo's own docs add labels of their own, such as Meridian's survey labels or Structra's `wayfinder:*`. Follow those as well.
 
@@ -28,12 +28,20 @@ The `dispatcher` skill reads these labels and sections to decide what an agent s
    ```
 
    The digest shows the first paragraph, so make it stand alone. The section stays open until it gains a `**Decided:** <answer>` line, which the dispatcher's relay adds when the maintainer answers on the digest. Any agent recording a decision ends the section the same way.
-3. **Order.** When one issue must wait for another, add a native blocked-by edge (**Blocking** in the repo's `docs/agents/issue-tracker.md`). Only where native dependencies are unavailable, use a `Blocked by: #n` line at the top of the body instead.
+3. **Order.** When one issue must wait for another, add a native blocked-by edge:
+
+   ```sh
+   gh api --method POST repos/<owner>/<repo>/issues/<blocked>/dependencies/blocked_by -F issue_id=<blocker-db-id>
+   ```
+
+   `<blocker-db-id>` is the blocker's numeric database id (`gh api repos/<owner>/<repo>/issues/<n> --jq .id`), not its `#number`. Only where native dependencies are unavailable, use a `Blocked by: #n` line at the top of the body instead. To make an issue part of a larger one, make it a sub-issue: `gh issue create --parent <n>`, or `gh issue edit <parent> --add-sub-issue <child>` afterwards. Where `gh` is missing, use the GitHub MCP tools (`issue_write`, `sub_issue_write`, …) the same way.
 4. **Approval.** Leave approval to the maintainer. `ready-for-agent` is their go-ahead and nothing is dispatched without it, so the issue waits under the digest's **Waiting on you** until they add it. Agents never add it themselves. The one exception is the dispatcher relaying the maintainer's own `ready` reply.
 
 Done when the issue has one tier label (or a decision section instead), a decision section if anything waits on the maintainer, and its blockers as edges.
 
 ## Opening a PR
+
+When a task leaves pushed commits on a branch with no open PR, open one, even if nobody asked. Fill in the repo's PR template if it has one. Then use the `tracemap-pr` skill (from realJohnDoe/tracemap) to add trace maps to the description; it decides itself when none would help, and if it can't attach them, say so in your reply. Push later changes to the same PR, and refresh its description and trace maps when the PR's purpose changes.
 
 Close the issue from the body with `Fixes #n`. Label a PR for a `haiku` or `sonnet` issue `automerge`: the dispatcher merges it once CI is green and nobody has left review feedback. A PR for an `opus` issue goes without the label and waits for review. A draft PR is outside the workshop.
 

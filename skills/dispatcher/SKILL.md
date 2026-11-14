@@ -92,7 +92,7 @@ To re-dispatch a stuck issue, unassign it. To keep a PR out of the workshop, mar
 
 ### Labels
 
-What each issue and PR label means, and who sets it, is in the `issue-conventions` skill (`../issue-conventions/SKILL.md`). Change a meaning there and in `decide.mjs` together. The one label of the workshop's own is `workshop-paused`, on the digest, which pauses every repo (below).
+What each issue and PR label means, and who sets it, is in the `conventions` skill (`../conventions/SKILL.md`). Change a meaning there and in `decide.mjs` together. The one label of the workshop's own is `workshop-paused`, on the digest, which pauses every repo (below).
 
 ## Pausing
 
