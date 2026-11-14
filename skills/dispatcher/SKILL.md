@@ -60,10 +60,10 @@ The two decisions that change what lands on a default branch are in `scripts/dec
   - has review feedback newer than its head commit that isn't an agent's (no Claude Code footer).
 
   It waits while a follow-up is newer than the head commit. Green, quiet PRs cost nothing.
-- **Auto-merge**: the `automerge` label on the PR is the only condition. Whoever opens the PR sets it: a dispatched session for a `haiku`/`sonnet` issue, or anyone else deliberately. A green, quiet `automerge` PR is merged by the script, pinned to the head commit it checked. Any other green, quiet non-draft PR goes in the digest's Review list. Dependabot PRs aren't merged by the script: a repo's own auto-merge workflow queues those, and a green Dependabot PR without native auto-merge goes in the Review list.
+- **Auto-merge**: the `automerge` label on the PR is the only condition. Whoever opens the PR sets it: a dispatched session for a `haiku`/`sonnet` issue, a repo's Dependabot workflow for every non-major bump, or anyone else deliberately. A green, quiet `automerge` PR is merged by the script, pinned to the head commit it checked. Any other green, quiet non-draft PR goes in the digest's Review list. The script merges Dependabot's PRs instead of GitHub's native auto-merge because a merge made with a workflow's own token starts no `push` workflow, so nothing would deploy. A PR already on native auto-merge waits for it.
 - **Caps**: at most `--max-sessions` (4) sessions per run **across all repos**. Follow-ups come first, then dispatches. Follow-ups go newest PR first, dispatches oldest issue first, whichever repo they're in. At most `--max-followups` (2) follow-ups per PR. After that the PR goes in the digest instead.
 - **Digest**: one draft issue in the `digest` repo, `Workshop digest (draft) — from <date>`. It is rewritten on every run (an edit notifies nobody). Every item names its repo as `owner/repo#n`. It lists what waits on the maintainer, PRs first:
-  - **Review**: green, quiet PRs without `automerge`, and Dependabot PRs without auto-merge.
+  - **Review**: green, quiet PRs without `automerge`, Dependabot majors among them.
   - **Unstick**: PRs at their follow-up cap, a follow-up with no push after 2 days, and a dispatched issue with no PR after 2 days.
   - **Waiting on you**: unblocked issues without `ready-for-agent`. First those with an open question (**Decide:**, showing the question), then tier-labelled ones that only need the go-ahead (**Go ahead?**, showing the tier). Agents file most of these, and nothing runs until the maintainer says so.
 

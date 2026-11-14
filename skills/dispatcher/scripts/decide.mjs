@@ -77,7 +77,7 @@ export const blockedText = (blockers, ref = (n) => `#${n}`) =>
  * What the workshop does with an open, non-draft PR:
  * - `wait`: CI still running, native auto-merge on it, or a follow-up still working
  * - `review`: green and quiet, waits for the maintainer
- * - `merge`: green, quiet and labelled `automerge` (never Dependabot's)
+ * - `merge`: green, quiet and labelled `automerge`
  * - `unstick`: at its follow-up cap, or a follow-up went stale; `why` says which
  * - `followup`: conflict, red CI or human feedback newer than the head commit
  * @param {{dependabot: boolean, labels: string[], autoMerge: boolean,
@@ -109,10 +109,11 @@ export const prVerdict = (pr) => {
       !AGENT.test(c.body ?? ""),
   );
   if (failing.length === 0 && feedback.length === 0 && !conflict) {
-    // Dependabot's policy is native auto-merge: its own workflow queues all but
-    // majors, and drops a PR anyone else pushed to; those wait for a human.
-    if (pr.dependabot ? !pr.autoMerge : !pr.labels.includes(AUTOMERGE))
-      return out("review");
+    // Each repo's Dependabot workflow labels all but majors `automerge`, and
+    // drops the label when anyone else pushes; those wait for a human. The
+    // script merges rather than GitHub's auto-merge because a merge with the
+    // workflow token starts no deploy. Native auto-merge set earlier still runs.
+    if (!pr.autoMerge && !pr.labels.includes(AUTOMERGE)) return out("review");
     return pr.autoMerge ? out("wait", "auto-merge enabled") : out("merge");
   }
   const marks = pr.comments.filter((c) => marked(c, FOLLOWUP));
