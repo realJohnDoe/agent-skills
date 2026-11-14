@@ -5,11 +5,11 @@ description: Run the daily workshop over several repositories at once: dispatch 
 
 # Dispatcher
 
-One scheduled run a day moves open work forward in every repo listed in [`workshop.json`](workshop.json), and the maintainer's part comes down to one twice-weekly digest issue in the `digest` repo, which also says why anything isn't moving. The scripts live in `scripts/` next to this file: run them with `node <this skill's directory>/scripts/<name>.mjs`.
+One scheduled run a day moves open work forward in every repo attached to its session, and the maintainer's part comes down to one twice-weekly digest issue in **`realJohnDoe/agent-skills`** (the digest repo), which also says why anything isn't moving. The scripts live in `scripts/` next to this file: run them as `node <this skill's directory>/scripts/<name>.mjs --digest realJohnDoe/agent-skills`. Every command below needs that `--digest` flag; it's left out for brevity.
 
 ## The run
 
-0. **Every configured repo must be in the session, with push access.** The scripts check this first and stop with an error naming each repo they can't work on. Don't work around it by skipping the repo: tell the user which repo, and why.
+0. **Every attached repo must have push access.** The scripts check this first and stop with an error naming each repo they can't push to. Don't work around it by skipping the repo: tell the user which repo, and why.
 1. `node scripts/pause.mjs` and act on its `state` (see **Pausing**). Anything but `normal` ends this procedure after that section's steps.
 2. `node scripts/dispatch.mjs` is the **dry run**: it prints the plan as JSON and writes nothing. Read it before applying.
 3. `node scripts/dispatch.mjs --apply` does what the plan says. It creates any workshop label a repo is missing (`missingLabels`), merges the `automerge` PRs, and claims what the plan starts: it assigns each dispatched issue and leaves a `workshop-dispatch` marker comment, and leaves a `workshop-followup` marker comment on each PR it follows up. Then it rewrites the draft digest and publishes it when due. It prints the same plan.
@@ -24,7 +24,7 @@ When the prompt asks for a dry run (for example the first run of a new scheduled
 
 1. Run `node scripts/pause.mjs` and report its `state`. If it is `drain` or `resume`, also report what its plan would defer, unassign, close or mark ready.
 2. Run `node scripts/dispatch.mjs` (with `--followups-only` if the state is `drain`) and report the plan as a short summary for the user:
-   - the configured repos, and the labels each would get created (`missingLabels`);
+   - the repos it found attached, and the labels each would get created (`missingLabels`);
    - each session with its repo, kind, issue or PR, and tier, then what's left over (`deferred`);
    - the PRs that would be merged (`automerge`);
    - the digest counts, whether it would be published, and the replies that would be relayed;
@@ -35,9 +35,11 @@ Each repo's own rules (how to build and check, PR template, label meanings beyon
 
 ## Configuring
 
-`workshop.json` holds the `digest` repo and the list of `repos`. **Adding a repo is one entry**, `{ "repo": "owner/name" }`, plus attaching that repo to the scheduled task's sessions with push access. The workshop labels it lacks are created on its first apply run.
+**The workshop's repos are the ones attached to the scheduled task.** To add a repo, attach it with push access; to remove one, detach it. The workshop labels a repo lacks are created on its first apply run. Every repo attached to that task is dispatched, so attach nothing there that the workshop shouldn't touch.
 
-A repo's clone is found at `<checkouts>/<name>`. Here checkouts is `--checkouts`, else `$WORKSHOP_CHECKOUTS`, else the folder that holds the clone the run started in, which is how a cloud session lays out its repos. An entry can also give `"path"`. `--repos owner/a,owner/b` limits one run to some of the configured repos.
+The scripts find the repos as every clone with a GitHub `origin` directly under the checkouts folder: `--checkouts`, else `$WORKSHOP_CHECKOUTS`, else the folder that holds the clone the run started in (or the working directory, when that isn't a clone). That is how a cloud session lays out its repos. A repo that isn't attached is simply not covered, so the digest ends with a `Repos covered:` line: a repo missing from it has lost its attachment. `--repos owner/a,owner/b` limits one run to some of them, and stops if one isn't attached.
+
+To move the digest, change the repo named at the top of this file.
 
 ## What the script decides
 
@@ -107,4 +109,4 @@ Each transition posts its marker comment (`workshop-snapshot`, `workshop-resumed
 
 ## Developing
 
-`node --test 'skills/**/*.test.mjs'` runs the decision tests, the `Blocked by:` parser test, and `dispatch.test.mjs`. That last file runs both scripts end to end over two repos against a fake `gh` and `git` (`scripts/fake-bin.mjs`). CI runs them on every PR. A change to a decision changes what lands on every configured repo's default branch: change its test first.
+`node --test 'skills/**/*.test.mjs'` runs the decision tests, the `Blocked by:` parser test, and `dispatch.test.mjs`. That last file runs both scripts end to end over two repos against a fake `gh` and `git` (`scripts/fake-bin.mjs`). CI runs them on every PR. A change to a decision changes what lands on every attached repo's default branch: change its test first.

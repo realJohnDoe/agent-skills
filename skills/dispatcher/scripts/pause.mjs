@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // The workshop's pause state and its two one-shot transitions, over every
-// configured repo at once. See ../SKILL.md (Pausing).
-// Usage: node pause.mjs [--apply] [--today YYYY-MM-DD] [--repos o/r,...] [--config file]
+// attached repo at once. See ../SKILL.md (Pausing).
+// Usage: node pause.mjs --digest owner/repo [--apply] [--today YYYY-MM-DD]
+//   [--repos o/r,...] [--checkouts dir]
 // Prints {state, plan}. state is normal | drain | paused | resume. Without --apply
 // nothing is written; with it, drain/resume carry out the plan and post their marker
 // comment last, so a crash is retried and a second firing in the same state does nothing.

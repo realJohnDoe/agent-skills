@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// The daily dispatcher's plan over every configured repo: which issues to start,
+// The daily dispatcher's plan over every attached repo: which issues to start,
 // which PRs need a follow-up session or get merged, and the one shared digest.
 // See ../SKILL.md.
-// Usage: node dispatch.mjs [--apply] [--followups-only] [--max-sessions N]
-//   [--max-followups N] [--today YYYY-MM-DD] [--repos o/r,...] [--config file]
+// Usage: node dispatch.mjs --digest owner/repo [--apply] [--followups-only]
+//   [--max-sessions N] [--max-followups N] [--today YYYY-MM-DD] [--repos o/r,...]
 //   [--checkouts dir]
 // Without --apply it is a dry run: it prints the plan and writes nothing.
 import { tmpdir } from "node:os";
@@ -150,7 +150,7 @@ main(() => {
   const render = (start, mergedLines, prev) =>
     `<!-- digest-since: ${start} -->\n\n${NOTE}${
       [...asks, ...info].join("\n") || "Nothing is waiting on the maintainer.\n"
-    }${prev ? `\nPrevious digest: #${prev}.\n` : ""}${
+    }\nRepos covered: ${repos.map((r) => r.repo).join(", ")}.\n${prev ? `\nPrevious digest: #${prev}.\n` : ""}${
       mergedLines.length
         ? `\n<details><summary>${mergedLines.length} merged since ${start.slice(0, 10)}</summary>\n\n${mergedLines.join("\n")}\n\n</details>\n`
         : ""
