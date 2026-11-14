@@ -1,6 +1,6 @@
 ---
 name: issue-conventions
-description: The labels and body sections the workshop dispatcher reads on issues and PRs, and what an agent sets on each. Use when creating, labelling or triaging an issue, or opening a PR, in a repo the workshop dispatches (meridian, tracemap, structra, agent-skills).
+description: The labels and body sections the workshop dispatcher reads on issues and PRs, and what an agent sets on each. Use when creating, labelling or triaging an issue, or opening a PR, in a repo the workshop dispatches (meridian, tracemap, structra, kenpo-notes, rentenluecke, agent-skills).
 ---
 
 # Issue conventions
