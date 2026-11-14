@@ -226,11 +226,10 @@ describe("prVerdict", () => {
       assert.equal(prVerdict(pr({ dependabot: true, autoMerge: true })).verdict, "wait"));
     test("Dependabot without native auto-merge goes to review", () =>
       assert.equal(prVerdict(pr({ dependabot: true })).verdict, "review"));
-    test("Dependabot is never merged by the label", () =>
-      assert.equal(
-        prVerdict(pr({ dependabot: true, labels: ["automerge"] })).verdict,
-        "review",
-      ));
+    test("Dependabot labelled automerge (by its workflow) is merged", () =>
+      assert.equal(prVerdict(pr({ dependabot: true, labels: ["automerge"] })).verdict, "merge"));
+    test("a PR on native auto-merge waits for it, label or not", () =>
+      assert.equal(prVerdict(pr({ autoMerge: true })).verdict, "wait"));
     test("unknown mergeability is not a conflict", () =>
       assert.equal(prVerdict(pr({ mergeable: null })).verdict, "review"));
   });

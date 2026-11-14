@@ -45,7 +45,7 @@ Close the issue from the body with `Fixes #n`. Label a PR for a `haiku` or `sonn
 | `opus-plan` | issue | whoever files it | A plan spanning several PRs; never dispatched |
 | `ready-for-agent` | issue | the maintainer | The go-ahead; with a tier label, the issue is dispatched once unblocked |
 | `deferred` | issue, PR | the maintainer, or a workshop pause | Parked on purpose; listed under Not picked up until removed |
-| `automerge` | PR | whoever opens it | Merged once green and quiet |
+| `automerge` | PR | whoever opens it; a repo's Dependabot workflow for non-major bumps | Merged by the dispatcher once green and quiet |
 
 `decision-required` is retired. A `## Decision needed` section replaces it, and the dispatcher ignores the label.
 
