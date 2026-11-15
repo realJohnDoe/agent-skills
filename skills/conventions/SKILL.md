@@ -7,6 +7,8 @@ description: The labels and body sections the workshop dispatcher reads on issue
 
 The `dispatcher` skill reads these labels and sections to decide what an agent session starts on and what waits for the maintainer. `../dispatcher/scripts/decide.mjs` is the authority on how it reads them, and this skill is the authority on what to set. A repo's own docs add labels of their own, such as Meridian's survey labels or Structra's `wayfinder:*`. Follow those as well.
 
+Whenever you ask the maintainer to do something by hand, in an issue, PR, digest, notification or reply, link the page where they do it, e.g. `https://github.com/<owner>/<repo>/settings/secrets/actions` or `…/labels`, rather than describing how to navigate there. Skip it only where no stable URL exists.
+
 ## Filing an issue
 
 1. **Tier.** Put exactly one tier label on the issue: the cheapest model that can do the work well.
