@@ -7,7 +7,9 @@ description: Run the dependency maintenance pass over one repository or several,
 
 Dependabot already proposes every available version and can auto-merge the non-major ones. This pass covers only the decisions it leaves to a person: whether to take a major, whether a pin still has a reason, whether a dependency should be swapped out or dropped, and whether Dependabot can see everything it should. **Never file a finding that Dependabot already has open as a PR**, and never bump a patch or minor yourself.
 
-**Scope:** the repos the user names. If they name none, use the current repo, or every repo attached to the session if they asked for "all". With several repos, a dependency they share gets one decision, applied in each repo that has it.
+**Scope:** the repos the user names. If they name none, use the current repo. Use every repo attached to the session if they asked for "all", or if the working directory isn't a repo but holds several. With several repos, a dependency they share gets one decision, applied in each repo that has it.
+
+**Previous run:** find the last run's tracking issue, the newest `Dependency maintenance <date>` issue in realJohnDoe/agent-skills. Its open sub-issues are decisions already made. Don't file them again: re-check their facts and update an issue only when a fact has changed.
 
 ## 1. Read each repo's own rules first
 
@@ -53,7 +55,7 @@ Give each item below its own verdict. Skip anything that is current and fine. On
 4. **Doesn't earn its place**: two libraries doing one job, a heavy dependency used for a sliver of its surface (look at its imports), or a declared dependency nothing imports. A dead dependency is removed, not replaced.
 5. **Drift across repos** (several repos only): the same dependency or toolchain on different majors, or one repo hand-rolling what another solves with a library. Recommend one direction for all of them.
 6. **Dependabot coverage**: no `dependabot.yml`, an ecosystem in the repo with no entry (including `github-actions` and `docker`), no `cooldown`, or auto-merge with no required check to wait for.
-7. **Advisories** that the audit reports and Dependabot hasn't fixed (often a transitive dependency with no patched parent). Give the override, constraint or accepted-risk entry and its reason, in the repo's existing style.
+7. **Advisories** that the audit reports and Dependabot hasn't fixed (often a transitive dependency with no patched parent). Give the override, constraint or accepted-risk entry and its reason, in the repo's existing style. Before you choose accepted risk, try an override limited to the vulnerable range (for example pnpm's `'minimatch@>=7 <11.0.1': ^11.0.5`) on a scratch install, then run the repo's lint and build. Accept the risk only if that fails, and name what failed. An advisory a repo already accepts gets the same test on every run.
 
 Two things are not findings: a major you'd hold anyway with no reason having changed, and a code-level "this custom code should use the library you already have" (that belongs to a repo's own health survey, if it has one).
 
@@ -73,4 +75,8 @@ Publish one Artifact page per run, titled `Dependency maintenance <YYYY-MM-DD>`,
 - Several repos only: a table of each dependency that appears in two or more of them, with its version in each repo and the decision.
 - Every issue filed or updated, linked and grouped by repo.
 
-If the user gives a previous run's report URL, link it at the top. End your reply with the report link and the issue count per repo.
+Link the previous run's report at the top.
+
+Then file the run's tracking issue in realJohnDoe/agent-skills, titled like the report. Its body holds the report link, the previous run's tracking issue, the per-repo table and the cross-repo decisions. Add every issue filed or updated as a sub-issue. Give it no tier label: it records the run and isn't work to dispatch.
+
+End your reply with the report link, the tracking issue, and the issue count per repo.
