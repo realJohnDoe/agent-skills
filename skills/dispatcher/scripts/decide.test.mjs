@@ -230,8 +230,19 @@ describe("prVerdict", () => {
       assert.equal(prVerdict(pr({ dependabot: true, labels: ["automerge"] })).verdict, "merge"));
     test("a PR on native auto-merge waits for it, label or not", () =>
       assert.equal(prVerdict(pr({ autoMerge: true })).verdict, "wait"));
-    test("unknown mergeability is not a conflict", () =>
-      assert.equal(prVerdict(pr({ mergeable: null })).verdict, "review"));
+    test("unknown mergeability waits instead of going to review or merging", () => {
+      assert.deepEqual(
+        [prVerdict(pr({ mergeable: null })), prVerdict(pr({ mergeable: null, labels: ["automerge"] }))].map(
+          (v) => [v.verdict, v.why],
+        ),
+        [["wait", "mergeability unknown"], ["wait", "mergeability unknown"]],
+      );
+    });
+    test("unknown mergeability is not a conflict: red CI still gets its follow-up", () => {
+      const v = prVerdict(pr({ mergeable: null, runs: red }));
+      assert.equal(v.verdict, "followup");
+      assert.equal(v.conflict, false);
+    });
   });
 
   describe("CI not finished", () => {

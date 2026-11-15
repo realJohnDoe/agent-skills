@@ -192,6 +192,11 @@ describe("dispatch dry run over two repos", () => {
       body,
       /## Waiting on you[^]*\*\*Decide:\*\* \[realJohnDoe\/meridian#13\]\(\S+\) Meridian needs a call \(Keep the old endpoint\?\)[^]*\*\*Go ahead\?\*\* \[realJohnDoe\/meridian#14\]/,
     );
+    assert.match(
+      body,
+      /## In progress\n\n- \[realJohnDoe\/tracemap#9\]\(\S+\) Tracemap red \(follow-up\)\n- \[realJohnDoe\/meridian#21\]\(\S+\) Meridian red \(follow-up\)\n- \[realJohnDoe\/tracemap#3\]\(\S+\) .* \(dispatched\)\n/,
+    );
+    assert.equal(res.plan.digest.counts.inProgress, 3);
     assert.match(body, /## Queue[^]*\[realJohnDoe\/meridian#10\][^]*\[realJohnDoe\/tracemap#4\]/);
     assert.match(body, /\[realJohnDoe\/meridian#14\]\(\S+\) Meridian filed by an agent \(haiku\)/);
     assert.match(body, /\[realJohnDoe\/meridian#12\]\(\S+\) Meridian untriaged \(no tier label/);

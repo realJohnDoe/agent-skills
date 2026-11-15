@@ -75,7 +75,8 @@ export const blockedText = (blockers, ref = (n) => `#${n}`) =>
 
 /**
  * What the workshop does with an open, non-draft PR:
- * - `wait`: CI still running, native auto-merge on it, or a follow-up still working
+ * - `wait`: CI still running, mergeability not computed yet, native auto-merge
+ *   on it, or a follow-up still working
  * - `review`: green and quiet, waits for the maintainer
  * - `merge`: green, quiet and labelled `automerge`
  * - `unstick`: at its follow-up cap, or a follow-up went stale; `why` says which
@@ -113,6 +114,8 @@ export const prVerdict = (pr) => {
     // drops the label when anyone else pushes; those wait for a human. The
     // script merges rather than GitHub's auto-merge because a merge with the
     // workflow token starts no deploy. Native auto-merge set earlier still runs.
+    // Green but not yet known to merge cleanly: neither ask the maintainer nor merge.
+    if (pr.mergeable == null) return out("wait", "mergeability unknown");
     if (!pr.autoMerge && !pr.labels.includes(AUTOMERGE)) return out("review");
     return pr.autoMerge ? out("wait", "auto-merge enabled") : out("merge");
   }

@@ -72,7 +72,7 @@ The two decisions that change what lands on a default branch are in `scripts/dec
 
   An issue that needs the maintainer to decide something has a `## Decision needed` section in its body: the question and its options. The section is open until it has a `Decided:` line. Until then, and while the issue has no `ready-for-agent`, it is listed under Waiting on you with its question, tier label or not. `ready-for-agent` settles it either way.
 - **Follow-up**: every open, non-draft PR gets one narrow session (on `opus` for Dependabot's, `sonnet` for one with no tier-labelled issue) when it:
-  - conflicts with its base branch, which is checked without waiting for CI because GitHub runs none on a conflicting PR. The session merges the base in and pushes. An "unknown" mergeability is skipped until the next run.
+  - conflicts with its base branch, which is checked without waiting for CI because GitHub runs none on a conflicting PR. The session merges the base in and pushes. GitHub computes mergeability lazily, so the script reads it a second time after a short pause. A green PR whose mergeability is still unknown waits for the next run, and is neither reviewed nor merged.
   - has a failing check, once CI has finished;
   - has review feedback newer than its head commit that isn't an agent's (no Claude Code footer).
 
@@ -84,7 +84,7 @@ The two decisions that change what lands on a default branch are in `scripts/dec
   - **Unstick**: PRs at their follow-up cap, a follow-up with no push after 2 days, and a dispatched issue with no PR after 2 days.
   - **Waiting on you**: unblocked issues without `ready-for-agent`. First those with an open question (**Decide:**, showing the question), then tier-labelled ones that only need the go-ahead (**Go ahead?**, showing the tier). Agents file most of these, and nothing runs until the maintainer says so.
 
-  Each ask says which issues it unblocks. Then comes what's coming: **Queue** (dispatchable issues past today's cap) and **Not picked up**. Blocked and `deferred` issues are only counted, in a collapsed list. Last, also collapsed, is what merged in each repo since the draft opened.
+  Each ask says which issues it unblocks. Then comes what's coming: **In progress** (this run's sessions, follow-ups past the cap, PRs waiting on CI, a follow-up or mergeability, and dispatched issues with no PR yet, so every open non-draft PR shows somewhere), **Queue** (dispatchable issues past today's cap) and **Not picked up**. Blocked and `deferred` issues are only counted, in a collapsed list. Last, also collapsed, is what merged in each repo since the draft opened.
 
   The first run on a Tuesday or Friday publishes the draft, if something merged or waits. Publishing retitles it `Workshop digest — <date>` and comments the counts (that comment is the ping). It also closes the previous published digest and opens the next draft. A quiet cycle stays a draft. Nothing is decided on silence.
 
