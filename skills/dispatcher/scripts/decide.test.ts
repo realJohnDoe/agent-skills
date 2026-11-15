@@ -1,18 +1,18 @@
 // Pins the workshop's two decisions that change what lands on main, as Meridian's
-// scripts/workshop-dispatch.mjs made them before the move (realJohnDoe/meridian#1434).
+// scripts/workshop-dispatch.ts made them before the move (realJohnDoe/meridian#1434).
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
-  AWAITING_TRIAGE,
-  DECISION,
+  DEFERRED,
   claimState,
   isDigest,
   linkedIssues,
   openQuestion,
+  issueState,
   prVerdict,
-  skipReason,
   tierOf,
-} from "./decide.mjs";
+} from "./decide.ts";
+import type { PrVerdict } from "./decide.ts";
 
 describe("linkedIssues", () => {
   test("closing keywords in any case, each named issue once per mention", () => {
@@ -36,7 +36,12 @@ test("isDigest matches workshop and pre-rename farm digests", () => {
   assert.ok(!isDigest("Fix the Workshop digest layout"));
 });
 
-describe("skipReason", () => {
+const ELSEWHERE = { kind: "elsewhere" };
+const DEFERRED_STATE = { kind: "deferred" };
+const NO_TIER = { kind: "notPicked", reason: "no tier label; add `haiku`, `sonnet` or `opus` to queue it" };
+const OPUS_PLAN = { kind: "notPicked", reason: "`opus-plan`; start a plan session by hand" };
+
+describe("issueState", () => {
   const issue = (over = {}) => ({
     title: "Do a thing",
     labels: ["sonnet", "ready-for-agent"],
@@ -48,109 +53,104 @@ describe("skipReason", () => {
   });
 
   test("dispatchable: tier label, ready-for-agent and nothing in the way", () => {
-    assert.equal(skipReason(issue()), undefined);
+    assert.deepEqual(issueState(issue()), { kind: "dispatchable" });
   });
 
-  describe("shown elsewhere (null)", () => {
+  describe("shown elsewhere", () => {
     test("a digest issue", () =>
-      assert.equal(skipReason(issue({ title: "Workshop digest (draft) — from x" })), null));
+      assert.deepEqual(issueState(issue({ title: "Workshop digest (draft) — from x" })), ELSEWHERE));
     test("has sub-issues", () =>
-      assert.equal(skipReason(issue({ subIssues: 2 })), null));
+      assert.deepEqual(issueState(issue({ subIssues: 2 })), ELSEWHERE));
     test("an open PR closes it", () =>
-      assert.equal(skipReason(issue({ linked: true })), null));
+      assert.deepEqual(issueState(issue({ linked: true })), ELSEWHERE));
     test("assigned", () =>
-      assert.equal(skipReason(issue({ assignees: 1 })), null));
+      assert.deepEqual(issueState(issue({ assignees: 1 })), ELSEWHERE));
   });
 
   describe("waiting on a decision", () => {
     test("an open question without the go-ahead", () =>
-      assert.equal(skipReason(issue({ labels: ["sonnet"], question: "Which API?" })), DECISION));
+      assert.deepEqual(issueState(issue({ labels: ["sonnet"], question: "Which API?" })), { kind: "decision", question: "Which API?" }));
     test("even without a tier label", () =>
-      assert.equal(skipReason(issue({ labels: [], question: "Which API?" })), DECISION));
+      assert.deepEqual(issueState(issue({ labels: [], question: "Which API?" })), { kind: "decision", question: "Which API?" }));
     test("the go-ahead settles it", () =>
-      assert.equal(skipReason(issue({ question: "Which API?" })), undefined));
+      assert.deepEqual(issueState(issue({ question: "Which API?" })), { kind: "dispatchable" }));
     test("blocked: waits for the blocker", () =>
-      assert.equal(
-        skipReason(issue({ labels: ["sonnet"], question: "Which API?", blockers: [3] })),
-        "blocked by #3",
+      assert.deepEqual(
+        issueState(issue({ labels: ["sonnet"], question: "Which API?", blockers: [3] })),
+        { kind: "blocked", blockers: [3] },
       ));
     test("deferred before the decision", () =>
-      assert.equal(
-        skipReason(issue({ labels: ["deferred"], question: "Which API?" })),
-        "`deferred`; remove the label to queue it",
+      assert.deepEqual(
+        issueState(issue({ labels: ["deferred"], question: "Which API?" })),
+        DEFERRED_STATE,
       ));
     test("assigned before the decision", () =>
-      assert.equal(skipReason(issue({ labels: [], assignees: 1, question: "Which API?" })), null));
+      assert.deepEqual(issueState(issue({ labels: [], assignees: 1, question: "Which API?" })), ELSEWHERE));
   });
 
   describe("not picked up, with the reason", () => {
     test("deferred", () =>
-      assert.equal(
-        skipReason(issue({ labels: ["sonnet", "deferred"] })),
-        "`deferred`; remove the label to queue it",
+      assert.deepEqual(
+        issueState(issue({ labels: ["sonnet", "deferred"] })),
+        DEFERRED_STATE,
       ));
     test("no tier label", () =>
-      assert.equal(
-        skipReason(issue({ labels: ["bug"] })),
-        "no tier label; add `haiku`, `sonnet` or `opus` to queue it",
+      assert.deepEqual(
+        issueState(issue({ labels: ["bug"] })),
+        NO_TIER,
       ));
     test("opus-plan", () =>
-      assert.equal(
-        skipReason(issue({ labels: ["opus-plan"] })),
-        "`opus-plan`; start a plan session by hand",
+      assert.deepEqual(
+        issueState(issue({ labels: ["opus-plan"] })),
+        OPUS_PLAN,
       ));
     test("tier label without ready-for-agent waits for triage", () =>
-      assert.equal(skipReason(issue({ labels: ["sonnet"] })), AWAITING_TRIAGE));
+      assert.deepEqual(issueState(issue({ labels: ["sonnet"] })), { kind: "awaitingTriage" }));
     test("ready-for-agent without a tier label still needs one", () =>
-      assert.equal(
-        skipReason(issue({ labels: ["ready-for-agent"] })),
-        "no tier label; add `haiku`, `sonnet` or `opus` to queue it",
+      assert.deepEqual(
+        issueState(issue({ labels: ["ready-for-agent"] })),
+        NO_TIER,
       ));
-    test("blocked, named with the given ref", () => {
-      assert.equal(skipReason(issue({ blockers: [4, 7] })), "blocked by #4, #7");
-      assert.equal(
-        skipReason(issue({ blockers: [4] }), { ref: (n) => `o/r#${n}` }),
-        "blocked by o/r#4",
-      );
-    });
+    test("blocked, carrying the blockers", () =>
+      assert.deepEqual(issueState(issue({ blockers: [4, 7] })), { kind: "blocked", blockers: [4, 7] }));
   });
 
   describe("order: the first matching reason wins", () => {
     test("digest before everything", () =>
-      assert.equal(
-        skipReason(issue({ title: "Workshop digest — x", labels: ["deferred"], blockers: [1] })),
-        null,
+      assert.deepEqual(
+        issueState(issue({ title: "Workshop digest — x", labels: ["deferred"], blockers: [1] })),
+        ELSEWHERE,
       ));
     test("linked before deferred", () =>
-      assert.equal(skipReason(issue({ linked: true, labels: ["deferred"] })), null));
+      assert.deepEqual(issueState(issue({ linked: true, labels: ["deferred"] })), ELSEWHERE));
     test("assigned before deferred", () =>
-      assert.equal(skipReason(issue({ assignees: 1, labels: ["deferred"] })), null));
+      assert.deepEqual(issueState(issue({ assignees: 1, labels: ["deferred"] })), ELSEWHERE));
     test("deferred before no tier", () =>
-      assert.equal(
-        skipReason(issue({ labels: ["deferred"] })),
-        "`deferred`; remove the label to queue it",
+      assert.deepEqual(
+        issueState(issue({ labels: ["deferred"] })),
+        DEFERRED_STATE,
       ));
     test("opus-plan beats a tier label", () =>
-      assert.equal(
-        skipReason(issue({ labels: ["sonnet", "opus-plan"] })),
-        "`opus-plan`; start a plan session by hand",
+      assert.deepEqual(
+        issueState(issue({ labels: ["sonnet", "opus-plan"] })),
+        OPUS_PLAN,
       ));
     test("no tier before blocked", () =>
-      assert.equal(
-        skipReason(issue({ labels: [], blockers: [3] })),
-        "no tier label; add `haiku`, `sonnet` or `opus` to queue it",
+      assert.deepEqual(
+        issueState(issue({ labels: [], blockers: [3] })),
+        NO_TIER,
       ));
     test("blocked before awaiting triage", () =>
-      assert.equal(skipReason(issue({ labels: ["sonnet"], blockers: [3] })), "blocked by #3"));
+      assert.deepEqual(issueState(issue({ labels: ["sonnet"], blockers: [3] })), { kind: "blocked", blockers: [3] }));
     test("deferred before awaiting triage", () =>
-      assert.equal(
-        skipReason(issue({ labels: ["sonnet", "deferred"] })),
-        "`deferred`; remove the label to queue it",
+      assert.deepEqual(
+        issueState(issue({ labels: ["sonnet", "deferred"] })),
+        DEFERRED_STATE,
       ));
     test("opus-plan before blocked", () =>
-      assert.equal(
-        skipReason(issue({ labels: ["opus-plan"], blockers: [3] })),
-        "`opus-plan`; start a plan session by hand",
+      assert.deepEqual(
+        issueState(issue({ labels: ["opus-plan"], blockers: [3] })),
+        OPUS_PLAN,
       ));
   });
 });
@@ -176,8 +176,10 @@ describe("openQuestion", () => {
   test("an empty section still asks", () =>
     assert.equal(openQuestion("## Decision needed\n\n## Next\nx"), "Decision needed"));
   test("long questions are cut", () =>
-    assert.equal(openQuestion(`## Decision needed\n${"x".repeat(300)}`).length, 200));
+    assert.equal(openQuestion(`## Decision needed\n${"x".repeat(300)}`)?.length, 200));
 });
+
+const whyOf = (v: PrVerdict) => ("why" in v ? v.why : undefined);
 
 describe("prVerdict", () => {
   const HEAD = "2026-11-10T12:00:00Z";
@@ -187,13 +189,13 @@ describe("prVerdict", () => {
     { name: "build", status: "completed", conclusion: "failure", html_url: "u/b" },
     { name: "lint", status: "completed", conclusion: "success", html_url: "u/l" },
   ];
-  const human = (at, body = "please rename this") => ({
+  const human = (at: string, body = "please rename this") => ({
     created_at: at,
     user: { type: "User" },
     body,
     html_url: `c/${at}`,
   });
-  const mark = (at) => ({
+  const mark = (at: string) => ({
     created_at: at,
     user: { type: "User" },
     body: "<!-- workshop-followup -->\nFollow-up session started for:\n- x\n\n---\n_Generated by [Claude Code](https://claude.ai/code)_",
@@ -217,30 +219,30 @@ describe("prVerdict", () => {
 
   describe("green and quiet", () => {
     test("unlabelled PR goes to review", () =>
-      assert.equal(prVerdict(pr()).verdict, "review"));
+      assert.equal(prVerdict(pr()).kind, "review"));
     test("automerge-labelled PR is merged", () =>
-      assert.equal(prVerdict(pr({ labels: ["automerge"] })).verdict, "merge"));
+      assert.equal(prVerdict(pr({ labels: ["automerge"] })).kind, "merge"));
     test("automerge-labelled PR already on native auto-merge waits", () =>
-      assert.equal(prVerdict(pr({ labels: ["automerge"], autoMerge: true })).verdict, "wait"));
+      assert.equal(prVerdict(pr({ labels: ["automerge"], autoMerge: true })).kind, "wait"));
     test("Dependabot with native auto-merge waits for it", () =>
-      assert.equal(prVerdict(pr({ dependabot: true, autoMerge: true })).verdict, "wait"));
+      assert.equal(prVerdict(pr({ dependabot: true, autoMerge: true })).kind, "wait"));
     test("Dependabot without native auto-merge goes to review", () =>
-      assert.equal(prVerdict(pr({ dependabot: true })).verdict, "review"));
+      assert.equal(prVerdict(pr({ dependabot: true })).kind, "review"));
     test("Dependabot labelled automerge (by its workflow) is merged", () =>
-      assert.equal(prVerdict(pr({ dependabot: true, labels: ["automerge"] })).verdict, "merge"));
+      assert.equal(prVerdict(pr({ dependabot: true, labels: ["automerge"] })).kind, "merge"));
     test("a PR on native auto-merge waits for it, label or not", () =>
-      assert.equal(prVerdict(pr({ autoMerge: true })).verdict, "wait"));
+      assert.equal(prVerdict(pr({ autoMerge: true })).kind, "wait"));
     test("unknown mergeability waits instead of going to review or merging", () => {
       assert.deepEqual(
         [prVerdict(pr({ mergeable: null })), prVerdict(pr({ mergeable: null, labels: ["automerge"] }))].map(
-          (v) => [v.verdict, v.why],
+          (v) => [v.kind, whyOf(v)],
         ),
         [["wait", "mergeability unknown"], ["wait", "mergeability unknown"]],
       );
     });
     test("unknown mergeability is not a conflict: red CI still gets its follow-up", () => {
       const v = prVerdict(pr({ mergeable: null, runs: red }));
-      assert.equal(v.verdict, "followup");
+      assert.equal(v.kind, "followup");
       assert.equal(v.conflict, false);
     });
   });
@@ -248,14 +250,14 @@ describe("prVerdict", () => {
   describe("CI not finished", () => {
     test("running checks: wait", () =>
       assert.equal(
-        prVerdict(pr({ runs: [{ name: "b", status: "in_progress", conclusion: null }] })).verdict,
+        prVerdict(pr({ runs: [{ name: "b", status: "in_progress", conclusion: null }] })).kind,
         "wait",
       ));
     test("no checks at all: wait", () =>
-      assert.equal(prVerdict(pr({ runs: [] })).verdict, "wait"));
+      assert.equal(prVerdict(pr({ runs: [] })).kind, "wait"));
     test("conflict without CI: follow up without waiting", () => {
       const v = prVerdict(pr({ runs: [], mergeable: false }));
-      assert.equal(v.verdict, "followup");
+      assert.equal(v.kind, "followup");
       assert.equal(v.conflict, true);
       assert.deepEqual(v.failing, []);
     });
@@ -263,7 +265,7 @@ describe("prVerdict", () => {
       const v = prVerdict(
         pr({ runs: [{ name: "b", status: "in_progress", conclusion: "failure" }], mergeable: false }),
       );
-      assert.equal(v.verdict, "followup");
+      assert.equal(v.kind, "followup");
       assert.deepEqual(v.failing, []);
     });
   });
@@ -271,7 +273,7 @@ describe("prVerdict", () => {
   describe("red CI", () => {
     test("failure gets a follow-up naming the failing check", () => {
       const v = prVerdict(pr({ runs: red }));
-      assert.equal(v.verdict, "followup");
+      assert.equal(v.kind, "followup");
       assert.deepEqual(v.failing.map((r) => r.name), ["build"]);
     });
     test("timed_out and startup_failure count; cancelled and neutral don't", () => {
@@ -284,17 +286,17 @@ describe("prVerdict", () => {
       );
     });
     test("an automerge PR with red CI is not merged", () =>
-      assert.equal(prVerdict(pr({ runs: red, labels: ["automerge"] })).verdict, "followup"));
+      assert.equal(prVerdict(pr({ runs: red, labels: ["automerge"] })).kind, "followup"));
   });
 
   describe("human feedback", () => {
     test("newer than the head commit gets a follow-up", () => {
       const v = prVerdict(pr({ comments: [human("2026-11-11T00:00:00Z")] }));
-      assert.equal(v.verdict, "followup");
+      assert.equal(v.kind, "followup");
       assert.equal(v.feedback.length, 1);
     });
     test("older than the head commit is answered already", () =>
-      assert.equal(prVerdict(pr({ comments: [human("2026-11-09T00:00:00Z")] })).verdict, "review"));
+      assert.equal(prVerdict(pr({ comments: [human("2026-11-09T00:00:00Z")] })).kind, "review"));
     test("review comments and reviews count too", () => {
       const v = prVerdict(
         pr({
@@ -306,7 +308,7 @@ describe("prVerdict", () => {
           ],
         }),
       );
-      assert.equal(v.verdict, "followup");
+      assert.equal(v.kind, "followup");
       assert.equal(v.feedback.length, 3);
     });
     test("bots and agents (Claude Code footer) are not feedback", () => {
@@ -318,53 +320,53 @@ describe("prVerdict", () => {
           ],
         }),
       );
-      assert.equal(v.verdict, "review");
+      assert.equal(v.kind, "review");
     });
   });
 
   describe("follow-up bookkeeping", () => {
     test("a follow-up newer than the head commit is still on it: wait", () =>
       assert.equal(
-        prVerdict(pr({ runs: red, comments: [mark("2026-11-12T00:00:00Z")] })).verdict,
+        prVerdict(pr({ runs: red, comments: [mark("2026-11-12T00:00:00Z")] })).kind,
         "wait",
       ));
     test("a pending follow-up older than staleDays: unstick", () => {
       const v = prVerdict(pr({ runs: red, comments: [mark("2026-11-10T13:00:00Z")] }));
-      assert.equal(v.verdict, "unstick");
-      assert.equal(v.why, "CI red after 1 follow-up(s)");
+      assert.equal(v.kind, "unstick");
+      assert.equal(whyOf(v), "CI red after 1 follow-up(s)");
     });
     test("a follow-up older than the head commit was answered: follow up again", () => {
       const v = prVerdict(
         pr({ runs: red, headDate: "2026-11-12T00:00:00Z", comments: [mark("2026-11-11T00:00:00Z")] }),
       );
-      assert.equal(v.verdict, "followup");
+      assert.equal(v.kind, "followup");
     });
     test("at the follow-up cap: unstick, saying why", () => {
       const marks = [mark("2026-11-01T00:00:00Z"), mark("2026-11-02T00:00:00Z")];
       assert.equal(
-        prVerdict(pr({ runs: red, comments: marks })).why,
+        whyOf(prVerdict(pr({ runs: red, comments: marks }))),
         "CI red after 2 follow-up(s)",
       );
       assert.equal(
-        prVerdict(pr({ mergeable: false, comments: marks })).why,
+        whyOf(prVerdict(pr({ mergeable: false, comments: marks }))),
         "conflicts with main after 2 follow-up(s)",
       );
       assert.equal(
-        prVerdict(pr({ mergeable: false, comments: marks, base: "trunk" })).why,
+        whyOf(prVerdict(pr({ mergeable: false, comments: marks, base: "trunk" }))),
         "conflicts with trunk after 2 follow-up(s)",
       );
       assert.equal(
-        prVerdict(pr({ comments: [...marks, human("2026-11-11T00:00:00Z")] })).why,
+        whyOf(prVerdict(pr({ comments: [...marks, human("2026-11-11T00:00:00Z")] }))),
         "unanswered review after 2 follow-up(s)",
       );
     });
     test("pre-rename farm markers count", () => {
       const farm = { ...mark("2026-11-01T00:00:00Z"), body: "<!-- farm-followup -->" };
-      assert.equal(prVerdict(pr({ runs: red, comments: [farm, farm] })).verdict, "unstick");
+      assert.equal(prVerdict(pr({ runs: red, comments: [farm, farm] })).kind, "unstick");
     });
     test("a green, quiet PR ignores its follow-up history", () =>
       assert.equal(
-        prVerdict(pr({ comments: [mark("2026-11-01T00:00:00Z"), mark("2026-11-02T00:00:00Z")] })).verdict,
+        prVerdict(pr({ comments: [mark("2026-11-01T00:00:00Z"), mark("2026-11-02T00:00:00Z")] })).kind,
         "review",
       ));
   });
@@ -373,17 +375,17 @@ describe("prVerdict", () => {
 describe("claimState", () => {
   const TODAY = new Date("2026-11-13");
   test("assigned by hand (no dispatch marker) with a tier: not picked up", () =>
-    assert.equal(claimState({ tiered: true, dispatchedAt: null, today: TODAY, staleDays: 2 }), "notPicked"));
+    assert.deepEqual(claimState({ tiered: true, dispatchedAt: null, today: TODAY, staleDays: 2 }), { kind: "notPicked" }));
   test("assigned by hand without a tier: nothing to say", () =>
-    assert.equal(claimState({ tiered: false, dispatchedAt: null, today: TODAY, staleDays: 2 }), null));
+    assert.deepEqual(claimState({ tiered: false, dispatchedAt: null, today: TODAY, staleDays: 2 }), { kind: "none" }));
   test("dispatched recently: still working", () =>
-    assert.equal(
+    assert.deepEqual(
       claimState({ tiered: true, dispatchedAt: "2026-11-12T00:00:00Z", today: TODAY, staleDays: 2 }),
-      null,
+      { kind: "inProgress" },
     ));
   test("dispatched over staleDays ago with no PR: unstick", () =>
-    assert.equal(
+    assert.deepEqual(
       claimState({ tiered: true, dispatchedAt: "2026-11-10T00:00:00Z", today: TODAY, staleDays: 2 }),
-      "unstick",
+      { kind: "unstick" },
     ));
 });

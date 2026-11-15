@@ -1,7 +1,7 @@
 // Issue numbers named as blockers in an issue body: the documented fallback to
 // native dependencies (the repo's own issue-tracker docs), either a `Blocked by: #n, #m`
 // line or a `## Blocked by` section of `#n` references.
-export const bodyBlockers = (body) => {
+export const bodyBlockers = (body: string | null | undefined): number[] => {
   const text = body ?? "";
   const found = [
     ...text.matchAll(/^[ \t>*_-]*blocked by\b[*_]*:.*$/gim),

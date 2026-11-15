@@ -1,5 +1,5 @@
-// Runs dispatch.mjs and pause.mjs end to end over two repos, against a fake `gh`
-// and `git` (fake-bin.mjs): one plan, one session cap, one digest, and a loud stop
+// Runs dispatch.ts and pause.ts end to end over two repos, against a fake `gh`
+// and `git` (fake-bin.ts): one plan, one session cap, one digest, and a loud stop
 // when a repo can't be worked on.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { describe, test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { fakeBin } from "./fake-bin.mjs";
+import { fakeBin } from "./fake-bin.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const DIGEST = "realJohnDoe/agent-skills";
@@ -17,18 +17,19 @@ const T = "realJohnDoe/tracemap";
 const TODAY = "2026-11-13"; // a Friday
 const SINCE = "2026-11-10";
 
-const issue = (n, title, labels, extra = {}) => ({
+type Any = any;
+const issue = (n: number, title: string, labels: string[], extra: Any = {}) => ({
   number: n,
   title,
   labels: labels.map((name) => ({ name })),
-  assignees: [],
+  assignees: [] as { login: string }[],
   comments: 0,
   body: "",
   html_url: `https://github.com/x/issues/${n}`,
   created_at: "2026-10-01T00:00:00Z",
   ...extra,
 });
-const pr = (n, title, extra = {}) => ({
+const pr = (n: number, title: string, extra: Any = {}) => ({
   number: n,
   title,
   draft: false,
@@ -48,11 +49,11 @@ const green = [{ name: "build", status: "completed", conclusion: "success" }];
 const red = [{ name: "build", status: "completed", conclusion: "failure", html_url: "https://ci/1" }];
 
 // Answers for one repo's reads; `prs` entries carry their own `runs` and `mergeable`.
-const repoFixture = (repo, { issues, prs, labels = ALL_LABELS }) => {
-  const f = {
+const repoFixture = (repo: string, { issues, prs, labels = ALL_LABELS }: Any) => {
+  const f: Record<string, unknown> = {
     [`repos/${repo}`]: { default_branch: "main" },
     [`repos/${repo}/issues`]: issues,
-    [`repos/${repo}/pulls`]: prs.map(({ runs, mergeable, ...p }) => p),
+    [`repos/${repo}/pulls`]: prs.map(({ runs, mergeable, ...p }: Any) => p),
     [`repos/${repo}/labels`]: labels,
     [`search/issues?q=repo:${repo} is:pr is:merged merged:>=${SINCE}`]: { items: [] },
     [`repos/${repo}/commits/main`]: { sha: `${repo}-main` },
@@ -68,7 +69,12 @@ const repoFixture = (repo, { issues, prs, labels = ALL_LABELS }) => {
   return f;
 };
 
-const world = ({ digestIssues = [], digestComments = {}, digestLabels = [{ name: "workshop-paused" }], extra = {} } = {}) => ({
+const world = ({
+  digestIssues = [],
+  digestComments = {},
+  digestLabels = [{ name: "workshop-paused" }],
+  extra = {},
+}: { digestIssues?: Any[]; digestComments?: Any; digestLabels?: Any[]; extra?: Any } = {}) => ({
   ...repoFixture(M, {
     issues: [
       issue(10, "Meridian sonnet task", ["sonnet", "ready-for-agent"], { created_at: "2026-10-01T00:00:00Z" }),
@@ -105,10 +111,15 @@ const world = ({ digestIssues = [], digestComments = {}, digestLabels = [{ name:
 // Runs a workshop script against `fixture` with both repos checked out (attached),
 // except those in `missing`. The checkouts folder also holds a plain folder and a
 // clone without an origin, which discovery must skip.
-const run = (script, args, fixture, { apply = false, missing = [], noPush = [] } = {}) => {
+const run = (
+  script: string,
+  args: string[],
+  fixture: unknown,
+  { apply = false, missing = [], noPush = [] }: { apply?: boolean; missing?: string[]; noPush?: string[] } = {},
+) => {
   const dir = mkdtempSync(join(tmpdir(), "workshop-test-"));
   const checkouts = join(dir, "checkouts");
-  const remotes = {};
+  const remotes: Record<string, string> = {};
   for (const repo of [M, T]) {
     const name = repo.split("/")[1];
     if (missing.includes(repo)) continue;
@@ -140,7 +151,7 @@ const run = (script, args, fixture, { apply = false, missing = [], noPush = [] }
 };
 
 describe("dispatch dry run over two repos", () => {
-  const res = run("dispatch.mjs", ["--max-sessions", "3"], world());
+  const res = run("dispatch.ts", ["--max-sessions", "3"], world());
 
   test("succeeds and writes nothing", () => {
     assert.equal(res.status, 0, res.stderr);
@@ -151,7 +162,7 @@ describe("dispatch dry run over two repos", () => {
 
   test("one session cap across repos: newest follow-ups first, then the oldest issues anywhere", () => {
     assert.deepEqual(
-      res.plan.sessions.map((s) => [s.kind, s.repo, s.pr ?? s.issue]),
+      res.plan.sessions.map((s: Any) => [s.kind, s.repo, s.pr ?? s.issue]),
       [
         ["followup", T, 9],
         ["followup", M, 21],
@@ -205,8 +216,8 @@ describe("dispatch dry run over two repos", () => {
 });
 
 describe("dispatch apply", () => {
-  const res = run("dispatch.mjs", ["--max-sessions", "3"], world(), { apply: true });
-  const writes = (method, path) => res.writes.filter((w) => w.method === method && w.path.startsWith(path));
+  const res = run("dispatch.ts", ["--max-sessions", "3"], world(), { apply: true });
+  const writes = (method: string, path: string) => res.writes.filter((w) => w.method === method && w.path.startsWith(path));
 
   test("succeeds", () => assert.equal(res.status, 0, res.stderr));
 
@@ -242,24 +253,24 @@ describe("dispatch apply", () => {
 
 describe("the repos are the ones attached", () => {
   test("a repo that isn't attached isn't covered, and the digest says which are", () => {
-    const res = run("dispatch.mjs", [], world(), { missing: [T] });
+    const res = run("dispatch.ts", [], world(), { missing: [T] });
     assert.equal(res.status, 0, res.stderr);
     assert.deepEqual(res.plan.repos, [M]);
     assert.match(res.plan.digest.body, /\nRepos covered: realJohnDoe\/meridian\.\n/);
   });
   test("--repos naming a repo that isn't attached stops the run", () => {
-    const res = run("dispatch.mjs", ["--repos", T], world(), { missing: [T] });
+    const res = run("dispatch.ts", ["--repos", T], world(), { missing: [T] });
     assert.equal(res.status, 1);
     assert.match(res.stderr, /--repos names repos not checked out under .*: realjohndoe\/tracemap/);
     assert.equal(res.stdout, "");
   });
   test("no --digest stops the run", () => {
-    const res = spawnSync(process.execPath, [join(here, "dispatch.mjs")], { encoding: "utf8" });
+    const res = spawnSync(process.execPath, [join(here, "dispatch.ts")], { encoding: "utf8" });
     assert.equal(res.status, 1);
     assert.match(res.stderr, /pass --digest owner\/repo/);
   });
   test("no attached repo stops the run", () => {
-    const res = run("dispatch.mjs", [], world(), { missing: [M, T] });
+    const res = run("dispatch.ts", [], world(), { missing: [M, T] });
     assert.equal(res.status, 1);
     assert.match(res.stderr, /No GitHub clone under /);
   });
@@ -267,13 +278,13 @@ describe("the repos are the ones attached", () => {
 
 describe("dispatch stops on a repo it can't work on", () => {
   test("can't be pushed to", () => {
-    const res = run("dispatch.mjs", [], world(), { apply: true, noPush: [M] });
+    const res = run("dispatch.ts", [], world(), { apply: true, noPush: [M] });
     assert.equal(res.status, 1);
     assert.match(res.stderr, /realJohnDoe\/meridian: can't push/);
     assert.deepEqual(res.writes, []);
   });
   test("--repos limits the run to one attached repo", () => {
-    const res = run("dispatch.mjs", ["--repos", M], world());
+    const res = run("dispatch.ts", ["--repos", M], world());
     assert.equal(res.status, 0, res.stderr);
     assert.deepEqual(res.plan.repos, [M]);
   });
@@ -292,30 +303,30 @@ describe("pause over two repos", () => {
   });
 
   test("the label on the shared digest drains every repo", () => {
-    const res = run("pause.mjs", [], fixture);
+    const res = run("pause.ts", [], fixture);
     assert.equal(res.status, 0, res.stderr);
     assert.equal(res.plan.state, "drain");
-    assert.deepEqual(res.plan.plan.repos.map((r) => r.repo), [M, T]);
+    assert.deepEqual(res.plan.plan.repos.map((r: Any) => r.repo), [M, T]);
     assert.match(res.plan.plan.snapshot, /\*\*realJohnDoe\/meridian\*\*: main at `realJohnDoe\/meridian-main`/);
     assert.match(res.plan.plan.snapshot, /\*\*realJohnDoe\/tracemap\*\*/);
   });
 
   test("apply posts the one snapshot on the digest, last", () => {
-    const res = run("pause.mjs", [], fixture, { apply: true });
+    const res = run("pause.ts", [], fixture, { apply: true });
     assert.equal(res.status, 0, res.stderr);
     assert.equal(res.writes.at(-1).path, `repos/${DIGEST}/issues/50/comments`);
     assert.match(res.writes.at(-1).body.body, /workshop-snapshot/);
   });
 
   test("stops on a repo it can't push to before writing anything", () => {
-    const res = run("pause.mjs", [], fixture, { apply: true, noPush: [T] });
+    const res = run("pause.ts", [], fixture, { apply: true, noPush: [T] });
     assert.equal(res.status, 1);
     assert.match(res.stderr, /realJohnDoe\/tracemap: can't push/);
     assert.deepEqual(res.writes, []);
   });
 
   test("without a digest the workshop runs normally", () => {
-    const res = run("pause.mjs", [], world());
+    const res = run("pause.ts", [], world());
     assert.equal(res.plan.state, "normal");
   });
 });

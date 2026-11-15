@@ -16,4 +16,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 26
-      - run: node --test 'skills/**/*.test.mjs'
+      - run: npm ci
+      - run: npx tsc
+      - run: node --test 'skills/**/*.test.ts'
