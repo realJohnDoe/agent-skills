@@ -94,6 +94,13 @@ main(() => {
   const dispatches = pick("dispatches").sort(oldestFirst);
   const sessions = [...followups, ...dispatches].slice(0, MAX_SESSIONS);
   const queue = dispatches.slice(Math.max(0, MAX_SESSIONS - followups.length));
+  // What the workshop is working on: this run's sessions, PRs waiting on CI or
+  // a follow-up, follow-ups past today's cap, and dispatched issues with no PR yet.
+  const inProgress = [
+    ...sessions.map((s) => ({ ...s.item, why: s.kind === "followup" ? "follow-up" : "dispatched" })),
+    ...followups.slice(MAX_SESSIONS).map((s) => ({ ...s.item, why: "follow-up next run" })),
+    ...pick("inProgress"),
+  ];
   const automerge = pick("automerge");
   const review = pick("review");
   const unstick = pick("unstick");
@@ -134,6 +141,7 @@ main(() => {
   const isWaiting = (x) => /^(blocked by|`deferred`)/.test(x.why);
   const waiting = notPicked.filter(isWaiting);
   const info = [
+    ...section("In progress", inProgress),
     ...section("Queue (dispatched next, oldest first)", queue.map((q) => q.item)),
     ...section("Not picked up", notPicked.filter((x) => !isWaiting(x))),
     ...(waiting.length
@@ -192,6 +200,7 @@ main(() => {
       review: review.length,
       unstick: unstick.length,
       triage: triage.length,
+      inProgress: inProgress.length,
       queue: queue.length,
       notPicked: notPicked.length,
       merged: merged.length,
@@ -349,6 +358,7 @@ function planRepo({ repo, name, path }, since) {
     review: [],
     unstick: [],
     automerge: [],
+    inProgress: [],
     notPicked: [],
     triage: [],
     decide: [],
@@ -367,10 +377,19 @@ function planRepo({ repo, name, path }, since) {
     const tier = issue ? tierOf(names(issue)) : bot ? "opus" : "sonnet";
     const head = api(`repos/${repo}/commits/${pr.head.sha}`);
     const runs = api(`repos/${repo}/commits/${pr.head.sha}/check-runs?per_page=100`).check_runs;
-    const mergeable = api(`repos/${repo}/pulls/${pr.number}`).mergeable;
+    // GitHub computes `mergeable` in the background after the first read that
+    // needs it, so a null usually resolves a few seconds later. Read once more.
+    let mergeable = api(`repos/${repo}/pulls/${pr.number}`).mergeable;
+    if (mergeable == null) {
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 3000);
+      mergeable = api(`repos/${repo}/pulls/${pr.number}`).mergeable;
+    }
+    const it = item(pr, { pr: pr.number, created: pr.created_at });
     // CI still running and no conflict: nothing to decide yet, skip the reads below.
-    if (mergeable !== false && !(runs.length && runs.every((r) => r.status === "completed")))
+    if (mergeable !== false && !(runs.length && runs.every((r) => r.status === "completed"))) {
+      out.inProgress.push({ ...it, why: "CI running" });
       continue;
+    }
     const v = prVerdict({
       dependabot: bot,
       labels: names(pr),
@@ -386,7 +405,7 @@ function planRepo({ repo, name, path }, since) {
       maxFollowups: MAX_FOLLOWUPS,
       staleDays: STALE_DAYS,
     });
-    const it = item(pr, { pr: pr.number, created: pr.created_at });
+    if (v.verdict === "wait") out.inProgress.push({ ...it, why: v.why });
     if (v.verdict === "review") out.review.push(it);
     if (v.verdict === "merge")
       out.automerge.push({ repo, pr: pr.number, sha: pr.head.sha, title: pr.title, created: pr.created_at });
@@ -399,6 +418,7 @@ function planRepo({ repo, name, path }, since) {
         pr: pr.number,
         issue: issue?.number,
         tier,
+        item: it,
         branch: pr.head.ref,
         checkout: path,
         worktree: wt,
@@ -497,6 +517,10 @@ function planRepo({ repo, name, path }, since) {
           issue: i.number,
           why: `assigned to ${i.assignees.map((a) => `@${a.login}`).join(", ")}; unassign to queue it`,
         }),
+      );
+    if (!state && mark)
+      out.inProgress.push(
+        item(i, { issue: i.number, why: `dispatched ${mark.created_at.slice(0, 10)}, no PR yet` }),
       );
     if (state === "unstick")
       out.unstick.push(
