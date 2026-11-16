@@ -17,7 +17,7 @@ export function arg(name: string, dflt?: string | number) {
 }
 export const flag = (name: string) => process.argv.includes(name);
 
-const run = (cmd: string, args: string[], input?: string): string =>
+export const run = (cmd: string, args: string[], input?: string): string =>
   execFileSync(cmd, args, {
     encoding: "utf8",
     input,
@@ -49,6 +49,12 @@ export const loadConfig = (): { digest: string; checkouts: string; repos: Repo[]
   const digest = arg("--digest");
   if (!digest || !/^[^/\s]+\/[^/\s]+$/.test(digest))
     throw new Error("pass --digest owner/repo: the dispatcher's SKILL.md names the digest repo");
+  return { digest, ...attachedRepos() };
+};
+
+// The checkouts folder and the repos under it, as loadConfig describes; the survey
+// chooser reads them the same way.
+export const attachedRepos = (): { checkouts: string; repos: Repo[] } => {
   const checkouts = resolve(
     arg("--checkouts") ?? process.env.WORKSHOP_CHECKOUTS ?? startedIn(),
   );
@@ -76,7 +82,7 @@ export const loadConfig = (): { digest: string; checkouts: string; repos: Repo[]
     );
   if (!repos.length)
     throw new Error(`No GitHub clone under ${checkouts}: attach a repo to the session.`);
-  return { digest, checkouts, repos };
+  return { checkouts, repos };
 };
 
 // The folder holding the clone the run started in, or the working directory itself
