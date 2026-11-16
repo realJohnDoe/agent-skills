@@ -68,6 +68,7 @@ const LABELS: Record<string, string> = {
   deferred: "cccccc",
   [READY]: "0e8a16",
   [AUTOMERGE]: "0e8a16",
+  preview: "1d76db",
 };
 const days = (iso: string) => (+TODAY - +new Date(iso)) / 864e5;
 type Item = {
