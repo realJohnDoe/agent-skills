@@ -143,7 +143,7 @@ export type Feedback = GhComment | GhReview;
 type Facts = { conflict: boolean; failing: GhCheckRun[]; feedback: Feedback[] };
 type Verdict =
   | { kind: "wait"; why: string }
-  | { kind: "review" }
+  | { kind: "review"; why?: string }
   | { kind: "merge" }
   | { kind: "unstick"; why: string }
   | { kind: "followup" };
@@ -153,7 +153,9 @@ type Verdict =
  * `failing` checks and `feedback` behind it:
  * - `wait`: CI still running, mergeability not computed yet, native auto-merge
  *   on it, or a follow-up still working
- * - `review`: green and quiet, waits for the maintainer
+ * - `review`: green and quiet, waits for the maintainer; `why` says so when an
+ *   `automerge` PR on `claude/issue-N` has a description that doesn't reference #N
+ *   (a session that opened its PR with another session's description)
  * - `merge`: green, quiet and labelled `automerge`
  * - `unstick`: at its follow-up cap, or a follow-up went stale; `why` says which
  * - `followup`: conflict, red CI or human feedback newer than the head commit
@@ -167,6 +169,9 @@ export type PrFacts = {
   runs: GhCheckRun[];
   mergeable: boolean | null;
   headDate: string;
+  /** The PR's head branch and description, for the `claude/issue-N` check. */
+  branch?: string;
+  body?: string | null;
   comments: GhComment[];
   reviewComments: GhComment[];
   reviews: GhReview[];
@@ -207,7 +212,11 @@ export const prVerdict = (pr: PrFacts): PrVerdict => {
     // Green but not yet known to merge cleanly: neither ask the maintainer nor merge.
     if (pr.mergeable == null) return out({ kind: "wait", why: "mergeability unknown" });
     if (!pr.autoMerge && !pr.labels.includes(AUTOMERGE)) return out({ kind: "review" });
-    return pr.autoMerge ? out({ kind: "wait", why: "auto-merge enabled" }) : out({ kind: "merge" });
+    if (pr.autoMerge) return out({ kind: "wait", why: "auto-merge enabled" });
+    const n = /^claude\/issue-(\d+)$/.exec(pr.branch ?? "")?.[1];
+    if (n && !referencedIssues(pr.body).includes(Number(n)))
+      return out({ kind: "review", why: `branch is for #${n} but the description doesn't reference it` });
+    return out({ kind: "merge" });
   }
   const marks = pr.comments.filter((c) => marked(c, FOLLOWUP));
   const last = marks.at(-1);

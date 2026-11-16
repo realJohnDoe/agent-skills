@@ -252,6 +252,15 @@ describe("prVerdict", () => {
   describe("green and quiet", () => {
     test("unlabelled PR goes to review", () =>
       assert.equal(prVerdict(pr()).kind, "review"));
+    test("automerge PR on claude/issue-N is merged only if its body references #N", () => {
+      const m = (branch: string, body: string) => prVerdict(pr({ labels: ["automerge"], branch, body }));
+      assert.equal(m("claude/issue-5", "Fixes #5").kind, "merge");
+      assert.equal(m("claude/issue-5", "Refs #5").kind, "merge");
+      assert.equal(m("feature", "Fixes #6").kind, "merge");
+      const v = m("claude/issue-5", "Fixes #6");
+      assert.equal(v.kind, "review");
+      assert.match(v.kind === "review" ? (v.why ?? "") : "", /branch is for #5 but the description doesn't reference it/);
+    });
     test("automerge-labelled PR is merged", () =>
       assert.equal(prVerdict(pr({ labels: ["automerge"] })).kind, "merge"));
     test("automerge-labelled PR already on native auto-merge waits", () =>
