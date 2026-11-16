@@ -2,6 +2,7 @@
 // they can be tested: which issues are dispatched and what happens to each PR.
 // Pinned by decide.test.ts to Meridian's behaviour before the move.
 
+import type { Blocker } from "./bodyBlockers.ts";
 import type { GhCheckRun, GhComment, GhReview } from "./github.ts";
 
 export const TIERS = ["haiku", "sonnet", "opus"];
@@ -65,8 +66,11 @@ export type IssueState =
   | { kind: "decision"; question: string }
   | { kind: "awaitingTriage" }
   | { kind: "deferred" }
-  | { kind: "blocked"; blockers: number[] }
+  | { kind: "blocked"; blockers: ResolvedBlocker[] }
   | { kind: "notPicked"; reason: string };
+
+/** An open blocker, or one that couldn't be looked up and so blocks until it can be. */
+export type ResolvedBlocker = Blocker & { unreadable?: boolean };
 
 export type IssueFacts = {
   title: string;
@@ -76,7 +80,7 @@ export type IssueFacts = {
   /** An open PR closes it. */
   linked: boolean;
   /** The open issues it waits on. */
-  blockers: number[];
+  blockers: ResolvedBlocker[];
   /** Its open question (`openQuestion`). */
   question?: string;
 };
@@ -99,8 +103,14 @@ export const issueState = (issue: IssueFacts): IssueState => {
   return { kind: "dispatchable" };
 };
 
-export const blockedText = (blockers: number[], ref = (n: number) => `#${n}`) =>
-  `blocked by ${blockers.map(ref).join(", ")}`;
+const refText = (b: Blocker) => `${b.repo}#${b.number}`;
+export const blockedText = (blockers: ResolvedBlocker[]) =>
+  [
+    ...(blockers.some((b) => !b.unreadable)
+      ? [`blocked by ${blockers.filter((b) => !b.unreadable).map(refText).join(", ")}`]
+      : []),
+    ...blockers.filter((b) => b.unreadable).map((b) => `blocker ${refText(b)} unreadable`),
+  ].join("; ");
 
 export type Feedback = GhComment | GhReview;
 

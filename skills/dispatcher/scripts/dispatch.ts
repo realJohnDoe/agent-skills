@@ -8,7 +8,7 @@
 // Without --apply it is a dry run: it prints the plan and writes nothing.
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { bodyBlockers } from "./bodyBlockers.ts";
+import { type Blocker, bodyBlockers } from "./bodyBlockers.ts";
 import {
   AUTOMERGE,
   DEFERRED,
@@ -16,6 +16,7 @@ import {
   AGENT,
   assertNever,
   blockedText,
+  type ResolvedBlocker,
   claimState,
   isDigest,
   issueState,
@@ -113,6 +114,23 @@ const byRepo = (a: Dated, b: Dated) => a.repo.localeCompare(b.repo);
 const oldestFirst = (a: Dated, b: Dated) => a.created.localeCompare(b.created) || byRepo(a, b);
 const newestFirst = (a: Dated, b: Dated) => b.created.localeCompare(a.created) || byRepo(a, b);
 
+// Other repos' issues named as blockers, each looked up once per run; one that
+// can't be read (unreadable repo, typo) counts as blocking, so a mistake holds work back.
+const lookups = new Map<string, "open" | "closed" | "unreadable">();
+const lookup = ({ repo, number }: Blocker) => {
+  const key = `${repo.toLowerCase()}#${number}`;
+  let state = lookups.get(key);
+  if (!state) {
+    try {
+      state = api<{ state: string }>(`repos/${repo}/issues/${number}`).state === "open" ? "open" : "closed";
+    } catch {
+      state = "unreadable";
+    }
+    lookups.set(key, state);
+  }
+  return state;
+};
+
 main(() => {
   const { digest: DIGEST, repos } = loadConfig();
   preflight(repos);
@@ -190,7 +208,7 @@ main(() => {
     ...section("Not picked up", notPicked.filter((x) => !x.waiting)),
     ...(waiting.length
       ? [
-          `<details><summary>${waiting.length} issues waiting on a blocker, a decision or <code>deferred</code></summary>`,
+          `<details><summary>${waiting.length} items waiting on a blocker, a decision or <code>deferred</code></summary>`,
           "",
           ...waiting.map((x) => line(x)),
           "",
@@ -373,20 +391,27 @@ function planRepo({ repo, name, path }: Repo, since: string): RepoPlan {
   const linked = new Set(prs.flatMap((p) => linkedIssues(p.body)));
   // Open issues an issue waits on: native blocked-by edges, plus the documented
   // fallback of a blocker named in the body while it is open.
+  const sameRepo = (r: string) => r.toLowerCase() === repo.toLowerCase();
   const blockersOf = new Map(
-    issues.map((i) => [
-      i.number,
-      [
-        ...new Set([
-          ...((i.issue_dependencies_summary?.blocked_by ?? 0) > 0
-            ? all<GhIssue>(`repos/${repo}/issues/${i.number}/dependencies/blocked_by?per_page=100`)
-                .filter((b) => (b as GhIssue & { state: string }).state === "open")
-                .map((b) => b.number)
-            : []),
-          ...bodyBlockers(i.body).filter((n) => byNumber.has(n)),
-        ]),
-      ],
-    ]),
+    issues.map((i) => {
+      const native = (i.issue_dependencies_summary?.blocked_by ?? 0) > 0
+        ? all<GhIssue>(`repos/${repo}/issues/${i.number}/dependencies/blocked_by?per_page=100`)
+            .filter((b) => b.state === "open")
+            .map((b) => ({ repo: b.repository_url?.replace(/^.*\/repos\//, "") ?? repo, number: b.number }))
+        : [];
+      const body = bodyBlockers(i.body, repo).flatMap((b): ResolvedBlocker[] => {
+        const s = sameRepo(b.repo) ? (byNumber.has(b.number) ? "open" : "closed") : lookup(b);
+        return s === "closed" ? [] : [s === "open" ? b : { ...b, unreadable: true }];
+      });
+      const seen = new Set<string>();
+      return [
+        i.number,
+        [...native, ...body].filter((b) => {
+          const k = `${b.repo.toLowerCase()}#${b.number}`;
+          return !seen.has(k) && !!seen.add(k);
+        }),
+      ];
+    }),
   );
   const item = (x: GhIssue | GhPull, extra: Partial<Item>): Item => ({
     repo,
@@ -415,6 +440,10 @@ function planRepo({ repo, name, path }: Repo, since: string): RepoPlan {
   // --- PR follow-up ---------------------------------------------------------
   // Ours to follow up: every non-draft PR (draft = keep out of the workshop).
   for (const pr of prs.filter((p) => !p.draft)) {
+    if (names(pr).includes("deferred")) {
+      out.notPicked.push(item(pr, { pr: pr.number, created: pr.created_at, why: DEFERRED, waiting: true }));
+      continue;
+    }
     const issue = linkedIssues(pr.body)
       .map((n) => byNumber.get(n))
       .find((i) => i && tierOf(names(i)));
@@ -532,7 +561,7 @@ function planRepo({ repo, name, path }: Repo, since: string): RepoPlan {
         break;
       case "blocked":
         out.notPicked.push(
-          item(i, { issue: i.number, why: blockedText(st.blockers, ref), waiting: true }),
+          item(i, { issue: i.number, why: blockedText(st.blockers), waiting: true }),
         );
         break;
       case "notPicked":
@@ -620,7 +649,9 @@ function planRepo({ repo, name, path }: Repo, since: string): RepoPlan {
   for (const i of issues) out.unblocks.set(ref(i.number), unblocked([i.number]));
   function unblocked(done: number[]) {
     return issues
-      .filter((i) => done.some((n) => blockersOf.get(i.number)?.includes(n)))
+      .filter((i) =>
+        done.some((n) => blockersOf.get(i.number)?.some((b) => sameRepo(b.repo) && b.number === n)),
+      )
       .map((i) => ref(i.number));
   }
 

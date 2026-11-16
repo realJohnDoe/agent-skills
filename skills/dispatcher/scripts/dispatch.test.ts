@@ -290,6 +290,78 @@ describe("dispatch stops on a repo it can't work on", () => {
   });
 });
 
+describe("cross-repo blockers and deferred PRs", () => {
+  const X = "realJohnDoe/other";
+  const open = (n: number, title: string, extra: Any = {}) =>
+    issue(n, title, ["sonnet", "ready-for-agent"], { created_at: "2026-10-01T00:00:00Z", ...extra });
+  // Meridian's plan with `issues` and `prs` added, and `extra` answers.
+  const plan = (issues: Any[], prs: Any[], extra: Any = {}) => {
+    const w: Any = world({ extra });
+    const fresh = repoFixture(M, { issues: [], prs });
+    Object.assign(w, fresh, {
+      [`repos/${M}/issues`]: [...w[`repos/${M}/issues`], ...issues],
+      [`repos/${M}/pulls`]: [...w[`repos/${M}/pulls`], ...fresh[`repos/${M}/pulls`] as Any[]],
+    });
+    return run("dispatch.ts", ["--max-sessions", "20"], w);
+  };
+  const dispatched = (res: Any) =>
+    res.plan.sessions.filter((s: Any) => s.kind === "dispatch" && s.repo === M).map((s: Any) => s.issue);
+
+  test("an issue blocked by an open issue elsewhere stays blocked, named with its repo", () => {
+    const res = plan([open(15, "Waits on other", { body: `Blocked by: ${X}#10` })], [], {
+      [`repos/${X}/issues/10`]: { state: "open" },
+    });
+    assert.equal(res.status, 0, res.stderr);
+    assert.ok(!dispatched(res).includes(15));
+    assert.match(res.plan.digest.body, /Waits on other \(blocked by realJohnDoe\/other#10\)/);
+  });
+
+  test("closed there, it is dispatchable; the same number here is not consulted", () => {
+    const res = plan([open(15, "Waits on other", { body: `Blocked by: ${X}#10` })], [], {
+      [`repos/${X}/issues/10`]: { state: "closed" },
+    });
+    assert.equal(res.status, 0, res.stderr);
+    assert.ok(dispatched(res).includes(15));
+  });
+
+  test("an unreadable blocker blocks", () => {
+    const res = plan([open(15, "Waits on other", { body: `Blocked by: ${X}#10` })], []);
+    assert.equal(res.status, 0, res.stderr);
+    assert.ok(!dispatched(res).includes(15));
+    assert.match(res.plan.digest.body, /Waits on other \(blocker realJohnDoe\/other#10 unreadable\)/);
+  });
+
+  test("a native cross-repo blocker is named with its repo", () => {
+    const res = plan(
+      [open(15, "Waits natively", { issue_dependencies_summary: { blocked_by: 1 } })],
+      [],
+      {
+        [`repos/${M}/issues/15/dependencies/blocked_by`]: [
+          { number: 10, state: "open", repository_url: `https://api.github.com/repos/${X}` },
+        ],
+      },
+    );
+    assert.equal(res.status, 0, res.stderr);
+    assert.ok(!dispatched(res).includes(15));
+    assert.match(res.plan.digest.body, /Waits natively \(blocked by realJohnDoe\/other#10\)/);
+  });
+
+  test("a green automerge PR labelled deferred is not merged, and is listed as not picked up", () => {
+    const res = plan(
+      [],
+      [
+        pr(22, "Deferred green", { labels: [{ name: "automerge" }, { name: "deferred" }], runs: green, mergeable: true }),
+        pr(23, "Deferred red", { labels: [{ name: "deferred" }], runs: red, mergeable: true }),
+      ],
+    );
+    assert.equal(res.status, 0, res.stderr);
+    assert.deepEqual(res.plan.automerge.map((m: Any) => m.pr), [20]);
+    assert.ok(!res.plan.sessions.some((s: Any) => s.repo === M && s.pr === 23));
+    assert.match(res.plan.digest.body, /\[realJohnDoe\/meridian#22\]\(\S+\) Deferred green \(`deferred`; remove the label to queue it\)/);
+    assert.match(res.plan.digest.body, /\[realJohnDoe\/meridian#23\]\(\S+\) Deferred red \(`deferred`/);
+  });
+});
+
 describe("pause over two repos", () => {
   const draft = { number: 50, title: "Workshop digest (draft) — from 2026-11-10", labels: [{ name: "workshop-paused" }], body: "" };
   const fixture = world({
