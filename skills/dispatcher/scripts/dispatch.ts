@@ -493,6 +493,8 @@ function planRepo({ repo, name, path }: Repo, since: string): RepoPlan {
       comments: all<GhComment>(`repos/${repo}/issues/${pr.number}/comments?per_page=100`),
       reviewComments: all<GhComment>(`repos/${repo}/pulls/${pr.number}/comments?per_page=100`),
       reviews: all<GhReview>(`repos/${repo}/pulls/${pr.number}/reviews?per_page=100`),
+      branch: pr.head.ref,
+      body: pr.body,
       base,
       today: TODAY,
       maxFollowups: MAX_FOLLOWUPS,
@@ -503,7 +505,7 @@ function planRepo({ repo, name, path }: Repo, since: string): RepoPlan {
         out.inProgress.push({ ...it, why: v.why });
         break;
       case "review":
-        out.review.push(it);
+        out.review.push(v.why ? { ...it, why: v.why } : it);
         break;
       case "merge":
         out.automerge.push({ repo, pr: pr.number, sha: pr.head.sha, title: pr.title, created: pr.created_at });
@@ -543,7 +545,7 @@ function planRepo({ repo, name, path }: Repo, since: string): RepoPlan {
               ? `This is a Dependabot bump: adapt the code or config to the new versions rather than reverting a bump, and leave the PR description as Dependabot wrote it. If a bump can't be adopted narrowly, say why in a PR comment instead of pushing.`
               : `If the repo has a PR template, the PR description must still meet it.`,
             `Do not subscribe to PR activity: the daily workshop run checks this PR again tomorrow.`,
-            `When you're done, remove the worktree: \`git -C ${path} worktree remove ${wt}\`.`,
+            `When you're done, remove the worktree and the scratch folder: \`git -C ${path} worktree remove ${wt}\` and \`rm -rf ${wt}.scratch\`.`,
           ].join("\n"),
         });
         break;
@@ -621,7 +623,7 @@ function planRepo({ repo, name, path }: Repo, since: string): RepoPlan {
           ? `Don't label the PR \`${AUTOMERGE}\`: it waits for the maintainer's review.`
           : `Label the PR \`${AUTOMERGE}\`: the daily workshop run merges it once green.`,
         `Do not subscribe to PR activity: the daily workshop run follows up on red CI and review comments.`,
-        `When you're done, remove the worktree: \`git -C ${path} worktree remove ${wt}\`.`,
+        `When you're done, remove the worktree and the scratch folder: \`git -C ${path} worktree remove ${wt}\` and \`rm -rf ${wt}.scratch\`.`,
       ].join("\n"),
     });
   }
@@ -712,5 +714,6 @@ function setup(path: string, wt: string, commands: string[]) {
     ...commands,
     "```",
     `then do everything from \`${wt}\`.`,
+    `Put every temporary file (PR description, check logs, JSON, anything else) in your own scratch folder \`${wt}.scratch\`, never directly in /tmp or the run's scratchpad: other sessions share them. Remove it along with the worktree.`,
   ];
 }

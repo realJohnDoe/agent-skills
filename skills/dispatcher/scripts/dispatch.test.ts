@@ -181,7 +181,10 @@ describe("dispatch dry run over two repos", () => {
       assert.equal(s.checkout, clone);
       assert.ok(s.prompt.includes(`git -C ${clone} worktree add`), s.prompt);
       assert.ok(s.prompt.includes(s.worktree));
+      assert.ok(s.prompt.includes(`${s.worktree}.scratch`), s.prompt);
     }
+    const scratch = res.plan.sessions.map((s: { worktree: string }) => `${s.worktree}.scratch`);
+    assert.equal(new Set(scratch).size, scratch.length);
     const [, followup, dispatch] = res.plan.sessions;
     assert.ok(followup.prompt.includes("- CI failing: build: https://ci/1"));
     assert.ok(dispatch.prompt.includes("Label the PR `automerge`"));
