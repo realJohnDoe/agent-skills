@@ -77,8 +77,8 @@ Publish one Artifact page per run, titled `Dependency maintenance <YYYY-MM-DD>`,
 
 Link the previous run's report at the top.
 
-Then file the run's tracking issue in realJohnDoe/agent-skills, titled like the report. Its body holds the report link, the previous run's tracking issue, the per-repo table and the cross-repo decisions. Add every issue filed or updated as a sub-issue. Give it no tier label: it records the run and isn't work to dispatch.
+Then, if the run filed or updated at least one issue, file the run's tracking issue in realJohnDoe/agent-skills, titled like the report. Its body holds the report link, the previous run's tracking issue, the per-repo table and the cross-repo decisions. Add every issue filed or updated as a sub-issue. Give it no tier label: it records the run and isn't work to dispatch. A run with no findings files no tracking issue.
 
-Close every open tracking issue whose sub-issues are all closed, as completed, including this run's if it has none open. A tracking issue with any open sub-issue stays open.
+Close every open tracking issue whose sub-issues are all closed, as completed. A tracking issue with any open sub-issue stays open.
 
-End your reply with the report link, the tracking issue, and the issue count per repo.
+End your reply with the report link, the tracking issue if there is one, and the issue count per repo.
