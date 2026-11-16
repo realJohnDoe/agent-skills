@@ -50,7 +50,7 @@ test("isDigest matches workshop and pre-rename farm digests", () => {
 const ELSEWHERE = { kind: "elsewhere" };
 const DEFERRED_STATE = { kind: "deferred" };
 const NO_TIER = { kind: "notPicked", reason: "no tier label; add `haiku`, `sonnet` or `opus` to queue it" };
-const OPUS_PLAN = { kind: "notPicked", reason: "`opus-plan`; start a plan session by hand" };
+const PLAN_STATE = { kind: "notPicked", reason: "`plan`; start a plan session by hand" };
 
 describe("issueState", () => {
   const issue = (over = {}) => ({
@@ -116,10 +116,14 @@ describe("issueState", () => {
         issueState(issue({ labels: ["bug"] })),
         NO_TIER,
       ));
-    test("opus-plan", () =>
+    test("plan, with or without a tier", () => {
+      assert.deepEqual(issueState(issue({ labels: ["plan"] })), PLAN_STATE);
+      assert.deepEqual(issueState(issue({ labels: ["opus", "plan", "ready-for-agent"] })), PLAN_STATE);
+    });
+    test("retired opus-plan still reads as plan", () =>
       assert.deepEqual(
         issueState(issue({ labels: ["opus-plan"] })),
-        OPUS_PLAN,
+        PLAN_STATE,
       ));
     test("tier label without ready-for-agent waits for triage", () =>
       assert.deepEqual(issueState(issue({ labels: ["sonnet"] })), { kind: "awaitingTriage" }));
@@ -147,10 +151,10 @@ describe("issueState", () => {
         issueState(issue({ labels: ["deferred"] })),
         DEFERRED_STATE,
       ));
-    test("opus-plan beats a tier label", () =>
+    test("plan beats a tier label", () =>
       assert.deepEqual(
-        issueState(issue({ labels: ["sonnet", "opus-plan"] })),
-        OPUS_PLAN,
+        issueState(issue({ labels: ["sonnet", "plan"] })),
+        PLAN_STATE,
       ));
     test("no tier before blocked", () =>
       assert.deepEqual(
@@ -164,10 +168,10 @@ describe("issueState", () => {
         issueState(issue({ labels: ["sonnet", "deferred"] })),
         DEFERRED_STATE,
       ));
-    test("opus-plan before blocked", () =>
+    test("plan before blocked", () =>
       assert.deepEqual(
-        issueState(issue({ labels: ["opus-plan"], blockers: [3] })),
-        OPUS_PLAN,
+        issueState(issue({ labels: ["plan"], blockers: [3] })),
+        PLAN_STATE,
       ));
   });
 });

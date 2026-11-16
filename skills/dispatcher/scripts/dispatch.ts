@@ -64,7 +64,7 @@ const LABELS: Record<string, string> = {
   haiku: "c5def5",
   sonnet: "0075ca",
   opus: "5319e7",
-  "opus-plan": "d4c5f9",
+  plan: "d4c5f9",
   deferred: "cccccc",
   [READY]: "0e8a16",
   [AUTOMERGE]: "0e8a16",

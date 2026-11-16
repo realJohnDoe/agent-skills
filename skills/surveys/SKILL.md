@@ -54,17 +54,11 @@ Nothing in this plugin names a repo, its paths or its issues: those belong in th
 - **Read the merged-PR history for defect classes, not just for churn.** Commits tell you what changed; PR titles tell you what was *wrong*, which is the question a survey is asking. Sample the last ~200 and tally what was being fixed. A class the repo keeps paying for that no category names is a finding *about the survey*: fix it with a diff on the survey file (see the last section).
 - **Run what you need.** A survey that requires a measurement, a screenshot or the dev server says so, and that pass is the ask, whatever a repo's rule about not driving the dev server unprompted says.
 
-## Recommended model tiers
+## Tier
 
-Every finding is tagged with a **Recommended model**: the cheapest tier capable of doing the fix well, **Haiku 4.5** / **Sonnet 5** / **Opus 5** / **Opus 5 in plan mode, for a plan spanning multiple PRs** (or the current equivalent tier, if these names have moved on).
+Every finding gets a tier label, chosen as the `conventions` skill's **Choosing a tier** says: the cheapest tier that can do the fix well *with* the finding's Task context block present. Each survey names what "fails silently" looks like in its own domain. Whether a finding is a multi-PR `plan` and whether it waits on a `## Decision needed` are separate from the tier (`conventions`, **Filing an issue**): an architecture change spanning several PRs is `plan`, a product decision only the maintainer can make is a decision section, and neither raises the tier.
 
-Judge by how much of the fix is load-bearing judgement versus mechanical edit, and by **how the fix fails**. A wrong-but-plausible change that breaks the build, a type-check or a test is far safer to hand down-tier than one that fails silently; each survey names what "fails silently" looks like in its own domain. Reserve plan mode + multi-PR for findings that need an architecture change **or** a product decision only the user should make.
-
-**Always state the specific hazard that sets the tier**: the trap that would void the fix, the invariant that fails quietly, the interacting call site that's easy to miss. If naming that hazard would let a lower tier do the job, say so (e.g. "Sonnet 5 if the cache key is specified in the task; else Opus 5").
-
-## Write findings down to Sonnet 5 where you honestly can
-
-The tier is a property of the finding *as written*. Most Opus-tier ratings are really "Opus, because the report withheld what the fixer would need". So give every finding a **Task context** block carrying the specifics that let the named tier work without re-deriving them, and rate the tier against the finding *with* that block. What belongs there:
+Give every finding a **Task context** block with what lets that tier work without re-deriving it:
 
 - **Exact locations.** File plus line or line range for every site to change, and the call sites to update. Verify the numbers before writing them down; a confidently wrong line number is worse than none.
 - **The enumerated work.** If the fix is "add the missing N things", list all N with their values. If it is a move, say what moves and what stays.
@@ -73,15 +67,13 @@ The tier is a property of the finding *as written*. Most Opus-tier ratings are r
 - **The precedent.** If the repo has already solved this shape, name the file and the commit.
 - **The seam, verified in both directions.** For any extraction, state what the moved code depends on *and* what still depends on it, and say you checked.
 
-**Do not fake the downgrade.** A finding that needs a judgement call (a shared mutable singleton with no obvious owner, a product decision, an abstraction whose shape the code doesn't determine) stays at Opus 5: say so and why the context doesn't help. Where a finding splits cleanly, split it: rate the specified half down and leave the decision half where it belongs.
-
 Re-rank after writing the blocks, since the tier feeds the ranking. Carry rank as its own column in the parent's summary table; a finding's identity is its issue number.
 
 ## Ranking findings
 
-Rank by `(impact × breadth) ÷ effort`, where `effort` is the tier read as an ordinal (Haiku 4.5 = 1, Sonnet 5 = 2, Opus 5 = 3, Opus 5 plan-mode/multi-PR = 5), but report impact, breadth and recommended model as separate fields. Put a short **summary table** above the findings (finding → recommended model, plus that survey's other columns).
+Rank by `(impact × breadth) ÷ effort`, where `effort` is the tier read as an ordinal (`haiku` = 1, `sonnet` = 2, `opus` = 3), plus 2 for a `plan`. A decision section doesn't change effort. Report impact, breadth, tier and `plan` as separate fields. Put a short **summary table** above the findings (finding → tier, `plan`, open decision, plus that survey's other columns).
 
-The tier rates **the fix**, not confirming it: re-running a build, a test suite, a measurement or a repro is scripted and suits the cheapest tier. Where findings touch the same code, add a one-line **sequencing note** saying which order avoids rebasing the same file twice, and record it as a native blocked-by edge on the later finding (`conventions`, **Order**). Open findings that can start now:
+Where findings touch the same code, add a one-line **sequencing note** saying which order avoids rebasing the same file twice, and record it as a native blocked-by edge on the later finding (`conventions`, **Order**). Open findings that can start now:
 
 ```bash
 gh api repos/<owner/repo>/issues/<parent>/sub_issues --jq '.[] | select(.state=="open" and .issue_dependencies_summary.blocked_by==0) | .number'
@@ -93,7 +85,7 @@ Six fields are the same in every survey. Each survey adds its own (its `Category
 
 - **Title**: short label.
 - **Breadth**: the number of **files** affected, from an actual search (grep/glob) you can name; write "est." if you estimated. Where the exposure is a *condition* ("every entry, whenever two tabs are open"), say that instead, still naming the search, including a grep with **zero** hits where absence is the point.
-- **Recommended model**: per **Recommended model tiers**, rated with the Task context block present.
+- **Tier**: per **Tier**, rated with the Task context block present, plus `plan` where the fix spans several PRs.
 - **Evidence**: at least one file path plus a short **verbatim quote** from it, grep-safe: quote a span on one line, or say so and give the line range. For toolchain findings a config quote plus a dry-run result is evidence.
 - **Problem**: one sentence: what is wrong and why it matters.
 - **Fix**: one sentence: the concrete change. Where the survey measures something, also say how the measurement should read afterwards.
@@ -117,7 +109,7 @@ Every survey caps its findings at a stated top-N. Include everything that makes 
 ## Reporting
 
 - **One parent issue per run**, in the surveyed repo, titled with the survey, its scope and the date, labelled `survey` plus the survey-type label. Its body carries the **Why this survey** line, the coverage statement, the category verdicts and the summary table, with each row linking its finding's sub-issue rather than restating it. It stays open until every finding is resolved.
-- **One sub-issue per finding**, attached to the parent, with the fields above (the repo's `survey-finding` issue template, if it has one, is the skeleton). Label each with the survey's `Category` tag(s), `survey-finding`, the survey-type label, and a tier label, plus a `## Decision needed` section when it hinges on a decision only the maintainer can make, both per the `conventions` skill.
+- **One sub-issue per finding**, attached to the parent, with the fields above (the repo's `survey-finding` issue template, if it has one, is the skeleton). Label each with the survey's `Category` tag(s), `survey-finding`, the survey-type label, a tier label, and `plan` where it applies, plus a `## Decision needed` section when it hinges on a decision only the maintainer can make, all per the `conventions` skill.
 - **A finding whose fix belongs in the workshop's shared files** (the dispatcher's prompts, `conventions`, these survey skills) is filed in the workshop's own repo, the digest repo the `dispatcher` skill names, and attached to the parent as a sub-issue there too.
 - **Search first.** Search the repo's open parents (and their sub-issues) for the survey-type label: a re-run mostly re-derives findings already open, and those get a comment with the new evidence rather than a second issue. Then read the newest *closed* parent's "deliberately not filed" section, which an open-issue search can't see.
 - A fix that adds a cache, memo or incremental-update path ships a test that its output deep-equals a full recompute. The fixer re-runs the finding's acceptance check before it closes.

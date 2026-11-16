@@ -6,7 +6,7 @@
 // Prints {state, plan}. state is normal | drain | paused | resume. Without --apply
 // nothing is written; with it, drain/resume carry out the plan and post their marker
 // comment last, so a crash is retried and a second firing in the same state does nothing.
-import { FAILED, assertNever, isDigest, marked, referencedIssues, openQuestion, READY } from "./decide.ts";
+import { FAILED, assertNever, isDigest, marked, referencedIssues, openQuestion, READY, tierOf, isPlan } from "./decide.ts";
 import type { GhCheckRuns, GhIssue, GhPull } from "./github.ts";
 import {
   FOOTER,
@@ -28,8 +28,7 @@ const TODAY = arg("--today", new Date().toISOString().slice(0, 10));
 const SNAPSHOT = "<!-- workshop-snapshot -->";
 const RESUMED = "<!-- workshop-resumed -->";
 const DRIFT = 100; // a deferred PR this many commits behind its base is closed on resume
-const TIERS = ["haiku", "sonnet", "opus", "opus-plan"];
-const tiered = (x: GhIssue | GhPull) => names(x).some((l) => TIERS.includes(l));
+const tiered = (x: GhIssue | GhPull) => !!tierOf(names(x)) || isPlan(names(x));
 
 // normal: nothing to do. drain: the label is on a digest and the snapshot isn't
 // posted yet. paused: the snapshot is posted. resume: the label is gone and the

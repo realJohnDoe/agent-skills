@@ -108,7 +108,7 @@ File the run per the `surveys` skill's **Reporting**, with `retro` as the survey
 4. **Findings — top 5.** The `surveys` skill's finding fields, plus:
    - **Sessions** — the PRs/session ids it was seen in, and what happened in each
      (one line, with a verbatim quote from the transcript or PR).
-   - **Category** — one of the tags below. Label only `retro` + `survey-finding` + the tier.
+   - **Category** — one of the tags below. Label only `retro` + `survey-finding` + the tier (and `plan` where it applies).
    - **Impact** — 1–10, where 10 = it already shipped a wrong change that no
      check caught; 5 = it costs a red CI round or a follow-up session each time
      it fires; 1 = wasted tokens only.
@@ -117,8 +117,8 @@ Breadth here is **sessions affected** of those read, not files.
 
 **Fails silently here** means a steering-file edit that no session follows. It
 passes every check by construction. So prefer a fix that a gate enforces over
-prose. Example hazard note: "Sonnet 5 if the exact `CLAUDE.md` lines to cut are
-listed; else Opus 5, since a cut that drops a rule sessions relied on is
+prose. Example hazard note: "`sonnet` if the exact `CLAUDE.md` lines to cut are
+listed; else `opus`, since a cut that drops a rule sessions relied on is
 invisible until a session breaks it."
 
 ## Categories — ranked by priority

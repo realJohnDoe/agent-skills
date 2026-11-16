@@ -42,7 +42,7 @@ const pr = (n: number, title: string, extra: Any = {}) => ({
   created_at: "2026-10-01T00:00:00Z",
   ...extra,
 });
-const ALL_LABELS = ["haiku", "sonnet", "opus", "opus-plan", "deferred", "ready-for-agent", "automerge", "preview"].map(
+const ALL_LABELS = ["haiku", "sonnet", "opus", "plan", "deferred", "ready-for-agent", "automerge", "preview"].map(
   (name) => ({ name }),
 );
 const green = [{ name: "build", status: "completed", conclusion: "success" }];
@@ -195,7 +195,7 @@ describe("dispatch dry run over two repos", () => {
 
   test("lists the labels each repo is missing", () =>
     assert.deepEqual(res.plan.missingLabels, [
-      { repo: T, missing: ["opus", "opus-plan", "deferred", "automerge", "preview"] },
+      { repo: T, missing: ["opus", "plan", "deferred", "automerge", "preview"] },
     ]));
 
   test("one digest naming every item's repo", () => {
@@ -226,7 +226,7 @@ describe("dispatch apply", () => {
 
   test("creates missing labels first, in the repo missing them", () => {
     const created = writes("POST", `repos/${T}/labels`).map((w) => w.body.name);
-    assert.deepEqual(created, ["opus", "opus-plan", "deferred", "automerge", "preview"]);
+    assert.deepEqual(created, ["opus", "plan", "deferred", "automerge", "preview"]);
     assert.equal(res.writes[0].path, `repos/${T}/labels`);
     assert.equal(writes("POST", `repos/${M}/labels`).length, 0);
   });

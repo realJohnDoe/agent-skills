@@ -11,14 +11,15 @@ Whenever you ask the maintainer to do something by hand, in an issue, PR, digest
 
 ## Filing an issue
 
-1. **Tier.** Put exactly one tier label on the issue: the cheapest model that can do the work well.
+1. **Tier.** Put exactly one tier label on the issue: the cheapest model that can do the work well, as the issue is written. See **Choosing a tier** below.
    - `haiku`: well-specified, mechanical work with a clear done-state, such as a config change, deleting code or a simple chore.
    - `sonnet`: well-scoped work that follows settled decisions.
    - `opus`: work that needs design, judgement or reasoning across modules.
-   - `opus-plan`: a plan spanning several PRs. It is never dispatched; a person starts a plan session for it.
 
    When in doubt, use `opus`. Work only a person can do (accounts, secrets, taste) gets no tier: say what is needed in a decision section (step 2).
-2. **Decision.** When the maintainer must decide or do something before an agent can work, add this section to the body:
+
+   The tier says only which model does the work. Whether the work is a plan (step 3) or waits on a decision (step 2) is set separately and never moves the tier.
+2. **Decision.** When the maintainer must decide or do something before an agent can work, add this section to the body. Keep the tier the work needs once it is decided:
 
    ```markdown
    ## Decision needed
@@ -30,17 +31,28 @@ Whenever you ask the maintainer to do something by hand, in an issue, PR, digest
    ```
 
    The digest shows the first paragraph, so make it stand alone. The section stays open until it gains a `**Decided:** <answer>` line, which the dispatcher's relay adds when the maintainer answers on the digest. Any agent recording a decision ends the section the same way.
-3. **After merge.** When an issue needs a manual step once its PR has merged, e.g. switching a Pages source, add an `## After merge` section. Its first paragraph says what to do and links the page where it's done; the digest shows it, as with `## Decision needed`. Whoever files the issue adds it, and an agent that discovers such a step while working adds it to the issue body. First check whether the PR can do the step itself: only what genuinely needs the maintainer goes there. The maintainer closes the issue once the step is done. Anything blocked by it waits until then, not just until the merge.
-4. **Order.** When one issue must wait for another, add a native blocked-by edge:
+3. **Plan.** When the work spans several PRs and needs a plan before any of them, add the `plan` label next to the tier label. The tier is the model the plan session runs on, usually `opus`. A `plan` issue is never dispatched: a person starts a plan session for it, which files the PRs' issues as sub-issues, each with its own tier. `opus-plan` is retired; the dispatcher still reads it as `plan`.
+4. **After merge.** When an issue needs a manual step once its PR has merged, e.g. switching a Pages source, add an `## After merge` section. Its first paragraph says what to do and links the page where it's done; the digest shows it, as with `## Decision needed`. Whoever files the issue adds it, and an agent that discovers such a step while working adds it to the issue body. First check whether the PR can do the step itself: only what genuinely needs the maintainer goes there. The maintainer closes the issue once the step is done. Anything blocked by it waits until then, not just until the merge.
+5. **Order.** When one issue must wait for another, add a native blocked-by edge:
 
    ```sh
    gh api --method POST repos/<owner>/<repo>/issues/<blocked>/dependencies/blocked_by -F issue_id=<blocker-db-id>
    ```
 
    `<blocker-db-id>` is the blocker's numeric database id (the `id` that MCP `issue_write` returns, or `gh api repos/<owner>/<repo>/issues/<n> --jq .id`), not its `#number`. The blocker may be in another repo. This is a REST call, so it works where GraphQL is blocked and `gh issue`/`gh pr` commands fail. The GitHub MCP tools have no dependency tool, so use `gh api` for it. Check the edge took with `gh api repos/<owner>/<repo>/issues/<blocked>/dependencies/blocked_by --jq '.[].html_url'`. Only where `gh api` can't reach GitHub at all, use a `Blocked by: #n` line at the top of the body instead; it may name an issue in another repo as `owner/repo#n`. To make an issue part of a larger one, make it a sub-issue: MCP `issue_write` with `parent_issue_number` (it may be in another repo), or `sub_issue_write` afterwards.
-5. **Approval.** Leave approval to the maintainer. `ready-for-agent` is their go-ahead and nothing is dispatched without it, so the issue waits under the digest's **Waiting on you** until they add it. Agents never add it themselves. The one exception is the dispatcher relaying the maintainer's own `ready` reply.
+6. **Approval.** Leave approval to the maintainer. `ready-for-agent` is their go-ahead and nothing is dispatched without it, so the issue waits under the digest's **Waiting on you** until they add it. Agents never add it themselves. The one exception is the dispatcher relaying the maintainer's own `ready` reply.
 
-Done when the issue has one tier label (or a decision section instead), a decision section if anything waits on the maintainer, and its blockers as edges.
+Done when the issue has one tier label (or a decision section instead), `plan` if it is a multi-PR plan, a decision section if anything waits on the maintainer, and its blockers as edges.
+
+## Choosing a tier
+
+The tier rates the work **as the issue is written**, so write it down a tier where you honestly can. Most `opus` ratings are really "`opus`, because the issue withheld what the worker would need". Give the issue the specifics that let a cheaper tier do it without re-deriving them: exact files and lines (verified), the enumerated work, measured numbers, the trap located to a file and line, a precedent in the repo. Then rate it with those present.
+
+- **Judge by how the work fails.** A wrong-but-plausible change that breaks the build, a type-check or a test is safe to hand down-tier; one that fails silently is not.
+- **Name the hazard that sets the tier**: the trap that would void the fix, the invariant that fails quietly, the call site that's easy to miss. If naming it would let a lower tier do the job, say so, e.g. "`sonnet` if the cache key is specified; else `opus`".
+- **Don't fake the downgrade.** Work that needs a judgement call the issue can't settle (a shared mutable singleton with no obvious owner, an abstraction whose shape the code doesn't determine) stays `opus`; say why the context doesn't help. A decision only the maintainer can make is not a reason for `opus`: put it in a `## Decision needed` section and rate the work that follows it.
+- **Split what splits cleanly**: rate the specified half down and leave the rest where it belongs.
+- **Rate the fix, not confirming it.** Re-running a build, a test suite, a measurement or a repro is scripted and suits the cheapest tier.
 
 ## Opening a PR
 
@@ -53,13 +65,13 @@ Close the issue from the body with `Fixes #n`. For an issue with an `## After me
 | Label | Where | Set by | Means |
 |---|---|---|---|
 | `haiku` / `sonnet` / `opus` | issue | whoever files it | The model a session runs on, once the issue is approved and unblocked |
-| `opus-plan` | issue | whoever files it | A plan spanning several PRs; never dispatched |
+| `plan` | issue | whoever files it | A plan spanning several PRs, alongside a tier label; never dispatched |
 | `ready-for-agent` | issue | the maintainer | The go-ahead; with a tier label, the issue is dispatched once unblocked |
 | `deferred` | issue, PR | the maintainer, or a workshop pause | Parked on purpose; listed under Not picked up until removed |
 | `automerge` | PR | whoever opens it; a repo's Dependabot workflow for non-major bumps | Merged by the dispatcher once green and quiet |
 | `preview` | PR | whoever opens a PR that changes what a page looks like; the maintainer on any PR | Deploys a live preview of the PR, in a repo with PR previews |
 
-`decision-required` is retired. A `## Decision needed` section replaces it, and the dispatcher ignores the label.
+`decision-required` is retired. A `## Decision needed` section replaces it, and the dispatcher ignores the label. `opus-plan` is retired too: use `plan` with `opus`.
 
 ## Triage roles
 
