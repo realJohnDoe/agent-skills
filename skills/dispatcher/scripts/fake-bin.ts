@@ -28,34 +28,35 @@ export const fakeBin = () => {
   return dir;
 };
 
-const fail = (msg) => {
+function fail(msg: string): never {
   process.stderr.write(`${msg}\n`);
   process.exit(1);
-};
+}
 
-const gh = (args) => {
+const gh = (args: string[]) => {
   if (args[0] !== "api") fail(`fake gh: only \`gh api\`, got ${args.join(" ")}`);
   // The path is the first argument that is neither a flag nor a flag's value.
   const valued = ["-X", "-f", "--input"];
-  const path = args.slice(1).find(
-    (a, i, rest) => !a.startsWith("-") && !valued.includes(rest[i - 1]),
-  );
-  const opt = (name) => {
+  const path =
+    args.slice(1).find((a, i, rest) => !a.startsWith("-") && !valued.includes(rest[i - 1])) ??
+    fail("fake gh: no path");
+  const opt = (name: string) => {
     const i = args.indexOf(name);
     return i > 0 ? args[i + 1] : undefined;
   };
   const method = opt("-X") ?? (args.includes("--input") ? "POST" : "GET");
   if (method !== "GET") {
-    if (!process.env.FAKE_GH_LOG) fail(`fake gh: write in a dry run: ${method} ${path}`);
+    const log = process.env.FAKE_GH_LOG;
+    if (!log) fail(`fake gh: write in a dry run: ${method} ${path}`);
     const body = readFileSync(0, "utf8");
     appendFileSync(
-      process.env.FAKE_GH_LOG,
+      log,
       `${JSON.stringify({ method, path, body: body ? JSON.parse(body) : null })}\n`,
     );
     process.stdout.write(JSON.stringify({ number: 900 }));
     return;
   }
-  const fixture = JSON.parse(readFileSync(process.env.FAKE_GH_FIXTURE, "utf8"));
+  const fixture = JSON.parse(readFileSync(process.env.FAKE_GH_FIXTURE!, "utf8"));
   const q = args.find((a) => a.startsWith("q="));
   const key = q ? `${path}?${q}` : path.split("?")[0];
   if (!(key in fixture)) fail(`fake gh: no fixture for ${key}`);
@@ -63,7 +64,7 @@ const gh = (args) => {
   process.stdout.write(JSON.stringify(args.includes("--slurp") ? [answer] : answer));
 };
 
-const git = (args) => {
+const git = (args: string[]) => {
   const c = args[0] === "-C" ? args[1] : process.cwd();
   const rest = args[0] === "-C" ? args.slice(2) : args;
   const cmd = rest.join(" ");

@@ -2,30 +2,33 @@
 // The daily dispatcher's plan over every attached repo: which issues to start,
 // which PRs need a follow-up session or get merged, and the one shared digest.
 // See ../SKILL.md.
-// Usage: node dispatch.mjs --digest owner/repo [--apply] [--followups-only]
+// Usage: node dispatch.ts --digest owner/repo [--apply] [--followups-only]
 //   [--max-sessions N] [--max-followups N] [--today YYYY-MM-DD] [--repos o/r,...]
 //   [--checkouts dir]
 // Without --apply it is a dry run: it prints the plan and writes nothing.
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { bodyBlockers } from "./bodyBlockers.mjs";
+import { bodyBlockers } from "./bodyBlockers.ts";
 import {
   AUTOMERGE,
+  DEFERRED,
   FOLLOWUP,
   AGENT,
+  assertNever,
+  blockedText,
   claimState,
   isDigest,
+  issueState,
   linkedIssues,
   marked,
   prVerdict,
-  skipReason,
-  AWAITING_TRIAGE,
-  DECISION,
   openQuestion,
   READY,
   tierOf,
-} from "./decide.mjs";
+} from "./decide.ts";
+import type { GhCheckRuns, GhComment, GhIssue, GhPull, GhReview, GhSearch } from "./github.ts";
 import {
+  type Repo,
   FOOTER,
   PAUSE_LABEL,
   all,
@@ -37,7 +40,7 @@ import {
   names,
   post,
   preflight,
-} from "./lib.mjs";
+} from "./lib.ts";
 
 const APPLY = flag("--apply");
 const FOLLOWUPS_ONLY = flag("--followups-only"); // drain: merge and follow up, start nothing new
@@ -54,7 +57,7 @@ const DIGEST_PREFIX = "Workshop digest";
 const DISPATCH = "<!-- workshop-dispatch -->";
 const RELAYED = "<!-- workshop-relayed -->"; // digest replies up to here are copied to their issues
 // Created in each repo on first contact if missing.
-const LABELS = {
+const LABELS: Record<string, string> = {
   haiku: "c5def5",
   sonnet: "0075ca",
   opus: "5319e7",
@@ -63,29 +66,71 @@ const LABELS = {
   [READY]: "0e8a16",
   [AUTOMERGE]: "0e8a16",
 };
-const days = (iso) => (TODAY - new Date(iso)) / 864e5;
-const byRepo = (a, b) => a.repo.localeCompare(b.repo);
-const oldestFirst = (a, b) => a.created.localeCompare(b.created) || byRepo(a, b);
-const newestFirst = (a, b) => b.created.localeCompare(a.created) || byRepo(a, b);
+const days = (iso: string) => (+TODAY - +new Date(iso)) / 864e5;
+type Item = {
+  repo: string;
+  ref: string;
+  url: string;
+  title: string;
+  why?: string;
+  ask?: string;
+  waiting?: boolean; // Not picked up, but only counted in the digest
+  issue?: number;
+  pr?: number;
+  created?: string;
+};
+type Dated = { repo: string; created: string };
+type Session = {
+  repo: string;
+  tier: string | undefined;
+  item: Item;
+  checkout: string;
+  worktree: string;
+  created: string;
+  title: string;
+  prompt: string;
+};
+type Followup = Session & { kind: "followup"; pr: number; issue: number | undefined; branch: string };
+type Dispatch = Session & { kind: "dispatch"; issue: number };
+type Merge = { repo: string; pr: number; sha: string; title: string; created: string };
+type RepoPlan = {
+  repo: string;
+  followups: Followup[];
+  dispatches: Dispatch[];
+  review: Item[];
+  unstick: Item[];
+  automerge: Merge[];
+  inProgress: Item[];
+  notPicked: Item[];
+  triage: Item[];
+  decide: Item[];
+  merged: string[];
+  unblocks: Map<string, string[]>;
+  missingLabels: string[];
+};
+type ListKey = Exclude<keyof RepoPlan, "repo" | "unblocks" | "missingLabels">;
+const byRepo = (a: Dated, b: Dated) => a.repo.localeCompare(b.repo);
+const oldestFirst = (a: Dated, b: Dated) => a.created.localeCompare(b.created) || byRepo(a, b);
+const newestFirst = (a: Dated, b: Dated) => b.created.localeCompare(a.created) || byRepo(a, b);
 
 main(() => {
   const { digest: DIGEST, repos } = loadConfig();
   preflight(repos);
 
   // --- The shared digest's state, read first: its window bounds "merged since".
-  const digests = all(`repos/${DIGEST}/issues?state=open&per_page=100`)
+  const digests = all<GhIssue>(`repos/${DIGEST}/issues?state=open&per_page=100`)
     .filter((i) => !i.pull_request && isDigest(i.title))
     .sort((a, b) => a.number - b.number);
-  const isDraft = (i) => i.title.includes("(draft)");
+  const isDraft = (i: GhIssue) => i.title.includes("(draft)");
   const draft = digests.findLast(isDraft);
   const published = digests.findLast((i) => !isDraft(i));
   const marker = /<!-- digest-(?:date|since): (\S+) -->/;
   const since =
     (draft ?? published)?.body?.match(marker)?.[1] ??
-    new Date(TODAY - DIGEST_DAYS * 864e5).toISOString().slice(0, 10);
+    new Date(+TODAY - DIGEST_DAYS * 864e5).toISOString().slice(0, 10);
 
   const plans = repos.map((r) => planRepo(r, since));
-  const pick = (k) => plans.flatMap((p) => p[k]);
+  const pick = <K extends ListKey>(k: K): RepoPlan[K] => plans.flatMap((p) => p[k] as unknown[]) as RepoPlan[K];
 
   // Follow-ups first: finishing beats starting. Follow-ups go newest PR first and
   // dispatches oldest issue first, as in Meridian, each across every repo
@@ -114,14 +159,14 @@ main(() => {
   // One issue per digest cycle, in the digest repo. Its body is rewritten on
   // every run (an edit notifies nobody); publishing it is the ping. Every item
   // names its repo with a full reference, so links resolve from here.
-  const line = (x, ask) => {
+  const line = (x: Item, ask?: string) => {
     const unblocks = ask ? (unblocksOf.get(x.ref) ?? []) : [];
     const why = [x.why, ...(unblocks.length ? [`unblocks ${unblocks.join(", ")}`] : [])]
       .filter(Boolean)
       .join("; ");
     return `- ${ask ? `[ ] **${ask}** ` : ""}[${x.ref}](${x.url}) ${x.title}${why ? ` (${why})` : ""}`;
   };
-  const section = (h, xs, ask) =>
+  const section = (h: string, xs: Item[], ask?: string) =>
     xs.length ? [`## ${h}`, "", ...xs.map((x) => line(x, x.ask ?? ask)), ""] : [];
   const ANSWER =
     "Answer on the issue or PR, or reply here naming the item (e.g. `meridian#12`): the next daily run copies replies onto their issues.";
@@ -138,12 +183,11 @@ main(() => {
   ];
   // Issues that wait on another issue, a decision or the maintainer's own
   // `deferred` would repeat in every digest, so they are only counted.
-  const isWaiting = (x) => /^(blocked by|`deferred`)/.test(x.why);
-  const waiting = notPicked.filter(isWaiting);
+  const waiting = notPicked.filter((x) => x.waiting);
   const info = [
     ...section("In progress", inProgress),
     ...section("Queue (dispatched next, oldest first)", queue.map((q) => q.item)),
-    ...section("Not picked up", notPicked.filter((x) => !isWaiting(x))),
+    ...section("Not picked up", notPicked.filter((x) => !x.waiting)),
     ...(waiting.length
       ? [
           `<details><summary>${waiting.length} issues waiting on a blocker, a decision or <code>deferred</code></summary>`,
@@ -155,7 +199,7 @@ main(() => {
         ]
       : []),
   ];
-  const render = (start, mergedLines, prev) =>
+  const render = (start: string, mergedLines: string[], prev?: number | null) =>
     `<!-- digest-since: ${start} -->\n\n${NOTE}${
       [...asks, ...info].join("\n") || "Nothing is waiting on the maintainer.\n"
     }\nRepos covered: ${repos.map((r) => r.repo).join(", ")}.\n${prev ? `\nPrevious digest: #${prev}.\n` : ""}${
@@ -172,8 +216,8 @@ main(() => {
     DIGEST_WEEKDAYS.includes(new Date(NOW).getUTCDay()) &&
     (merged.length > 0 || asks.length > 0);
   // Maintainer replies on either digest not yet copied onto their issues.
-  const replies = [draft, published].filter(Boolean).flatMap((d) => {
-    const cs = all(`repos/${DIGEST}/issues/${d.number}/comments?per_page=100`);
+  const replies = [draft, published].filter((d) => d !== undefined).flatMap((d) => {
+    const cs = all<GhComment>(`repos/${DIGEST}/issues/${d.number}/comments?per_page=100`);
     const relayedAt = cs.findLast((c) => marked(c, RELAYED))?.created_at ?? "";
     return cs
       .filter(
@@ -206,7 +250,7 @@ main(() => {
       merged: merged.length,
     },
   };
-  const digestLabels = all(`repos/${DIGEST}/labels?per_page=100`).map((l) => l.name);
+  const digestLabels = all<{ name: string }>(`repos/${DIGEST}/labels?per_page=100`).map((l) => l.name);
   const missingLabels = [
     ...plans
       .filter((p) => p.missingLabels.length)
@@ -236,9 +280,10 @@ main(() => {
           "PUT",
         );
       } catch (e) {
-        console.error(`merge ${m.repo}#${m.pr} refused: ${e.stderr ?? e.message}`);
+        const err = e as { stderr?: string; message: string };
+        console.error(`merge ${m.repo}#${m.pr} refused: ${err.stderr ?? err.message}`);
       }
-    const me = sessions.length ? api("user").login : null;
+    const me = sessions.length ? api<{ login: string }>("user").login : null;
     for (const s of sessions) {
       if (s.kind === "dispatch") {
         post(`repos/${s.repo}/issues/${s.issue}/assignees`, { assignees: [me] });
@@ -256,7 +301,7 @@ main(() => {
       }
     }
     if (!FOLLOWUPS_ONLY) {
-      const newDraft = (start, b) =>
+      const newDraft = (start: string, b: string) =>
         JSON.parse(
           post(`repos/${DIGEST}/issues`, {
             title: `${DIGEST_PREFIX} (draft) — from ${start.slice(0, 10)}`,
@@ -317,13 +362,13 @@ main(() => {
 });
 
 // Everything one repo contributes to the plan, every item carrying its repo.
-function planRepo({ repo, name, path }, since) {
-  const ref = (n) => `${repo}#${n}`;
-  const base = api(`repos/${repo}`).default_branch;
-  const issues = all(`repos/${repo}/issues?state=open&per_page=100`).filter(
+function planRepo({ repo, name, path }: Repo, since: string): RepoPlan {
+  const ref = (n: number) => `${repo}#${n}`;
+  const base = api<{ default_branch: string }>(`repos/${repo}`).default_branch;
+  const issues = all<GhIssue>(`repos/${repo}/issues?state=open&per_page=100`).filter(
     (i) => !i.pull_request,
   );
-  const prs = all(`repos/${repo}/pulls?state=open&per_page=100`);
+  const prs = all<GhPull>(`repos/${repo}/pulls?state=open&per_page=100`);
   const byNumber = new Map(issues.map((i) => [i.number, i]));
   const linked = new Set(prs.flatMap((p) => linkedIssues(p.body)));
   // Open issues an issue waits on: native blocked-by edges, plus the documented
@@ -333,9 +378,9 @@ function planRepo({ repo, name, path }, since) {
       i.number,
       [
         ...new Set([
-          ...(i.issue_dependencies_summary?.blocked_by > 0
-            ? all(`repos/${repo}/issues/${i.number}/dependencies/blocked_by?per_page=100`)
-                .filter((b) => b.state === "open")
+          ...((i.issue_dependencies_summary?.blocked_by ?? 0) > 0
+            ? all<GhIssue>(`repos/${repo}/issues/${i.number}/dependencies/blocked_by?per_page=100`)
+                .filter((b) => (b as GhIssue & { state: string }).state === "open")
                 .map((b) => b.number)
             : []),
           ...bodyBlockers(i.body).filter((n) => byNumber.has(n)),
@@ -343,15 +388,15 @@ function planRepo({ repo, name, path }, since) {
       ],
     ]),
   );
-  const item = (x, extra) => ({
+  const item = (x: GhIssue | GhPull, extra: Partial<Item>): Item => ({
     repo,
     ref: ref(x.number),
     url: x.html_url,
     title: x.title,
     ...extra,
   });
-  const worktree = (kind, n) => join(tmpdir(), "workshop", `${name}-${kind}-${n}`);
-  const out = {
+  const worktree = (kind: string, n: number) => join(tmpdir(), "workshop", `${name}-${kind}-${n}`);
+  const out: RepoPlan = {
     repo,
     followups: [],
     dispatches: [],
@@ -364,6 +409,7 @@ function planRepo({ repo, name, path }, since) {
     decide: [],
     merged: [],
     unblocks: new Map(),
+    missingLabels: [],
   };
 
   // --- PR follow-up ---------------------------------------------------------
@@ -375,14 +421,14 @@ function planRepo({ repo, name, path }, since) {
     const bot = pr.user.login === "dependabot[bot]";
     // A red bump is undiagnosed and often rooted in a dependency's own change.
     const tier = issue ? tierOf(names(issue)) : bot ? "opus" : "sonnet";
-    const head = api(`repos/${repo}/commits/${pr.head.sha}`);
-    const runs = api(`repos/${repo}/commits/${pr.head.sha}/check-runs?per_page=100`).check_runs;
+    const head = api<{ commit: { committer: { date: string } } }>(`repos/${repo}/commits/${pr.head.sha}`);
+    const runs = api<GhCheckRuns>(`repos/${repo}/commits/${pr.head.sha}/check-runs?per_page=100`).check_runs;
     // GitHub computes `mergeable` in the background after the first read that
     // needs it, so a null usually resolves a few seconds later. Read once more.
-    let mergeable = api(`repos/${repo}/pulls/${pr.number}`).mergeable;
+    let mergeable = api<{ mergeable: boolean | null }>(`repos/${repo}/pulls/${pr.number}`).mergeable;
     if (mergeable == null) {
       Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 3000);
-      mergeable = api(`repos/${repo}/pulls/${pr.number}`).mergeable;
+      mergeable = api<{ mergeable: boolean | null }>(`repos/${repo}/pulls/${pr.number}`).mergeable;
     }
     const it = item(pr, { pr: pr.number, created: pr.created_at });
     // CI still running and no conflict: nothing to decide yet, skip the reads below.
@@ -397,77 +443,105 @@ function planRepo({ repo, name, path }, since) {
       runs,
       mergeable,
       headDate: head.commit.committer.date,
-      comments: all(`repos/${repo}/issues/${pr.number}/comments?per_page=100`),
-      reviewComments: all(`repos/${repo}/pulls/${pr.number}/comments?per_page=100`),
-      reviews: all(`repos/${repo}/pulls/${pr.number}/reviews?per_page=100`),
+      comments: all<GhComment>(`repos/${repo}/issues/${pr.number}/comments?per_page=100`),
+      reviewComments: all<GhComment>(`repos/${repo}/pulls/${pr.number}/comments?per_page=100`),
+      reviews: all<GhReview>(`repos/${repo}/pulls/${pr.number}/reviews?per_page=100`),
       base,
       today: TODAY,
       maxFollowups: MAX_FOLLOWUPS,
       staleDays: STALE_DAYS,
     });
-    if (v.verdict === "wait") out.inProgress.push({ ...it, why: v.why });
-    if (v.verdict === "review") out.review.push(it);
-    if (v.verdict === "merge")
-      out.automerge.push({ repo, pr: pr.number, sha: pr.head.sha, title: pr.title, created: pr.created_at });
-    if (v.verdict === "unstick") out.unstick.push({ ...it, why: v.why });
-    if (v.verdict === "followup") {
-      const wt = worktree("pr", pr.number);
-      out.followups.push({
-        kind: "followup",
-        repo,
-        pr: pr.number,
-        issue: issue?.number,
-        tier,
-        item: it,
-        branch: pr.head.ref,
-        checkout: path,
-        worktree: wt,
-        created: pr.created_at,
-        title: `Follow up ${name}#${pr.number}`,
-        prompt: [
-          `PR ${ref(pr.number)} (${pr.html_url}, branch \`${pr.head.ref}\`) ${issue ? `for ${ref(issue.number)} ` : ""}needs a narrow fix. Work on that branch and push to it; do not open a new PR.`,
-          ...setup(path, wt, [
-            `git -C ${path} fetch origin ${pr.head.ref}`,
-            `git -C ${path} worktree add -B ${pr.head.ref} ${wt} origin/${pr.head.ref}`,
-          ]),
-          ...(v.conflict
-            ? [
-                `- Merge conflict with ${base}: merge or rebase \`${base}\` into the branch, resolve the conflicts and push. This is a conflict resolution, not a CI fix; CI runs once it pushes.`,
-              ]
-            : []),
-          ...v.failing.map((r) => `- CI failing: ${r.name}: ${r.html_url}`),
-          ...v.feedback.map((c) => `- Unanswered review feedback: ${c.html_url}`),
-          `Fix only that. For CI, reproduce the failure first and show the same check passing. Before pushing, run the checks ${repo}'s CLAUDE.md asks for. Reply to each review comment you address.`,
-          bot
-            ? `This is a Dependabot bump: adapt the code or config to the new versions rather than reverting a bump, and leave the PR description as Dependabot wrote it. If a bump can't be adopted narrowly, say why in a PR comment instead of pushing.`
-            : `If the repo has a PR template, the PR description must still meet it.`,
-          `Do not subscribe to PR activity: the daily workshop run checks this PR again tomorrow.`,
-          `When you're done, remove the worktree: \`git -C ${path} worktree remove ${wt}\`.`,
-        ].join("\n"),
-      });
+    switch (v.kind) {
+      case "wait":
+        out.inProgress.push({ ...it, why: v.why });
+        break;
+      case "review":
+        out.review.push(it);
+        break;
+      case "merge":
+        out.automerge.push({ repo, pr: pr.number, sha: pr.head.sha, title: pr.title, created: pr.created_at });
+        break;
+      case "unstick":
+        out.unstick.push({ ...it, why: v.why });
+        break;
+      case "followup": {
+        const wt = worktree("pr", pr.number);
+        out.followups.push({
+          kind: "followup",
+          repo,
+          pr: pr.number,
+          issue: issue?.number,
+          tier,
+          item: it,
+          branch: pr.head.ref,
+          checkout: path,
+          worktree: wt,
+          created: pr.created_at,
+          title: `Follow up ${name}#${pr.number}`,
+          prompt: [
+            `PR ${ref(pr.number)} (${pr.html_url}, branch \`${pr.head.ref}\`) ${issue ? `for ${ref(issue.number)} ` : ""}needs a narrow fix. Work on that branch and push to it; do not open a new PR.`,
+            ...setup(path, wt, [
+              `git -C ${path} fetch origin ${pr.head.ref}`,
+              `git -C ${path} worktree add -B ${pr.head.ref} ${wt} origin/${pr.head.ref}`,
+            ]),
+            ...(v.conflict
+              ? [
+                  `- Merge conflict with ${base}: merge or rebase \`${base}\` into the branch, resolve the conflicts and push. This is a conflict resolution, not a CI fix; CI runs once it pushes.`,
+                ]
+              : []),
+            ...v.failing.map((r) => `- CI failing: ${r.name}: ${r.html_url}`),
+            ...v.feedback.map((c) => `- Unanswered review feedback: ${c.html_url}`),
+            `Fix only that. For CI, reproduce the failure first and show the same check passing. Before pushing, run the checks ${repo}'s CLAUDE.md asks for. Reply to each review comment you address.`,
+            bot
+              ? `This is a Dependabot bump: adapt the code or config to the new versions rather than reverting a bump, and leave the PR description as Dependabot wrote it. If a bump can't be adopted narrowly, say why in a PR comment instead of pushing.`
+              : `If the repo has a PR template, the PR description must still meet it.`,
+            `Do not subscribe to PR activity: the daily workshop run checks this PR again tomorrow.`,
+            `When you're done, remove the worktree: \`git -C ${path} worktree remove ${wt}\`.`,
+          ].join("\n"),
+        });
+        break;
+      }
+      default:
+        assertNever(v);
     }
   }
 
   // --- Dispatch -------------------------------------------------------------
   for (const i of issues) {
-    const why = skipReason(
-      {
+    const st = issueState({
         title: i.title,
         labels: names(i),
         assignees: i.assignees.length,
         subIssues: i.sub_issues_summary?.total ?? 0,
         linked: linked.has(i.number),
-        blockers: blockersOf.get(i.number),
+        blockers: blockersOf.get(i.number) ?? [],
         question: openQuestion(i.body),
-      },
-      { ref },
-    );
-    if (why === DECISION)
-      out.decide.push(item(i, { issue: i.number, why: openQuestion(i.body) }));
-    else if (why === AWAITING_TRIAGE)
-      out.triage.push(item(i, { issue: i.number, why: tierOf(names(i)) }));
-    else if (why) out.notPicked.push(item(i, { issue: i.number, why }));
-    if (why !== undefined || FOLLOWUPS_ONLY) continue;
+    });
+    switch (st.kind) {
+      case "dispatchable":
+      case "elsewhere":
+        break;
+      case "decision":
+        out.decide.push(item(i, { issue: i.number, why: st.question }));
+        break;
+      case "awaitingTriage":
+        out.triage.push(item(i, { issue: i.number, why: tierOf(names(i)) }));
+        break;
+      case "deferred":
+        out.notPicked.push(item(i, { issue: i.number, why: DEFERRED, waiting: true }));
+        break;
+      case "blocked":
+        out.notPicked.push(
+          item(i, { issue: i.number, why: blockedText(st.blockers, ref), waiting: true }),
+        );
+        break;
+      case "notPicked":
+        out.notPicked.push(item(i, { issue: i.number, why: st.reason }));
+        break;
+      default:
+        assertNever(st);
+    }
+    if (st.kind !== "dispatchable" || FOLLOWUPS_ONLY) continue;
     const tier = tierOf(names(i));
     const wt = worktree("issue", i.number);
     const branch = `claude/issue-${i.number}`;
@@ -499,9 +573,9 @@ function planRepo({ repo, name, path }, since) {
 
   // Claimed by a dispatch, still no PR: stuck.
   for (const i of issues.filter((i) => i.assignees.length && !linked.has(i.number))) {
-    if (isDigest(i.title) || i.sub_issues_summary?.total > 0) continue;
+    if (isDigest(i.title) || (i.sub_issues_summary?.total ?? 0) > 0) continue;
     const mark = i.comments
-      ? all(`repos/${repo}/issues/${i.number}/comments?per_page=100`)
+      ? all<GhComment>(`repos/${repo}/issues/${i.number}/comments?per_page=100`)
           .filter((c) => marked(c, DISPATCH))
           .at(-1)
       : null;
@@ -511,24 +585,32 @@ function planRepo({ repo, name, path }, since) {
       today: TODAY,
       staleDays: STALE_DAYS,
     });
-    if (state === "notPicked")
-      out.notPicked.push(
-        item(i, {
-          issue: i.number,
-          why: `assigned to ${i.assignees.map((a) => `@${a.login}`).join(", ")}; unassign to queue it`,
-        }),
-      );
-    if (!state && mark)
-      out.inProgress.push(
-        item(i, { issue: i.number, why: `dispatched ${mark.created_at.slice(0, 10)}, no PR yet` }),
-      );
-    if (state === "unstick")
-      out.unstick.push(
-        item(i, {
-          issue: i.number,
-          why: `dispatched ${mark.created_at.slice(0, 10)}, no PR yet; unassign to re-dispatch`,
-        }),
-      );
+    const day = mark?.created_at.slice(0, 10);
+    switch (state.kind) {
+      case "notPicked":
+        out.notPicked.push(
+          item(i, {
+            issue: i.number,
+            why: `assigned to ${i.assignees.map((a) => `@${a.login}`).join(", ")}; unassign to queue it`,
+          }),
+        );
+        break;
+      case "inProgress":
+        out.inProgress.push(item(i, { issue: i.number, why: `dispatched ${day}, no PR yet` }));
+        break;
+      case "unstick":
+        out.unstick.push(
+          item(i, {
+            issue: i.number,
+            why: `dispatched ${day}, no PR yet; unassign to re-dispatch`,
+          }),
+        );
+        break;
+      case "none":
+        break;
+      default:
+        assertNever(state);
+    }
   }
 
   // What finishing an ask frees: the open issues waiting on it (or, for a PR, on
@@ -536,14 +618,14 @@ function planRepo({ repo, name, path }, since) {
   for (const pr of prs)
     out.unblocks.set(ref(pr.number), unblocked(linkedIssues(pr.body)));
   for (const i of issues) out.unblocks.set(ref(i.number), unblocked([i.number]));
-  function unblocked(done) {
+  function unblocked(done: number[]) {
     return issues
-      .filter((i) => done.some((n) => blockersOf.get(i.number).includes(n)))
+      .filter((i) => done.some((n) => blockersOf.get(i.number)?.includes(n)))
       .map((i) => ref(i.number));
   }
 
   // What merged in this digest's window, each with the issue it closed and its labels.
-  out.merged = api(
+  out.merged = api<GhSearch>(
     "search/issues",
     "-X",
     "GET",
@@ -560,13 +642,13 @@ function planRepo({ repo, name, path }, since) {
       return `- [${ref(pr.number)}](${pr.html_url}) ${pr.title}${closes.length ? ` (closes ${closes.join("; ")})` : ""}`;
     });
 
-  const have = all(`repos/${repo}/labels?per_page=100`).map((l) => l.name);
+  const have = all<{ name: string }>(`repos/${repo}/labels?per_page=100`).map((l) => l.name);
   out.missingLabels = Object.keys(LABELS).filter((l) => !have.includes(l));
   return out;
 }
 
 // The lines that put a session in its own worktree of its repo's clone.
-function setup(path, wt, commands) {
+function setup(path: string, wt: string, commands: string[]) {
   return [
     `Work only in your own worktree of that repo's clone, never in ${path} itself or the run's working directory. Create it first:`,
     "```",

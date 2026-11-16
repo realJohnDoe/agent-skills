@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { bodyBlockers } from "./bodyBlockers.mjs";
+import { bodyBlockers } from "./bodyBlockers.ts";
 
 test("Blocked by line", () => {
   assert.deepEqual(bodyBlockers("Blocked by: #12, #7\n\n## Problem\nsee #99"), [12, 7]);

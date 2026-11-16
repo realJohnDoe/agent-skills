@@ -5,14 +5,14 @@ description: Run the daily workshop over several repositories at once: dispatch 
 
 # Dispatcher
 
-One scheduled run a day moves open work forward in every repo attached to its session, and the maintainer's part comes down to one twice-weekly digest issue in **`realJohnDoe/agent-skills`** (the digest repo), which also says why anything isn't moving. The scripts live in `scripts/` next to this file: run them as `node <this skill's directory>/scripts/<name>.mjs --digest realJohnDoe/agent-skills`. Every command below needs that `--digest` flag; it's left out for brevity.
+One scheduled run a day moves open work forward in every repo attached to its session, and the maintainer's part comes down to one twice-weekly digest issue in **`realJohnDoe/agent-skills`** (the digest repo), which also says why anything isn't moving. The scripts live in `scripts/` next to this file: run them as `node <this skill's directory>/scripts/<name>.ts --digest realJohnDoe/agent-skills`. Every command below needs that `--digest` flag; it's left out for brevity.
 
 ## The run
 
 0. **Every attached repo must have push access.** The scripts check this first and stop with an error naming each repo they can't push to. Don't work around it by skipping the repo: tell the user which repo, and why.
-1. `node scripts/pause.mjs` and act on its `state` (see **Pausing**). Anything but `normal` ends this procedure after that section's steps.
-2. `node scripts/dispatch.mjs` is the **dry run**: it prints the plan as JSON and writes nothing. Read it before applying.
-3. `node scripts/dispatch.mjs --apply` does what the plan says. It creates any workshop label a repo is missing (`missingLabels`), merges the `automerge` PRs, and claims what the plan starts: it assigns each dispatched issue and leaves a `workshop-dispatch` marker comment, and leaves a `workshop-followup` marker comment on each PR it follows up. Then it rewrites the draft digest and publishes it when due. It prints the same plan.
+1. `node scripts/pause.ts` and act on its `state` (see **Pausing**). Anything but `normal` ends this procedure after that section's steps.
+2. `node scripts/dispatch.ts` is the **dry run**: it prints the plan as JSON and writes nothing. Read it before applying.
+3. `node scripts/dispatch.ts --apply` does what the plan says. It creates any workshop label a repo is missing (`missingLabels`), merges the `automerge` PRs, and claims what the plan starts: it assigns each dispatched issue and leaves a `workshop-dispatch` marker comment, and leaves a `workshop-followup` marker comment on each PR it follows up. Then it rewrites the draft digest and publishes it when due. It prints the same plan.
 4. For each entry in `sessions`, start one background subagent with the `Agent` tool. Give it the entry's `prompt`, take `description` from its `title`, and set `model` to its `tier`. Don't pass `isolation: "worktree"`: that would isolate this run's own checkout. The prompt already has the subagent create its own worktree (`worktree`) of its repo's clone (`checkout`) and work only there. Start them all, then wait for every one to finish before ending the run. Scheduled runs have no `create_session`, so subagents are how one run fans out.
 5. For each entry in `digest.replies` (the maintainer replying on the digest), work out which issue or PR it is about. Digest items are named `owner/repo#n`. Copy the decision onto that issue or PR in its own repo, as a comment linking the reply. If it answers the issue's `## Decision needed` section, also add a `**Decided:** <answer> ([reply](<link>))` line at the end of that section, so the issue body stays the spec. A `ready` reply naming items adds `ready-for-agent` to each, but only when the reply's `author` is the digest repo's owner: that label is the maintainer's go-ahead, and nobody else's reply grants it. Skip a reply already copied there. Then comment `<!-- workshop-relayed -->` on that digest issue, with the footer, so the next run doesn't relay it again. A reply that names no item gets an answer on the digest instead.
 6. Don't subscribe to PR activity, yours or the sessions'. Tomorrow's run is the follow-up. Don't open PRs or issues yourself beyond what the script writes and what the subagents open.
@@ -22,8 +22,8 @@ One scheduled run a day moves open work forward in every repo attached to its se
 
 When the prompt asks for a dry run (for example the first run of a new scheduled task, or after adding a repo), **write nothing**. Never pass `--apply`, start no subagents, relay no replies, and post no comments, issues or labels. Instead:
 
-1. Run `node scripts/pause.mjs` and report its `state`. If it is `drain` or `resume`, also report what its plan would defer, unassign, close or mark ready.
-2. Run `node scripts/dispatch.mjs` (with `--followups-only` if the state is `drain`) and report the plan as a short summary for the user:
+1. Run `node scripts/pause.ts` and report its `state`. If it is `drain` or `resume`, also report what its plan would defer, unassign, close or mark ready.
+2. Run `node scripts/dispatch.ts` (with `--followups-only` if the state is `drain`) and report the plan as a short summary for the user:
    - the repos it found attached, and the labels each would get created (`missingLabels`);
    - each session with its repo, kind, issue or PR, and tier, then what's left over (`deferred`);
    - the PRs that would be merged (`automerge`);
@@ -58,7 +58,7 @@ To move the digest, change the repo named at the top of this file.
 
 ## What the script decides
 
-The two decisions that change what lands on a default branch are in `scripts/decide.mjs` and pinned by `scripts/decide.test.mjs`. One is whether an issue is dispatchable (`skipReason`). The other is whether a PR waits, goes to review, is merged, or gets a follow-up (`prVerdict`).
+The two decisions that change what lands on a default branch are in `scripts/decide.ts` and pinned by `scripts/decide.test.ts`. One is whether an issue is dispatchable (`issueState`). The other is whether a PR waits, goes to review, is merged, or gets a follow-up (`prVerdict`).
 
 - **Dispatch**: an open issue is dispatched when it:
   - has a `haiku`/`sonnet`/`opus` label and the `ready-for-agent` label;
@@ -92,13 +92,13 @@ To re-dispatch a stuck issue, unassign it. To keep a PR out of the workshop, mar
 
 ### Labels
 
-What each issue and PR label means, and who sets it, is in the `conventions` skill (`../conventions/SKILL.md`). Change a meaning there and in `decide.mjs` together. The one label of the workshop's own is `workshop-paused`, on the digest, which pauses every repo (below).
+What each issue and PR label means, and who sets it, is in the `conventions` skill (`../conventions/SKILL.md`). Change a meaning there and in `decide.ts` together. The one label of the workshop's own is `workshop-paused`, on the digest, which pauses every repo (below).
 
 ## Pausing
 
 The maintainer pauses and resumes the whole workshop, every repo at once, with the `workshop-paused` label on an open `Workshop digest` issue, the draft or the published one. To pause, add the label. To resume, remove it. Nothing is published while paused. State lives on GitHub (the label plus marker comments on the newest digest), not in any session.
 
-| `state` from `pause.mjs` | The run |
+| `state` from `pause.ts` | The run |
 |---|---|
 | `drain` (label on, no snapshot newer than it) | Drain, once |
 | `paused` (label on, snapshot posted) | Exits |
@@ -109,9 +109,9 @@ Each transition posts its marker comment (`workshop-snapshot`, `workshop-resumed
 
 **Drain**
 
-1. Dry runs: `node scripts/dispatch.mjs --followups-only` lists what would merge and be followed up, and `node scripts/pause.mjs` lists, per repo, what would be deferred and unassigned, plus the snapshot.
-2. `node scripts/dispatch.mjs --apply --followups-only` merges green PRs, gives red ones their last follow-up, and starts no new issue. Run its sessions as in step 4 and wait for them.
-3. `node scripts/pause.mjs --apply` handles each repo:
+1. Dry runs: `node scripts/dispatch.ts --followups-only` lists what would merge and be followed up, and `node scripts/pause.ts` lists, per repo, what would be deferred and unassigned, plus the snapshot.
+2. `node scripts/dispatch.ts --apply --followups-only` merges green PRs, gives red ones their last follow-up, and starts no new issue. Run its sessions as in step 4 and wait for them.
+3. `node scripts/pause.ts --apply` handles each repo:
    - PRs still red or conflicting are converted to draft, labelled `deferred` and commented. `opus` PRs stay open for review.
    - Issues assigned with no PR are unassigned.
 
@@ -119,9 +119,11 @@ Each transition posts its marker comment (`workshop-snapshot`, `workshop-resumed
 
 **Resume**
 
-1. Dry run: `node scripts/pause.mjs` lists, per repo, the deferred PRs to close (over 100 commits behind their base; their issues go back to the dispatcher by unassigning) and the ones to mark ready again.
-2. `node scripts/pause.mjs --apply` does it and posts the "resumed" comment. Then continue with the normal run. The digest goes out as usual.
+1. Dry run: `node scripts/pause.ts` lists, per repo, the deferred PRs to close (over 100 commits behind their base; their issues go back to the dispatcher by unassigning) and the ones to mark ready again.
+2. `node scripts/pause.ts --apply` does it and posts the "resumed" comment. Then continue with the normal run. The digest goes out as usual.
 
 ## Developing
 
-`node --test 'skills/**/*.test.mjs'` runs the decision tests, the `Blocked by:` parser test, and `dispatch.test.mjs`. That last file runs both scripts end to end over two repos against a fake `gh` and `git` (`scripts/fake-bin.mjs`). CI runs them on every PR. A change to a decision changes what lands on every attached repo's default branch: change its test first.
+`node --test 'skills/**/*.test.ts'` runs the decision tests, the `Blocked by:` parser test, and `dispatch.test.ts`. That last file runs both scripts end to end over two repos against a fake `gh` and `git` (`scripts/fake-bin.ts`). CI runs them on every PR. A change to a decision changes what lands on every attached repo's default branch: change its test first.
+
+The scripts are TypeScript that Node runs directly, with no build step, so use only erasable syntax (no `enum`, `namespace` or parameter properties) and `import type` for types. `npm ci && npx tsc` must pass; CI runs it before the tests. A state is a union member (`IssueState`, `PrVerdict`, `ClaimState`, `PauseState`), and every `switch` over one ends in `assertNever`. To add a state, add the union member: `tsc` then flags each `switch` that doesn't handle it.
