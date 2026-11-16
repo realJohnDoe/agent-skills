@@ -423,13 +423,7 @@ function planRepo({ repo, name, path }: Repo, since: string): RepoPlan {
       ];
     }),
   );
-  // Merged PRs that reference an issue with an `## After merge` step, read only
-  // when there is one: the newest page of closed PRs is as far back as it looks.
-  const stepIssues = issues.filter((i) => !linked.has(i.number) && afterMerge(i.body));
-  const closed = stepIssues.length
-    ? all<GhPull>(`repos/${repo}/pulls?state=closed&per_page=100`).filter((p) => p.merged_at)
-    : [];
-  const mergedFor = (n: number) => closed.find((p) => referencedIssues(p.body).includes(n));
+  const merging: GhPull[] = []; // the `automerge` PRs this run merges
   const item = (x: GhIssue | GhPull, extra: Partial<Item>): Item => ({
     repo,
     ref: ref(x.number),
@@ -509,6 +503,7 @@ function planRepo({ repo, name, path }: Repo, since: string): RepoPlan {
         break;
       case "merge":
         out.automerge.push({ repo, pr: pr.number, sha: pr.head.sha, title: pr.title, created: pr.created_at });
+        merging.push(pr);
         break;
       case "unstick":
         out.unstick.push({ ...it, why: v.why });
@@ -556,6 +551,17 @@ function planRepo({ repo, name, path }: Repo, since: string): RepoPlan {
   }
 
   // --- Dispatch -------------------------------------------------------------
+  // Merged PRs that reference an issue with an `## After merge` step, read only
+  // when there is one: the newest page of closed PRs is as far back as it looks.
+  // A PR this run merges already counts as merged, so the step shows in this
+  // run's digest rather than the next one's.
+  const stillOpen = new Set(prs.filter((p) => !merging.includes(p)).flatMap((p) => referencedIssues(p.body)));
+  const stepIssues = issues.filter((i) => !stillOpen.has(i.number) && afterMerge(i.body));
+  for (const i of stepIssues) linked.delete(i.number);
+  const closed = stepIssues.length
+    ? [...merging, ...all<GhPull>(`repos/${repo}/pulls?state=closed&per_page=100`).filter((p) => p.merged_at)]
+    : [];
+  const mergedFor = (n: number) => closed.find((p) => referencedIssues(p.body).includes(n));
   const doneStep = (i: GhIssue) => {
     const pr = stepIssues.includes(i) ? mergedFor(i.number) : undefined;
     return pr && { step: afterMerge(i.body)!, pr: `[${ref(pr.number)}](${pr.html_url})` };
