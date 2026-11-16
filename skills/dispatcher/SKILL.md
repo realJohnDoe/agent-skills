@@ -64,7 +64,7 @@ The two decisions that change what lands on a default branch are in `scripts/dec
   - has a `haiku`/`sonnet`/`opus` label and the `ready-for-agent` label;
   - has no `opus-plan` or `deferred` label;
   - has no assignee;
-  - has no open blocker, whether native or named in the body by a `Blocked by: #n` line or a `## Blocked by` section;
+  - has no open blocker, whether native or named in the body by a `Blocked by: #n` line or a `## Blocked by` section, which may name `owner/repo#n` in another repo (one that can't be read blocks);
   - has no sub-issues;
   - has no open PR that closes it.
 
@@ -73,7 +73,7 @@ The two decisions that change what lands on a default branch are in `scripts/dec
   A PR for an issue with an `## After merge` section says `Refs #n`, which keeps the issue open after merge. An open PR that `Refs` an issue counts as linked to it, as one that closes it does. Once that PR has merged and no open one remains, the issue is Waiting on you, never dispatched again nor Unstick, until the maintainer closes it. Finding the merged PR reads the newest page of closed PRs, and only for issues that have the section.
 
   An issue that needs the maintainer to decide something has a `## Decision needed` section in its body: the question and its options. The section is open until it has a `Decided:` line. Until then, and while the issue has no `ready-for-agent`, it is listed under Waiting on you with its question, tier label or not. `ready-for-agent` settles it either way.
-- **Follow-up**: every open, non-draft PR gets one narrow session (on `opus` for Dependabot's, `sonnet` for one with no tier-labelled issue) when it:
+- **Follow-up**: every open, non-draft PR without a `deferred` label gets one narrow session (on `opus` for Dependabot's, `sonnet` for one with no tier-labelled issue) when it:
   - conflicts with its base branch, which is checked without waiting for CI because GitHub runs none on a conflicting PR. The session merges the base in and pushes. GitHub computes mergeability lazily, so the script reads it a second time after a short pause. A green PR whose mergeability is still unknown waits for the next run, and is neither reviewed nor merged.
   - has a failing check, once CI has finished;
   - has review feedback newer than its head commit that isn't an agent's (no Claude Code footer).

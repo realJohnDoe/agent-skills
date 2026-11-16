@@ -5,6 +5,8 @@ type User = { login: string; type: string };
 
 export type GhIssue = {
   number: number;
+  state?: string;
+  repository_url?: string;
   title: string;
   body: string | null;
   html_url: string;
