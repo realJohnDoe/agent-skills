@@ -70,6 +70,8 @@ The two decisions that change what lands on a default branch are in `scripts/dec
 
   Every other open issue is somewhere else in the digest (its PR, Unstick, Waiting on you), or under **Not picked up** with its reason, so nothing is skipped silently. The reasons are no tier label, `opus-plan`, `deferred`, blocked by `owner/repo#N`, and assigned by hand.
 
+  A PR for an issue with an `## After merge` section says `Refs #n`, which keeps the issue open after merge. An open PR that `Refs` an issue counts as linked to it, as one that closes it does. Once that PR has merged and no open one remains, the issue is Waiting on you, never dispatched again nor Unstick, until the maintainer closes it. Finding the merged PR reads the newest page of closed PRs, and only for issues that have the section.
+
   An issue that needs the maintainer to decide something has a `## Decision needed` section in its body: the question and its options. The section is open until it has a `Decided:` line. Until then, and while the issue has no `ready-for-agent`, it is listed under Waiting on you with its question, tier label or not. `ready-for-agent` settles it either way.
 - **Follow-up**: every open, non-draft PR gets one narrow session (on `opus` for Dependabot's, `sonnet` for one with no tier-labelled issue) when it:
   - conflicts with its base branch, which is checked without waiting for CI because GitHub runs none on a conflicting PR. The session merges the base in and pushes. GitHub computes mergeability lazily, so the script reads it a second time after a short pause. A green PR whose mergeability is still unknown waits for the next run, and is neither reviewed nor merged.
@@ -82,7 +84,7 @@ The two decisions that change what lands on a default branch are in `scripts/dec
 - **Digest**: one draft issue in the `digest` repo, `Workshop digest (draft) — from <date>`. It is rewritten on every run (an edit notifies nobody). Every item names its repo as `owner/repo#n`. It lists what waits on the maintainer, PRs first:
   - **Review**: green, quiet PRs without `automerge`, Dependabot majors among them.
   - **Unstick**: PRs at their follow-up cap, a follow-up with no push after 2 days, and a dispatched issue with no PR after 2 days.
-  - **Waiting on you**: unblocked issues without `ready-for-agent`. First those with an open question (**Decide:**, showing the question), then tier-labelled ones that only need the go-ahead (**Go ahead?**, showing the tier). Agents file most of these, and nothing runs until the maintainer says so.
+  - **Waiting on you**: first issues with an open question (**Decide:**, showing the question), then issues whose PR has merged and that have an `## After merge` section (**After merge:**, showing its first paragraph and the merged PR), then unblocked tier-labelled ones without `ready-for-agent` that only need the go-ahead (**Go ahead?**, showing the tier). Agents file most of these, and nothing runs until the maintainer says so.
 
   Each ask says which issues it unblocks. Then comes what's coming: **In progress** (this run's sessions, follow-ups past the cap, PRs waiting on CI, a follow-up or mergeability, and dispatched issues with no PR yet, so every open non-draft PR shows somewhere), **Queue** (dispatchable issues past today's cap) and **Not picked up**. Blocked and `deferred` issues are only counted, in a collapsed list. Last, also collapsed, is what merged in each repo since the draft opened.
 

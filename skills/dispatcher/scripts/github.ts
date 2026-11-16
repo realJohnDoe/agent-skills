@@ -24,6 +24,7 @@ export type GhPull = {
   html_url: string;
   created_at: string;
   draft: boolean;
+  merged_at?: string | null;
   labels: Label[];
   user: { login: string };
   auto_merge: unknown;

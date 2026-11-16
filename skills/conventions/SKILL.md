@@ -30,14 +30,15 @@ Whenever you ask the maintainer to do something by hand, in an issue, PR, digest
    ```
 
    The digest shows the first paragraph, so make it stand alone. The section stays open until it gains a `**Decided:** <answer>` line, which the dispatcher's relay adds when the maintainer answers on the digest. Any agent recording a decision ends the section the same way.
-3. **Order.** When one issue must wait for another, add a native blocked-by edge:
+3. **After merge.** When an issue needs a manual step once its PR has merged, e.g. switching a Pages source, add an `## After merge` section. Its first paragraph says what to do and links the page where it's done; the digest shows it, as with `## Decision needed`. Whoever files the issue adds it, and an agent that discovers such a step while working adds it to the issue body. First check whether the PR can do the step itself: only what genuinely needs the maintainer goes there. The maintainer closes the issue once the step is done. Anything blocked by it waits until then, not just until the merge.
+4. **Order.** When one issue must wait for another, add a native blocked-by edge:
 
    ```sh
    gh api --method POST repos/<owner>/<repo>/issues/<blocked>/dependencies/blocked_by -F issue_id=<blocker-db-id>
    ```
 
    `<blocker-db-id>` is the blocker's numeric database id (`gh api repos/<owner>/<repo>/issues/<n> --jq .id`), not its `#number`. Only where native dependencies are unavailable, use a `Blocked by: #n` line at the top of the body instead. To make an issue part of a larger one, make it a sub-issue: `gh issue create --parent <n>`, or `gh issue edit <parent> --add-sub-issue <child>` afterwards. Where `gh` is missing, use the GitHub MCP tools (`issue_write`, `sub_issue_write`, …) the same way.
-4. **Approval.** Leave approval to the maintainer. `ready-for-agent` is their go-ahead and nothing is dispatched without it, so the issue waits under the digest's **Waiting on you** until they add it. Agents never add it themselves. The one exception is the dispatcher relaying the maintainer's own `ready` reply.
+5. **Approval.** Leave approval to the maintainer. `ready-for-agent` is their go-ahead and nothing is dispatched without it, so the issue waits under the digest's **Waiting on you** until they add it. Agents never add it themselves. The one exception is the dispatcher relaying the maintainer's own `ready` reply.
 
 Done when the issue has one tier label (or a decision section instead), a decision section if anything waits on the maintainer, and its blockers as edges.
 
@@ -45,7 +46,7 @@ Done when the issue has one tier label (or a decision section instead), a decisi
 
 When a task leaves pushed commits on a branch with no open PR, open one, even if nobody asked. Fill in the repo's PR template if it has one. Then use the `tracemap-pr` skill (from realJohnDoe/tracemap) to add trace maps to the description; it decides itself when none would help, and if it can't attach them, say so in your reply. When the PR changes what a page looks like, add before and after screenshots of each affected screen at desktop (1280px) and phone (390px) width under an `Acceptance check` heading. Take them with headless Chromium from builds of the base branch and the PR branch, and attach them the way `tracemap-pr` attaches its images. If you can't, say why under that heading. Push later changes to the same PR, and refresh its description, trace maps and screenshots when the PR's purpose changes.
 
-Close the issue from the body with `Fixes #n`. Label a PR for a `haiku` or `sonnet` issue `automerge`: the dispatcher merges it once CI is green and nobody has left review feedback. A PR for an `opus` issue goes without the label and waits for review. A draft PR is outside the workshop.
+Close the issue from the body with `Fixes #n`. For an issue with an `## After merge` section write `Refs #n` instead, so it stays open until the maintainer has done the step; the PR is otherwise handled the same, `automerge` included. Label a PR for a `haiku` or `sonnet` issue `automerge`: the dispatcher merges it once CI is green and nobody has left review feedback. A PR for an `opus` issue goes without the label and waits for review. A draft PR is outside the workshop.
 
 ## Labels
 

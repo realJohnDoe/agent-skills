@@ -4,12 +4,14 @@ import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
   DEFERRED,
+  afterMerge,
   claimState,
   isDigest,
   linkedIssues,
   openQuestion,
   issueState,
   prVerdict,
+  referencedIssues,
   tierOf,
 } from "./decide.ts";
 import type { PrVerdict } from "./decide.ts";
@@ -23,6 +25,15 @@ describe("linkedIssues", () => {
     assert.deepEqual(linkedIssues("FIXED #1 close #2 resolves #5"), [1, 2, 5]);
   });
   test("no body", () => assert.deepEqual(linkedIssues(null), []));
+  test("Refs doesn't close", () => assert.deepEqual(linkedIssues("Refs #25. Fixes #3"), [3]));
+});
+
+describe("referencedIssues", () => {
+  test("Refs links an issue without closing it, alongside the closing keywords", () =>
+    assert.deepEqual(referencedIssues("Refs #25. Fixes #3; ref #4, closes #5"), [25, 3, 4, 5]));
+  test("only a keyword before the number counts", () =>
+    assert.deepEqual(referencedIssues("see #9, prefs #8"), []));
+  test("no body", () => assert.deepEqual(referencedIssues(undefined), []));
 });
 
 test("tierOf picks the first tier label", () => {
@@ -54,6 +65,12 @@ describe("issueState", () => {
 
   test("dispatchable: tier label, ready-for-agent and nothing in the way", () => {
     assert.deepEqual(issueState(issue()), { kind: "dispatchable" });
+  });
+
+  test("afterMerge: its PR merged, so it waits on the maintainer, even assigned", () => {
+    const afterMerge = { step: "Switch Pages.", pr: "[x#1](u)" };
+    assert.deepEqual(issueState(issue({ assignees: 1, afterMerge })), { kind: "afterMerge", ...afterMerge });
+    assert.deepEqual(issueState(issue({ linked: true, afterMerge })), { kind: "elsewhere" });
   });
 
   describe("shown elsewhere", () => {
@@ -180,6 +197,21 @@ describe("openQuestion", () => {
 });
 
 const whyOf = (v: PrVerdict) => ("why" in v ? v.why : undefined);
+
+describe("afterMerge", () => {
+  test("the section's first paragraph, on one line", () =>
+    assert.equal(
+      afterMerge("Intro\n\n## After merge\n\nSwitch Pages at\nhttps://x/settings/pages.\n\nMore\n\n## Done when\nx"),
+      "Switch Pages at https://x/settings/pages.",
+    ));
+  test("the section may end the body", () => assert.equal(afterMerge("## After merge\nDo it."), "Do it."));
+  test("no section, no body", () => {
+    assert.equal(afterMerge("## Decision needed\nx"), undefined);
+    assert.equal(afterMerge(null), undefined);
+  });
+  test("a Decided: line doesn't end it", () =>
+    assert.equal(afterMerge("## After merge\nDo it.\n\nDecided: x"), "Do it."));
+});
 
 describe("prVerdict", () => {
   const HEAD = "2026-11-10T12:00:00Z";

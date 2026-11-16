@@ -11,6 +11,7 @@ import { join } from "node:path";
 import { bodyBlockers } from "./bodyBlockers.ts";
 import {
   AUTOMERGE,
+  afterMerge,
   DEFERRED,
   FOLLOWUP,
   AGENT,
@@ -22,6 +23,7 @@ import {
   linkedIssues,
   marked,
   prVerdict,
+  referencedIssues,
   openQuestion,
   READY,
   tierOf,
@@ -104,6 +106,7 @@ type RepoPlan = {
   notPicked: Item[];
   triage: Item[];
   decide: Item[];
+  afterMerge: Item[];
   merged: string[];
   unblocks: Map<string, string[]>;
   missingLabels: string[];
@@ -150,6 +153,7 @@ main(() => {
   const review = pick("review");
   const unstick = pick("unstick");
   const decide = pick("decide");
+  const afterMerge = pick("afterMerge");
   const triage = pick("triage");
   const notPicked = pick("notPicked");
   const merged = pick("merged");
@@ -178,7 +182,11 @@ main(() => {
     // Questions first: an answer is real work, a go-ahead is a glance.
     ...section(
       `Waiting on you (answer a question, or reply \`ready\` naming items to add \`${READY}\`)`,
-      [...decide.map((x) => ({ ...x, ask: "Decide:" })), ...triage.map((x) => ({ ...x, ask: "Go ahead?" }))],
+      [
+        ...decide.map((x) => ({ ...x, ask: "Decide:" })),
+        ...afterMerge.map((x) => ({ ...x, ask: "After merge:" })),
+        ...triage.map((x) => ({ ...x, ask: "Go ahead?" })),
+      ],
     ),
   ];
   // Issues that wait on another issue, a decision or the maintainer's own
@@ -241,6 +249,7 @@ main(() => {
     replies,
     counts: {
       decide: decide.length,
+      afterMerge: afterMerge.length,
       review: review.length,
       unstick: unstick.length,
       triage: triage.length,
@@ -370,7 +379,7 @@ function planRepo({ repo, name, path }: Repo, since: string): RepoPlan {
   );
   const prs = all<GhPull>(`repos/${repo}/pulls?state=open&per_page=100`);
   const byNumber = new Map(issues.map((i) => [i.number, i]));
-  const linked = new Set(prs.flatMap((p) => linkedIssues(p.body)));
+  const linked = new Set(prs.flatMap((p) => referencedIssues(p.body)));
   // Open issues an issue waits on: native blocked-by edges, plus the documented
   // fallback of a blocker named in the body while it is open.
   const blockersOf = new Map(
@@ -388,6 +397,13 @@ function planRepo({ repo, name, path }: Repo, since: string): RepoPlan {
       ],
     ]),
   );
+  // Merged PRs that reference an issue with an `## After merge` step, read only
+  // when there is one: the newest page of closed PRs is as far back as it looks.
+  const stepIssues = issues.filter((i) => !linked.has(i.number) && afterMerge(i.body));
+  const closed = stepIssues.length
+    ? all<GhPull>(`repos/${repo}/pulls?state=closed&per_page=100`).filter((p) => p.merged_at)
+    : [];
+  const mergedFor = (n: number) => closed.find((p) => referencedIssues(p.body).includes(n));
   const item = (x: GhIssue | GhPull, extra: Partial<Item>): Item => ({
     repo,
     ref: ref(x.number),
@@ -407,6 +423,7 @@ function planRepo({ repo, name, path }: Repo, since: string): RepoPlan {
     notPicked: [],
     triage: [],
     decide: [],
+    afterMerge: [],
     merged: [],
     unblocks: new Map(),
     missingLabels: [],
@@ -415,7 +432,7 @@ function planRepo({ repo, name, path }: Repo, since: string): RepoPlan {
   // --- PR follow-up ---------------------------------------------------------
   // Ours to follow up: every non-draft PR (draft = keep out of the workshop).
   for (const pr of prs.filter((p) => !p.draft)) {
-    const issue = linkedIssues(pr.body)
+    const issue = referencedIssues(pr.body)
       .map((n) => byNumber.get(n))
       .find((i) => i && tierOf(names(i)));
     const bot = pr.user.login === "dependabot[bot]";
@@ -507,6 +524,10 @@ function planRepo({ repo, name, path }: Repo, since: string): RepoPlan {
   }
 
   // --- Dispatch -------------------------------------------------------------
+  const doneStep = (i: GhIssue) => {
+    const pr = stepIssues.includes(i) ? mergedFor(i.number) : undefined;
+    return pr && { step: afterMerge(i.body)!, pr: `[${ref(pr.number)}](${pr.html_url})` };
+  };
   for (const i of issues) {
     const st = issueState({
         title: i.title,
@@ -516,8 +537,12 @@ function planRepo({ repo, name, path }: Repo, since: string): RepoPlan {
         linked: linked.has(i.number),
         blockers: blockersOf.get(i.number) ?? [],
         question: openQuestion(i.body),
+        afterMerge: doneStep(i),
     });
     switch (st.kind) {
+      case "afterMerge":
+        out.afterMerge.push(item(i, { issue: i.number, why: `${st.step}; merged in ${st.pr}` }));
+        break;
       case "dispatchable":
       case "elsewhere":
         break;
@@ -561,7 +586,7 @@ function planRepo({ repo, name, path }: Repo, since: string): RepoPlan {
           `git -C ${path} fetch origin ${base}`,
           `git -C ${path} worktree add -b ${branch} ${wt} origin/${base}`,
         ]),
-        `Push the branch \`${branch}\` and open a PR in ${repo} that says \`Fixes #${i.number}\`. If the repo has a PR template, fill it in. Before pushing, run the checks ${repo}'s CLAUDE.md asks for, and give their result in the PR.`,
+        `Push the branch \`${branch}\` and open a PR in ${repo} that says \`${afterMerge(i.body) ? "Refs" : "Fixes"} #${i.number}\`. If the repo has a PR template, fill it in. Before pushing, run the checks ${repo}'s CLAUDE.md asks for, and give their result in the PR.`,
         tier === "opus"
           ? `Don't label the PR \`${AUTOMERGE}\`: it waits for the maintainer's review.`
           : `Label the PR \`${AUTOMERGE}\`: the daily workshop run merges it once green.`,
@@ -573,7 +598,7 @@ function planRepo({ repo, name, path }: Repo, since: string): RepoPlan {
 
   // Claimed by a dispatch, still no PR: stuck.
   for (const i of issues.filter((i) => i.assignees.length && !linked.has(i.number))) {
-    if (isDigest(i.title) || (i.sub_issues_summary?.total ?? 0) > 0) continue;
+    if (isDigest(i.title) || (i.sub_issues_summary?.total ?? 0) > 0 || doneStep(i)) continue;
     const mark = i.comments
       ? all<GhComment>(`repos/${repo}/issues/${i.number}/comments?per_page=100`)
           .filter((c) => marked(c, DISPATCH))
