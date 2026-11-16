@@ -6,6 +6,10 @@ import type { Blocker } from "./bodyBlockers.ts";
 import type { GhCheckRun, GhComment, GhReview } from "./github.ts";
 
 export const TIERS = ["haiku", "sonnet", "opus"];
+// A plan spanning several PRs, never dispatched. Orthogonal to the tier, which
+// says which model the plan session runs on. `opus-plan` is the retired form.
+export const PLAN = "plan";
+export const isPlan = (labels: string[]) => labels.includes(PLAN) || labels.includes("opus-plan");
 
 // Ends every `switch` over a union: tsc then flags each one a new member isn't handled in.
 export const assertNever = (x: never): never => {
@@ -120,10 +124,9 @@ export const issueState = (issue: IssueFacts): IssueState => {
   // A decision can wait until its blocker is done; the go-ahead settles it.
   if (issue.question && !l.includes(READY))
     return issue.blockers.length ? blocked() : { kind: "decision", question: issue.question };
-  if (!tierOf(l) && !l.includes("opus-plan"))
+  if (isPlan(l)) return { kind: "notPicked", reason: "`plan`; start a plan session by hand" };
+  if (!tierOf(l))
     return { kind: "notPicked", reason: "no tier label; add `haiku`, `sonnet` or `opus` to queue it" };
-  if (l.includes("opus-plan"))
-    return { kind: "notPicked", reason: "`opus-plan`; start a plan session by hand" };
   if (issue.blockers.length) return blocked();
   if (!l.includes(READY)) return { kind: "awaitingTriage" };
   return { kind: "dispatchable" };

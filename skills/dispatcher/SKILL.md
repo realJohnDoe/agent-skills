@@ -63,13 +63,13 @@ The two decisions that change what lands on a default branch are in `scripts/dec
 
 - **Dispatch**: an open issue is dispatched when it:
   - has a `haiku`/`sonnet`/`opus` label and the `ready-for-agent` label;
-  - has no `opus-plan` or `deferred` label;
+  - has no `plan` (or retired `opus-plan`) or `deferred` label;
   - has no assignee;
   - has no open blocker, whether native or named in the body by a `Blocked by: #n` line or a `## Blocked by` section, which may name `owner/repo#n` in another repo (one that can't be read blocks);
   - has no sub-issues;
   - has no open PR that closes it.
 
-  Every other open issue is somewhere else in the digest (its PR, Unstick, Waiting on you), or under **Not picked up** with its reason, so nothing is skipped silently. The reasons are no tier label, `opus-plan`, `deferred`, blocked by `owner/repo#N`, and assigned by hand.
+  Every other open issue is somewhere else in the digest (its PR, Unstick, Waiting on you), or under **Not picked up** with its reason, so nothing is skipped silently. The reasons are `plan`, no tier label, `deferred`, blocked by `owner/repo#N`, and assigned by hand.
 
   A PR for an issue with an `## After merge` section says `Refs #n`, which keeps the issue open after merge. An open PR that `Refs` an issue counts as linked to it, as one that closes it does. Once that PR has merged and no open one remains, the issue is Waiting on you, never dispatched again nor Unstick, until the maintainer closes it. Finding the merged PR reads the newest page of closed PRs, and only for issues that have the section.
 
