@@ -3,10 +3,11 @@
 // tests. Installed by fakeBin() as `gh` and `git` on PATH.
 //
 // gh: reads answers from $FAKE_GH_FIXTURE, a JSON object keyed by the API path
-//   without its query string, except `?state=closed` (search: `search/issues?q=<q>`). A path that isn't
-//   in it is an error. Every write (-X other than GET, or --input) is appended to
-//   $FAKE_GH_LOG as `{method, path, body}`, or fails when FAKE_GH_LOG is unset, so
-//   a dry run that writes fails loudly. A write answers `{"number": 900}`.
+//   without its query string, except `?state=closed` (search: `search/issues?q=<q>`), or by
+//   the whole path when the fixture has that key. A path that isn't in it is an error.
+//   Every write (-X other than GET, or --input) is appended to $FAKE_GH_LOG as
+//   `{method, path, body}`, or fails when FAKE_GH_LOG is unset, so a dry run that
+//   writes fails loudly. A write answers `{"number": 900}`.
 //   A merge (PUT .../pulls/N/merge) also moves PR N to the fixture's closed list.
 // git: `remote get-url origin` answers from $FAKE_GIT_REMOTES ({path: url});
 //   `push --dry-run` fails for paths listed in $FAKE_GIT_NOPUSH; `rev-parse
@@ -18,10 +19,11 @@ import { fileURLToPath } from "node:url";
 
 const self = fileURLToPath(import.meta.url);
 
-// A directory holding `gh` and `git` wrappers around this file; put it first on PATH.
-export const fakeBin = () => {
+// A directory holding `gh` and `git` wrappers (or just `tools`) around this file; put it
+// first on PATH.
+export const fakeBin = (tools = ["gh", "git"]) => {
   const dir = mkdtempSync(join(tmpdir(), "workshop-fake-bin-"));
-  for (const tool of ["gh", "git"]) {
+  for (const tool of tools) {
     const file = join(dir, tool);
     writeFileSync(file, `#!/bin/sh\nexec "${process.execPath}" "${self}" ${tool} "$@"\n`);
     chmodSync(file, 0o755);
@@ -70,7 +72,7 @@ const gh = (args: string[]) => {
   }
   const fixture = JSON.parse(readFileSync(process.env.FAKE_GH_FIXTURE!, "utf8"));
   const q = args.find((a) => a.startsWith("q="));
-  const key = q ? `${path}?${q}` : path.split("?")[0] + (path.includes("state=closed") ? "?state=closed" : "");
+  const key = q ? `${path}?${q}` : path in fixture ? path : path.split("?")[0] + (path.includes("state=closed") ? "?state=closed" : "");
   if (!(key in fixture)) fail(`fake gh: no fixture for ${key}`);
   const answer = fixture[key];
   process.stdout.write(JSON.stringify(args.includes("--slurp") ? [answer] : answer));
