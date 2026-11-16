@@ -9,7 +9,7 @@ Dependabot already proposes every available version and can auto-merge the non-m
 
 **Scope:** the repos the user names. If they name none, use the current repo. Use every repo attached to the session if they asked for "all", or if the working directory isn't a repo but holds several. With several repos, a dependency they share gets one decision, applied in each repo that has it.
 
-**Previous run:** find the last run's tracking issue, the newest `Dependency maintenance <date>` issue in realJohnDoe/agent-skills. Its open sub-issues are decisions already made. Don't file them again: re-check their facts and update an issue only when a fact has changed.
+**Previous runs:** the tracking issues are the `Dependency maintenance <date>` issues in realJohnDoe/agent-skills. The newest one, open or closed, is the last run. The open sub-issues of every open tracking issue are decisions already made. Don't file them again: re-check their facts and update an issue only when a fact has changed.
 
 ## 1. Read each repo's own rules first
 
@@ -77,6 +77,8 @@ Publish one Artifact page per run, titled `Dependency maintenance <YYYY-MM-DD>`,
 
 Link the previous run's report at the top.
 
-Then file the run's tracking issue in realJohnDoe/agent-skills, titled like the report. Its body holds the report link, the previous run's tracking issue, the per-repo table and the cross-repo decisions. Add every issue filed or updated as a sub-issue. Give it no tier label: it records the run and isn't work to dispatch.
+Then, if the run filed or updated at least one issue, file the run's tracking issue in realJohnDoe/agent-skills, titled like the report. Its body holds the report link, the previous run's tracking issue, the per-repo table and the cross-repo decisions. Add every issue filed or updated as a sub-issue. Give it no tier label: it records the run and isn't work to dispatch. A run with no findings files no tracking issue.
 
-End your reply with the report link, the tracking issue, and the issue count per repo.
+Close every open tracking issue whose sub-issues are all closed, as completed. A tracking issue with any open sub-issue stays open.
+
+End your reply with the report link, the tracking issue if there is one, and the issue count per repo.
