@@ -3,7 +3,7 @@
 // tests. Installed by fakeBin() as `gh` and `git` on PATH.
 //
 // gh: reads answers from $FAKE_GH_FIXTURE, a JSON object keyed by the API path
-//   without its query string (search: `search/issues?q=<q>`). A path that isn't
+//   without its query string, except `?state=closed` (search: `search/issues?q=<q>`). A path that isn't
 //   in it is an error. Every write (-X other than GET, or --input) is appended to
 //   $FAKE_GH_LOG as `{method, path, body}`, or fails when FAKE_GH_LOG is unset, so
 //   a dry run that writes fails loudly. A write answers `{"number": 900}`.
@@ -58,7 +58,7 @@ const gh = (args: string[]) => {
   }
   const fixture = JSON.parse(readFileSync(process.env.FAKE_GH_FIXTURE!, "utf8"));
   const q = args.find((a) => a.startsWith("q="));
-  const key = q ? `${path}?${q}` : path.split("?")[0];
+  const key = q ? `${path}?${q}` : path.split("?")[0] + (path.includes("state=closed") ? "?state=closed" : "");
   if (!(key in fixture)) fail(`fake gh: no fixture for ${key}`);
   const answer = fixture[key];
   process.stdout.write(JSON.stringify(args.includes("--slurp") ? [answer] : answer));

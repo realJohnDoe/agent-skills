@@ -6,7 +6,7 @@
 // Prints {state, plan}. state is normal | drain | paused | resume. Without --apply
 // nothing is written; with it, drain/resume carry out the plan and post their marker
 // comment last, so a crash is retried and a second firing in the same state does nothing.
-import { FAILED, assertNever, isDigest, linkedIssues, marked, openQuestion, READY } from "./decide.ts";
+import { FAILED, assertNever, isDigest, marked, referencedIssues, openQuestion, READY } from "./decide.ts";
 import type { GhCheckRuns, GhIssue, GhPull } from "./github.ts";
 import {
   FOOTER,
@@ -60,10 +60,10 @@ const openOf = (repo: string) => ({
 // and gave red ones their last follow-up. Whatever is still red is deferred.
 function planDrain({ repo }: Repo): Drain {
   const { issues, prs, base } = openOf(repo);
-  const linked = new Set(prs.flatMap((p) => linkedIssues(p.body)));
+  const linked = new Set(prs.flatMap((p) => referencedIssues(p.body)));
   const defer: Drain["defer"] = [];
   for (const p of prs.filter((p) => !p.draft)) {
-    const issue = linkedIssues(p.body)
+    const issue = referencedIssues(p.body)
       .map((n) => issues.find((i) => i.number === n))
       .find((i) => i && tiered(i));
     if (!issue || [...names(p), ...names(issue)].includes("opus")) continue; // opus PRs stay open for review
@@ -93,7 +93,7 @@ function planResume({ repo }: Repo): Resume {
     const behind = api<{ behind_by: number }>(`repos/${repo}/compare/${base}...${p.head.label}`).behind_by;
     (behind > DRIFT ? r.close : r.undraft).push({
       ...prLine(p, `${behind} commits behind ${base}`),
-      issues: linkedIssues(p.body),
+      issues: referencedIssues(p.body),
     });
   }
   return r;

@@ -251,6 +251,60 @@ describe("dispatch apply", () => {
   });
 });
 
+describe("an issue with an After merge step", () => {
+  const STEP = "Switch the Pages source at https://github.com/x/settings/pages.";
+  const stale = [{ body: "<!-- workshop-dispatch -->", created_at: "2026-10-01T00:00:00Z", html_url: "u", user: { login: "b", type: "User" } }];
+  const fixture = (prs: Any[], closed: Any[]) => ({
+    ...world(),
+    ...repoFixture(M, {
+      issues: [
+        issue(30, "Needs a manual step", ["sonnet", "ready-for-agent"], {
+          assignees: [{ login: "workshop-bot" }],
+          comments: 1,
+          body: `## After merge\n\n${STEP}\n\nMore.`,
+        }),
+        issue(31, "Waits on 30", ["sonnet", "ready-for-agent"], { body: "Blocked by: #30" }),
+      ],
+      prs,
+    }),
+    [`repos/${M}/issues/30/comments`]: stale,
+    [`repos/${M}/pulls?state=closed`]: closed,
+  });
+  const plan = (prs: Any[], closed: Any[]) => {
+    const res = run("dispatch.ts", ["--repos", M], fixture(prs, closed));
+    assert.equal(res.status, 0, res.stderr);
+    return res.plan;
+  };
+  const refs = pr(40, "Do the thing", { body: "Refs #30", runs: green, mergeable: true });
+
+  test("while its Refs PR is open it is in progress under the PR", () => {
+    const { digest } = plan([refs], []);
+    assert.match(digest.body, /\*\*Review:\*\* \[realJohnDoe\/meridian#40\]/);
+    assert.doesNotMatch(digest.body, /meridian#30\]/);
+    assert.doesNotMatch(digest.body, /Unstick/);
+    assert.match(digest.body, /meridian#31\]\(\S+\) Waits on 30 \(blocked by realJohnDoe\/meridian#30\)/);
+  });
+
+  test("once merged it waits on the maintainer with the step, never Unstick, past STALE_DAYS", () => {
+    const merged = pr(40, "Do the thing", { body: "Refs #30", merged_at: "2026-11-12T00:00:00Z" });
+    const p = plan([], [pr(41, "Unrelated", { merged_at: "2026-11-12T00:00:00Z" }), merged]);
+    assert.match(
+      p.digest.body,
+      new RegExp(`## Waiting on you[^]*\\*\\*After merge:\\*\\* \\[realJohnDoe/meridian#30\\]\\(\\S+\\) Needs a manual step \\(Switch the Pages source[^;]*; merged in \\[realJohnDoe/meridian#40\\]\\(\\S+\\); unblocks realJohnDoe/meridian#31\\)`),
+    );
+    assert.doesNotMatch(p.digest.body, /Unstick/);
+    assert.deepEqual(p.sessions, []);
+    assert.equal(p.digest.counts.afterMerge, 1);
+    assert.match(p.digest.body, /meridian#31\]\(\S+\) Waits on 30 \(blocked by/);
+  });
+
+  test("a closed, unmerged PR that Refs it doesn't count", () => {
+    const { digest } = plan([], [pr(40, "Abandoned", { body: "Refs #30", merged_at: null })]);
+    assert.equal(digest.counts.afterMerge, 0);
+    assert.match(digest.body, /## Unstick[^]*meridian#30\]/);
+  });
+});
+
 describe("the repos are the ones attached", () => {
   test("a repo that isn't attached isn't covered, and the digest says which are", () => {
     const res = run("dispatch.ts", [], world(), { missing: [T] });
