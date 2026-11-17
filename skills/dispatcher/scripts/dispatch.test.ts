@@ -244,13 +244,78 @@ describe("dispatch apply", () => {
     assert.equal(writes("POST", `repos/${T}/issues/3/assignees`).length, 0);
   });
 
-  test("writes one digest, in the digest repo", () => {
+  test("writes no digest: that waits for the end of the run", () => {
+    assert.equal(res.writes.filter((w) => w.path.startsWith(`repos/${DIGEST}/issues`)).length, 0);
+    assert.match(res.plan.digest.body, /realJohnDoe\/meridian#13/);
+  });
+});
+
+describe("dispatch --apply --digest-only", () => {
+  const res = run("dispatch.ts", ["--digest-only"], world(), { apply: true });
+  const isDigestWrite = (w: Any) => w.path.startsWith(`repos/${DIGEST}/issues`);
+
+  test("makes no write but the digest: no labels, merges, claims or comments", () => {
+    assert.equal(res.status, 0, res.stderr);
+    assert.ok(res.writes.length > 0);
+    assert.deepEqual(res.writes.filter((w) => !isDigestWrite(w)), []);
+  });
+
+  test("writes one draft, in the digest repo, and starts no session", () => {
     const digests = res.writes.filter((w) => w.method === "POST" && /^repos\/[^/]+\/[^/]+\/issues$/.test(w.path));
     assert.equal(digests.length, 1);
     assert.equal(digests[0].path, `repos/${DIGEST}/issues`);
     assert.match(digests[0].body.title, /^Workshop digest \(draft\) — from /);
     assert.match(digests[0].body.body, /realJohnDoe\/meridian#13/);
-    assert.match(digests[0].body.body, /realJohnDoe\/tracemap#8/);
+    assert.deepEqual(res.plan.sessions, []);
+    assert.deepEqual(res.plan.deferred, []);
+    assert.doesNotMatch(res.plan.digest.body, /\(dispatched\)/);
+  });
+
+  test("publishes on a due day", () => {
+    const draft = issue(90, "Workshop digest (draft) — from 2026-11-10", [], { body: "<!-- digest-since: 2026-11-10 -->" });
+    const due = run("dispatch.ts", ["--digest-only"], world({ digestIssues: [draft], digestComments: { 90: [] } }), { apply: true });
+    assert.equal(due.status, 0, due.stderr);
+    assert.equal(due.plan.digest.publish, true);
+    assert.deepEqual(due.writes.filter((w) => !isDigestWrite(w)), []);
+    assert.ok(due.writes.some((w) => w.method === "PATCH" && /^Workshop digest — /.test(w.body?.title ?? "")));
+  });
+
+  test("without --apply it only prints", () => {
+    const dry = run("dispatch.ts", ["--digest-only"], world());
+    assert.equal(dry.status, 0, dry.stderr);
+    assert.deepEqual(dry.writes, []);
+    assert.deepEqual(dry.plan.sessions, []);
+    assert.match(dry.plan.digest.body, /realJohnDoe\/meridian#13/);
+  });
+});
+
+describe("the final digest of a run that dispatched an issue", () => {
+  const claim = [{ body: "<!-- workshop-dispatch -->", created_at: "2026-11-13T10:00:00Z", html_url: "u", user: { login: "b", type: "User" } }];
+  const fixture = (prs: Any[]) => ({
+    ...world(),
+    ...repoFixture(M, {
+      issues: [
+        issue(60, "Dispatched with a PR", ["sonnet", "ready-for-agent"], { assignees: [{ login: "workshop-bot" }], comments: 1 }),
+        issue(61, "Dispatched, still no PR", ["sonnet", "ready-for-agent"], { assignees: [{ login: "workshop-bot" }], comments: 1 }),
+      ],
+      prs,
+    }),
+    [`repos/${M}/issues/60/comments`]: claim,
+    [`repos/${M}/issues/61/comments`]: claim,
+  });
+  const res = run(
+    "dispatch.ts",
+    ["--repos", M, "--digest-only"],
+    fixture([pr(70, "Do 60", { body: "Fixes #60", runs: [], mergeable: true })]),
+  );
+
+  test("shows the opened PR, and no PR yet for the other, never a new dispatch", () => {
+    assert.equal(res.status, 0, res.stderr);
+    const body: string = res.plan.digest.body;
+    assert.match(body, /In progress[^]*meridian#70\]/);
+    assert.match(body, /meridian#61\]\(\S+\)[^\n]*no PR yet/);
+    assert.doesNotMatch(body, /meridian#6[01]\]\(\S+\)[^\n]*\(dispatched\)/);
+    assert.deepEqual(res.plan.sessions, []);
   });
 });
 
