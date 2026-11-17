@@ -32,6 +32,13 @@ const surveysIn = (dir: string): Survey[] =>
 // Pathspec words; double quotes allow ones with spaces or colons.
 const words = (s: string) => [...s.matchAll(/"([^"]*)"|(\S+)/g)].map((m) => m[1] ?? m[2]);
 
+// The repo's `## <label> scope` heading in its overlay (see ../SKILL.md), overriding a survey's frontmatter scope.
+const overlayScope = (path: string, label: string) => {
+  const file = join(path, "docs/agents/survey.md");
+  const body = existsSync(file) ? readFileSync(file, "utf8").match(new RegExp(`^## ${label} scope[ \\t]*\\n+([^#\\n][^\\n]*)`, "im")) : null;
+  return body?.[1].replaceAll("`", "").trim();
+};
+
 main(() => {
   const today = new Date(arg("--today") ?? new Date().toISOString().slice(0, 10));
   const plugin = surveysIn(PLUGIN);
@@ -51,10 +58,11 @@ main(() => {
         .filter((i) => names(i).includes("survey") || (i.sub_issues_summary?.total ?? 0) > 0)
         .sort((a, b) => b.created_at.localeCompare(a.created_at));
       const since = runs[0]?.created_at.slice(0, 10) ?? firstCommit;
+      const scope = overlayScope(path, s.label) ?? s.scope;
       const activity =
-        s.scope === "sessions"
+        scope === "sessions"
           ? sessionPrs(repo, since).length
-          : git("log", "--first-parent", "-m", `--since=${since}`, "--format=%H", "--", ...words(s.scope))
+          : git("log", "--first-parent", "-m", `--since=${since}`, "--format=%H", "--", ...words(scope))
               .split("\n")
               .filter(Boolean).length;
       const days = Math.round((today.getTime() - new Date(since).getTime()) / 864e5);

@@ -36,7 +36,7 @@ const pr = (n: number, created: string, body = "") => ({
 const skill = (label: string, scope: string) => `---\nname: x\nlabel: ${label}\nscope: ${scope}\n---\n\nBody.\n`;
 
 // A clone of `repo` under `checkouts` with one commit per [date, file], and local skills.
-const clone = (checkouts: string, repo: string, commits: [string, string][], skills: Record<string, string> = {}) => {
+const clone = (checkouts: string, repo: string, commits: [string, string, string?][], skills: Record<string, string> = {}) => {
   const dir = join(checkouts, repo.split("/")[1]);
   const git = (args: string[], date?: string) =>
     execFileSync("git", ["-C", dir, "-c", "user.name=t", "-c", "user.email=t@t", ...args], {
@@ -49,9 +49,9 @@ const clone = (checkouts: string, repo: string, commits: [string, string][], ski
     mkdirSync(join(dir, ".claude/skills", name), { recursive: true });
     writeFileSync(join(dir, ".claude/skills", name, "SKILL.md"), body);
   }
-  for (const [date, file] of commits) {
+  for (const [date, file, content] of commits) {
     mkdirSync(dirname(join(dir, file)), { recursive: true });
-    writeFileSync(join(dir, file), date);
+    writeFileSync(join(dir, file), content ?? date);
     git(["add", "-A"]);
     git(["commit", "--quiet", "-m", `${file} on ${date}`], date);
   }
@@ -91,6 +91,7 @@ const world = ({ trackerPrs = [pr(5, "2026-11-10", `https://claude.ai/code/${SES
   [`repos/${M}/pulls/71/commits`]: [{ commit: { message: `fix\n\nClaude-Session: https://claude.ai/code/${SESSION}` } }],
   [`repos/${M}/pulls/72/commits`]: [{ commit: { message: "chore" } }],
   // Tracemap has never been surveyed.
+  [`repos/${T}/issues?labels=health&state=all&per_page=100`]: [],
   [`repos/${T}/issues?labels=retro&state=all&per_page=100`]: [],
   [`repos/${T}/issues?labels=survey-finding&state=open&per_page=100`]: Array.from({ length: trackerFindings }, (_, i) =>
     issue(80 + i, ["survey-finding", "health"]),
@@ -98,7 +99,7 @@ const world = ({ trackerPrs = [pr(5, "2026-11-10", `https://claude.ai/code/${SES
   [`repos/${T}/pulls`]: trackerPrs,
 });
 
-const run = (fixture: unknown, args: string[] = []) => {
+const run = (fixture: unknown, args: string[] = [], overlay?: string) => {
   const dir = mkdtempSync(join(tmpdir(), "survey-next-test-"));
   const checkouts = join(dir, "checkouts");
   clone(
@@ -120,6 +121,7 @@ const run = (fixture: unknown, args: string[] = []) => {
   clone(checkouts, T, [
     ["2026-11-03", "README.md"],
     ["2026-11-04", "src/x.ts"],
+    ...(overlay ? [["2026-11-05", "docs/agents/survey.md", overlay] as [string, string, string]] : []),
   ]);
   writeFileSync(join(dir, "fixture.json"), JSON.stringify(fixture));
   const res = spawnSync(
@@ -145,6 +147,7 @@ describe("survey chooser over two repos", () => {
         [M, "survey-ui", "2026-09-01", 73, 2, 146, "open run #45 has 1 finding(s) to work on"],
         [M, "survey-health", "2026-10-01", 43, 2, 86, undefined],
         [M, "survey-retro", "2026-11-01", 12, 2, 24, undefined],
+        [T, "survey-health", "2026-11-03", 10, 2, 20, "3 open survey-finding issues"],
         [T, "survey-retro", "2026-11-03", 10, 1, 10, "3 open survey-finding issues"],
       ],
     );
@@ -160,15 +163,28 @@ describe("survey chooser over two repos", () => {
     assert.equal(pair(T, "survey-retro").skill, join(here, "../../survey-retro/SKILL.md"));
   });
 
+  test("the plugin's health survey counts the whole repo, so every attached repo gets a pair", () => {
+    assert.equal(pair(T, "survey-health").skill, join(here, "../../survey-health/SKILL.md"));
+    assert.equal(pair(T, "survey-health").activity, 2);
+  });
+
   test("the top pair is the best one neither gate skips; each gate holds per repo", () =>
     assert.deepEqual([res.out.top.repo, res.out.top.survey], [M, "survey-health"]));
 });
 
-describe("survey chooser with nothing to do", () => {
-  test("with every score 0 there is no top pair", () => {
-    const res = run(world({ trackerPrs: [], trackerFindings: 0 }), ["--repos", T]);
+describe("survey chooser with a repo overlay", () => {
+  test("a `## Health scope` heading narrows the pathspecs the activity counts", () => {
+    const res = run(world({ trackerFindings: 0 }), ["--repos", T], "# Survey overlay\n\n## Health scope\n\n`src`\n\n## Gates\n\nmake\n");
     assert.equal(res.status, 0, res.stderr);
-    assert.equal(res.out.pairs[0].score, 0);
+    assert.equal(res.out.pairs.find((p: Any) => p.survey === "survey-health").activity, 1);
+  });
+});
+
+describe("survey chooser with nothing to do", () => {
+  test("with every pair skipped or scoring 0 there is no top pair", () => {
+    const res = run(world({ trackerPrs: [] }), ["--repos", T]);
+    assert.equal(res.status, 0, res.stderr);
+    assert.equal(res.out.pairs.find((p: Any) => p.survey === "survey-retro").score, 0);
     assert.equal(res.out.top, null);
   });
 });
