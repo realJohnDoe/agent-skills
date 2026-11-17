@@ -6,7 +6,7 @@
   ("Board look and layout, prototyped on real dispatcher data") for the map #61.
   Round 2, after the maintainer's reaction to three variants: the vertical
   layout, the stages in reverse happy-path order (Stuck, Closed, After merge,
-  PR in progress, Queue, Waiting), the UI drawn as the control panel of a
+  PR in progress, Queue, Waiting), no moving rail, a PR link on every issue card with a PR, the UI drawn as the control panel of a
   workshop/farm/spaceship (plants and robots belong in the banner image only),
   dark only, every chip rectangular, and needs-review PRs at the top of their stage.
   Real data: `node skills/dispatcher/scripts/dispatch.ts` dry run of 2026-11-17,
@@ -16,8 +16,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
 <style>
-/* Layout: a banner, a cockpit status strip, then one column of console modules joined by a conduit
-   whose light flows upward, from Waiting at the bottom to Closed; Stuck is the alarm module at the top. */
+/* Layout: a banner, a cockpit status strip, then one column of console modules in reverse happy-path
+   order; Stuck is the alarm module at the top. */
 :root {
   --sky-top: #1c1640;
   --sky-low: #5b3a86;
@@ -106,28 +106,14 @@ main { max-width: 1080px; margin: 0 auto; }
 .status b { color: var(--fg); font-weight: 600; }
 .status .sep { width: 1px; height: 14px; background: var(--seam); }
 
-/* ---------- the line: modules joined by a conduit ---------- */
-.line { position: relative; display: grid; gap: 22px; padding-left: 34px; }
-.line::before { /* the conduit */
-  content: ""; position: absolute; left: 10px; top: 24px; bottom: 24px; width: 6px; border-radius: 3px;
-  background: var(--metal-lo); box-shadow: inset 0 0 0 1px var(--seam);
-}
-.line::after { /* light flowing up the conduit, toward Closed */
-  content: ""; position: absolute; left: 12px; top: 24px; bottom: 24px; width: 2px;
-  background: repeating-linear-gradient(0deg, var(--holo) 0 10px, transparent 10px 30px);
-  opacity: .8; animation: flow 1.6s linear infinite;
-}
-@keyframes flow { from { background-position: 0 0; } to { background-position: 0 -30px; } }
+/* ---------- the line of modules ---------- */
+.line { display: grid; gap: 22px; }
 
 .module {
   position: relative; border-radius: 8px; padding: 0 0 14px;
   background: var(--metal);
   border: 1px solid var(--metal-lo);
   box-shadow: inset 0 1px 0 var(--metal-hi), 0 8px 20px #0006;
-}
-.module::before { /* the joint where the conduit plugs in */
-  content: ""; position: absolute; left: -29px; top: 20px; width: 20px; height: 6px;
-  background: var(--metal-lo); box-shadow: inset 0 0 0 1px var(--seam);
 }
 /* rivets in the four corners */
 .module { background-image:
@@ -198,6 +184,8 @@ main { max-width: 1080px; margin: 0 auto; }
 .chip.ref { color: var(--muted); padding-inline: 0; }
 .chip.tier { background: var(--holo-dim); color: var(--holo); }
 .chip.sub { background: var(--metal-hi); color: var(--fg); }
+.chip.prlink { color: var(--holo); border-color: var(--holo); text-decoration: none; }
+.chip.prlink:hover { background: var(--holo-dim); }
 .chip.review { background: var(--warn); color: #241a00; }
 .chip.auto { background: var(--ok); color: #062312; }
 .check { display: inline-flex; align-items: center; gap: 5px; font: 11px var(--f-mono); color: var(--muted); }
@@ -208,7 +196,7 @@ main { max-width: 1080px; margin: 0 auto; }
 .empty::before { content: "◦ "; color: var(--c); }
 
 details.parked {
-  margin-top: 22px; margin-left: 34px; padding: 10px 16px; border-radius: 6px;
+  margin-top: 22px; padding: 10px 16px; border-radius: 6px;
   background: var(--metal); border: 1px dashed var(--seam); color: var(--muted);
 }
 details.parked summary { cursor: pointer; font: 600 13px var(--f-display); letter-spacing: .06em; text-transform: uppercase; }
@@ -217,14 +205,10 @@ details.parked li { margin: 4px 0; }
 details.parked .chip.ref { padding: 0; }
 
 @media (max-width: 560px) {
-  .line { padding-left: 18px; }
-  .line::before { left: 3px; } .line::after { left: 5px; }
-  .module::before { left: -15px; width: 14px; }
   .module-head, .module .stack { padding-inline: 12px; }
   .module .stack { grid-template-columns: 1fr; }
-  details.parked { margin-left: 18px; }
 }
-@media (prefers-reduced-motion: reduce) { .line::after, .m-stuck .led { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .m-stuck .led { animation: none; } }
 
 /* ---------- prototype controls (not part of the design) ---------- */
 .switcher {
@@ -270,22 +254,22 @@ addEventListener("load", bannerDebug);
 // REAL: dispatch.ts dry run, 2026-11-17, repos covered: realJohnDoe/agent-skills.
 const GH = "https://github.com/";
 const REAL = [
-  { stage: "afterMerge", repo: "agent-skills", n: 49, kind: "issue", tier: "opus",
+  { stage: "afterMerge", repo: "agent-skills", n: 49, kind: "issue", tier: "opus", pr: 56,
     title: "timetable: one routine and one schedule table in git for every workshop task",
-    why: "Create the Timetable routine at claude.ai/code/scheduled (merged in agent-skills#56)" },
+    why: "Create the Timetable routine at claude.ai/code/scheduled" },
   { stage: "pr", repo: "agent-skills", n: 60, kind: "pr", check: "green", automerge: true,
     title: "surveys: list labels over REST, create survey labels on a repo's first run",
     why: "Green and quiet: merges on the next run" },
   { stage: "closed", repo: "agent-skills", n: 62, kind: "issue",
     title: "Can pushes to the workshop-board branch deploy GitHub Pages?", why: "Resolved" },
-  { stage: "closed", repo: "agent-skills", n: 48, kind: "issue", tier: "sonnet",
-    title: "dispatcher: an unpushable repo still gets the digest written, and only that repo is skipped", why: "Fixed by agent-skills#57" },
-  { stage: "closed", repo: "agent-skills", n: 55, kind: "issue", tier: "sonnet",
-    title: "dispatcher: write the digest at the end of the run, after the sessions", why: "Fixed by agent-skills#58" },
-  { stage: "closed", repo: "agent-skills", n: 47, kind: "issue", tier: "sonnet",
-    title: "dispatcher: move the digest out of dispatch.ts into digest.ts", why: "Fixed by agent-skills#52" },
-  { stage: "closed", repo: "agent-skills", n: 45, kind: "issue", tier: "sonnet",
-    title: "dispatcher waits for GitHub to reflect a merge before re-reading", why: "Fixed by agent-skills#54" },
+  { stage: "closed", repo: "agent-skills", n: 48, kind: "issue", tier: "sonnet", pr: 57,
+    title: "dispatcher: an unpushable repo still gets the digest written, and only that repo is skipped", why: "Merged" },
+  { stage: "closed", repo: "agent-skills", n: 55, kind: "issue", tier: "sonnet", pr: 58,
+    title: "dispatcher: write the digest at the end of the run, after the sessions", why: "Merged" },
+  { stage: "closed", repo: "agent-skills", n: 47, kind: "issue", tier: "sonnet", pr: 52,
+    title: "dispatcher: move the digest out of dispatch.ts into digest.ts", why: "Merged" },
+  { stage: "closed", repo: "agent-skills", n: 45, kind: "issue", tier: "sonnet", pr: 54,
+    title: "dispatcher waits for GitHub to reflect a merge before re-reading", why: "Merged" },
   { stage: "parked", repo: "agent-skills", n: 66, title: "Slice the board build into tier-labelled issues", why: "no tier label" },
   { stage: "parked", repo: "agent-skills", n: 65, title: "Generate the board banner image", why: "no tier label" },
   { stage: "parked", repo: "agent-skills", n: 64, title: "Shape of board.json and where the site's source lives", why: "no tier label" },
@@ -315,15 +299,15 @@ const SAMPLE = [
     title: "Sync calendars in the background", why: "Red: follow-up 1 of 2 runs today" },
   { stage: "pr", repo: "kenpo-notes", n: 22, kind: "pr", tier: "opus", check: "green",
     title: "Group techniques by belt on the index page", why: "Green and quiet" },
-  { stage: "afterMerge", repo: "rentenluecke", n: 9, kind: "issue", tier: "sonnet",
-    title: "Move the tax tables to 2027 values", why: "Check the 2027 numbers against the Bundesanzeiger (merged in rentenluecke#11)" },
+  { stage: "afterMerge", repo: "rentenluecke", n: 9, kind: "issue", tier: "sonnet", pr: 11,
+    title: "Move the tax tables to 2027 values", why: "Check the 2027 numbers against the Bundesanzeiger" },
   { stage: "stuck", repo: "structra", n: 70, kind: "pr", tier: "opus", check: "red",
     title: "Incremental parser for large files", why: "Follow-up cap reached (2 of 2): still red" },
   { stage: "stuck", repo: "tracemap", n: 88, kind: "issue", tier: "sonnet",
     title: "Export traces as SVG sprites", why: "Dispatched 3 days ago, no PR yet" },
   { stage: "stuck", repo: "rentenluecke", kind: "repo",
     title: "Can't push to rentenluecke", why: "The Timetable routine has it attached read-only" },
-  { stage: "closed", repo: "meridian", n: 37, kind: "issue", tier: "haiku", title: "Fix the off-by-one in the agenda end date", why: "Fixed by meridian#38" },
+  { stage: "closed", repo: "meridian", n: 37, kind: "issue", tier: "haiku", pr: 38, title: "Fix the off-by-one in the agenda end date", why: "Merged" },
   { stage: "parked", repo: "structra", n: 64, title: "Rewrite the CLI in Rust", why: "deferred" },
   { stage: "parked", repo: "meridian", n: 30, tier: "opus", title: "Design the sharing model", why: "plan" },
 ];
@@ -357,6 +341,7 @@ function card(x) {
   const url = x.n ? `${GH}realJohnDoe/${x.repo}/${x.kind === "pr" ? "pull" : "issues"}/${x.n}` : `${GH}realJohnDoe/${x.repo}`;
   const chips = [`<span class="chip repo" style="--repo:${REPO_COLORS[x.repo]}">${esc(x.repo)}</span>`];
   if (x.n) chips.push(`<span class="chip ref">#${x.n}</span>`);
+  if (x.pr) chips.push(`<a class="chip prlink" href="${GH}realJohnDoe/${x.repo}/pull/${x.pr}" target="_blank" rel="noopener">PR #${x.pr}</a>`);
   if (x.tier) chips.push(`<span class="chip tier">${x.tier}</span>`);
   if (x.sub) chips.push(`<span class="chip sub">${esc(x.sub)}</span>`);
   if (needsReview(x)) chips.push(`<span class="chip review">needs review</span>`);
