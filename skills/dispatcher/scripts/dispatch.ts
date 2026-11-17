@@ -539,8 +539,6 @@ function planRepo({ repo, name, path }: Repo, since: string): RepoPlan {
     const state = claimState({
       tiered: !!tierOf(names(i)),
       dispatchedAt: mark?.created_at ?? null,
-      today: TODAY,
-      staleDays: STALE_DAYS,
     });
     const day = mark?.created_at.slice(0, 10);
     switch (state.kind) {
@@ -551,9 +549,6 @@ function planRepo({ repo, name, path }: Repo, since: string): RepoPlan {
             why: `assigned to ${i.assignees.map((a) => `@${a.login}`).join(", ")}; unassign to queue it`,
           }),
         );
-        break;
-      case "inProgress":
-        out.inProgress.push(item(i, { issue: i.number, why: `dispatched ${day}, no PR yet` }));
         break;
       case "unstick":
         out.unstick.push(

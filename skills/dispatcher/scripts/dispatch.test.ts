@@ -309,11 +309,12 @@ describe("the final digest of a run that dispatched an issue", () => {
     fixture([pr(70, "Do 60", { body: "Fixes #60", runs: [], mergeable: true })]),
   );
 
-  test("shows the opened PR, and no PR yet for the other, never a new dispatch", () => {
+  test("shows the opened PR, and the dispatched issue with no PR under Unstick, never a new dispatch", () => {
     assert.equal(res.status, 0, res.stderr);
     const body: string = res.plan.digest.body;
     assert.match(body, /In progress[^]*meridian#70\]/);
-    assert.match(body, /meridian#61\]\(\S+\)[^\n]*no PR yet/);
+    assert.match(body, /Unstick[^]*meridian#61\]\(\S+\)[^\n]*no PR yet/);
+    assert.doesNotMatch(body, /In progress[^]*meridian#61\]/);
     assert.doesNotMatch(body, /meridian#6[01]\]\(\S+\)[^\n]*\(dispatched\)/);
     assert.deepEqual(res.plan.sessions, []);
   });
