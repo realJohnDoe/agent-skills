@@ -160,18 +160,18 @@ describe("dispatch dry run over two repos", () => {
     assert.match(res.plan.digest.body, /\nRepos covered: realJohnDoe\/meridian, realJohnDoe\/tracemap\.\n/);
   });
 
-  test("one session cap across repos: newest follow-ups first, then the oldest issues anywhere", () => {
+  test("one session cap across repos: newest follow-ups first, then the newest issues anywhere", () => {
     assert.deepEqual(
       res.plan.sessions.map((s: Any) => [s.kind, s.repo, s.pr ?? s.issue]),
       [
         ["followup", T, 9],
         ["followup", M, 21],
-        ["dispatch", T, 3],
+        ["dispatch", T, 4],
       ],
     );
     assert.deepEqual(res.plan.deferred, [
       `${M}: meridian#10 Meridian sonnet task`,
-      `${T}: tracemap#4 Tracemap sonnet task`,
+      `${T}: tracemap#3 Tracemap haiku task`,
     ]);
   });
 
@@ -208,10 +208,10 @@ describe("dispatch dry run over two repos", () => {
     );
     assert.match(
       body,
-      /## In progress\n\n- \[realJohnDoe\/tracemap#9\]\(\S+\) Tracemap red \(follow-up\)\n- \[realJohnDoe\/meridian#21\]\(\S+\) Meridian red \(follow-up\)\n- \[realJohnDoe\/tracemap#3\]\(\S+\) .* \(dispatched\)\n/,
+      /## In progress\n\n- \[realJohnDoe\/tracemap#9\]\(\S+\) Tracemap red \(follow-up\)\n- \[realJohnDoe\/meridian#21\]\(\S+\) Meridian red \(follow-up\)\n- \[realJohnDoe\/tracemap#4\]\(\S+\) .* \(dispatched\)\n/,
     );
     assert.equal(res.plan.digest.counts.inProgress, 3);
-    assert.match(body, /## Queue[^]*\[realJohnDoe\/meridian#10\][^]*\[realJohnDoe\/tracemap#4\]/);
+    assert.match(body, /## Queue[^]*\[realJohnDoe\/meridian#10\][^]*\[realJohnDoe\/tracemap#3\]/);
     assert.match(body, /\[realJohnDoe\/meridian#14\]\(\S+\) Meridian filed by an agent \(haiku\)/);
     assert.match(body, /\[realJohnDoe\/meridian#12\]\(\S+\) Meridian untriaged \(no tier label/);
     assert.match(body, /\[realJohnDoe\/meridian#11\]\(\S+\) Meridian waits on 10 \(blocked by realJohnDoe\/meridian#10\)/);
@@ -238,10 +238,10 @@ describe("dispatch apply", () => {
 
   test("claims each session in its own repo", () => {
     assert.equal(writes("POST", `repos/${M}/issues/21/comments`).length, 1);
-    assert.equal(writes("POST", `repos/${T}/issues/3/assignees`).length, 1);
+    assert.equal(writes("POST", `repos/${T}/issues/4/assignees`).length, 1);
     assert.equal(writes("POST", `repos/${T}/issues/9/comments`).length, 1);
     assert.equal(writes("POST", `repos/${M}/issues/10/assignees`).length, 0);
-    assert.equal(writes("POST", `repos/${T}/issues/4/assignees`).length, 0);
+    assert.equal(writes("POST", `repos/${T}/issues/3/assignees`).length, 0);
   });
 
   test("writes one digest, in the digest repo", () => {
@@ -468,5 +468,27 @@ describe("pause over two repos", () => {
   test("without a digest the workshop runs normally", () => {
     const res = run("pause.ts", [], world());
     assert.equal(res.plan.state, "normal");
+  });
+});
+
+describe("a merge that closes an issue", () => {
+  const sent = issue(51, "Closed by the merge", ["sonnet", "ready-for-agent"], { assignees: [{ login: "workshop-bot" }], state: "open" });
+  const fixture = {
+    ...world(),
+    ...repoFixture(M, {
+      issues: [sent, issue(52, "Waits on 51", ["sonnet", "ready-for-agent"], { body: "Blocked by: #51" })],
+      prs: [pr(50, "Fix it", { body: "Fixes #51", labels: [{ name: "automerge" }], runs: green, mergeable: true })],
+    }),
+    [`repos/${M}/issues/51`]: { ...sent, state: "open" },
+    [`repos/${M}/issues/51/comments`]: [{ body: "<!-- workshop-dispatch -->", created_at: "2026-11-12T00:00:00Z", html_url: "u", user: { login: "b", type: "User" } }],
+  };
+
+  test("waits for GitHub: the PR is listed merged and its issue is not in progress", () => {
+    const res = run("dispatch.ts", ["--repos", M], fixture, { apply: true });
+    assert.equal(res.status, 0, res.stderr);
+    const body: string = res.plan.digest.body;
+    assert.match(body, /meridian#50\]\(\S+\) Fix it \(closes realJohnDoe\/meridian#51 · sonnet, ready-for-agent\)/);
+    assert.doesNotMatch(body, /meridian#51\]\(\S+\)[^\n]*no PR yet/);
+    assert.deepEqual(res.plan.sessions.map((s: Any) => s.issue), [52]);
   });
 });

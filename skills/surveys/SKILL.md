@@ -27,7 +27,7 @@ The scheduled survey run follows these steps. Each run surveys one repo, with on
 `score = days since that survey last ran on that repo × activity in its scope since then`
 
 - **Last run:** the newest issue in that repo labelled `survey` plus the survey's `label` (or, filed before the `survey` label, one with that `label` and sub-issues). A repo that has none counts from its first commit, so a repo never surveyed ranks high.
-- **Activity:** set by the survey's `scope` frontmatter. `sessions` (retro) counts the PRs opened since that name an agent session (`survey-retro/scripts/retro-candidates.ts`). Anything else is git pathspecs, and counts the first-parent commits (merged PRs) touching them.
+- **Activity:** set by the survey's `scope` frontmatter, which a repo's overlay overrides with a `## <label> scope` heading holding the pathspecs. `sessions` (retro) counts the PRs opened since that name an agent session (`survey-retro/scripts/retro-candidates.ts`). Anything else is git pathspecs, and counts the first-parent commits (merged PRs) touching them.
 - **Skipped** (`skip` says why), each per repo: the pair while that repo has an open parent for that survey with a finding the workshop can still work on (open, not `deferred`, no undecided `## Decision needed`), and every pair of a repo with 3 or more open `survey-finding` issues.
 - **`top`** is the highest-scoring pair not skipped, or `null` when every such score is 0.
 
@@ -41,6 +41,8 @@ A repo may describe itself to the surveys in `docs/agents/survey.md`. Every head
 
 - `## Gates`: the commands a session must pass before pushing (lint, typecheck, tests, build). Default: what the repo's CI workflows, build scripts and `CLAUDE.md` say.
 - `## Environment limits`: what a survey session can't do there (a backend it can't reach, types to generate before lint means anything, fixtures to use instead of writing a generator). Record them in the coverage statement up front rather than discovering them mid-pass. Default: none known.
+
+A survey may read headings of its own, named after its label (`## Health scope`, `## Health corpora`): its skill says which.
 
 Nothing in this plugin names a repo, its paths or its issues: those belong in the overlay or the repo's own survey skills.
 

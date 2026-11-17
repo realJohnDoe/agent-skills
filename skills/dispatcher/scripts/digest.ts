@@ -101,7 +101,7 @@ export function buildDigest({ repo, draft, published, since }: DigestState, plan
   const waiting = notPicked.filter((x) => x.waiting);
   const info = [
     ...section("In progress", inProgress),
-    ...section("Queue (dispatched next, oldest first)", queue),
+    ...section("Queue (dispatched next, newest first)", queue),
     ...section("Not picked up", notPicked.filter((x) => !x.waiting)),
     ...(waiting.length
       ? [

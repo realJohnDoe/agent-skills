@@ -80,7 +80,7 @@ type Session = {
 };
 type Followup = Session & { kind: "followup"; pr: number; issue: number | undefined; branch: string };
 type Dispatch = Session & { kind: "dispatch"; issue: number };
-type Merge = { repo: string; pr: number; sha: string; title: string; created: string };
+type Merge = { repo: string; pr: number; sha: string; title: string; created: string; body: string | null };
 type RepoPlan = {
   repo: string;
   followups: Followup[];
@@ -99,7 +99,6 @@ type RepoPlan = {
 };
 type ListKey = Exclude<keyof RepoPlan, "repo" | "unblocks" | "missingLabels">;
 const byRepo = (a: Dated, b: Dated) => a.repo.localeCompare(b.repo);
-const oldestFirst = (a: Dated, b: Dated) => a.created.localeCompare(b.created) || byRepo(a, b);
 const newestFirst = (a: Dated, b: Dated) => b.created.localeCompare(a.created) || byRepo(a, b);
 
 // Other repos' issues named as blockers, each looked up once per run; one that
@@ -144,6 +143,7 @@ main(() => {
   // refused merge is logged and retried on the next run, not fatal. A repo
   // where something merged is read again, so sessions and the digest see it.
   const mergedIn = new Set<string>();
+  const mergedPrs: Merge[] = [];
   if (APPLY) {
     for (const { repo, missing } of missingLabels)
       for (const name of missing)
@@ -152,19 +152,33 @@ main(() => {
       try {
         post(`repos/${m.repo}/pulls/${m.pr}/merge`, { sha: m.sha, merge_method: "merge" }, "PUT");
         mergedIn.add(m.repo);
+        mergedPrs.push(m);
       } catch (e) {
         const err = e as { stderr?: string; message: string };
         console.error(`merge ${m.repo}#${m.pr} refused: ${err.stderr ?? err.message}`);
       }
   }
+  // GitHub closes the merged PR's issues and indexes it for search a moment
+  // after the merge, so wait for that before reading again (bounded; on timeout
+  // carry on, and the next run corrects it).
+  const settled = (m: Merge) =>
+    linkedIssues(m.body).every((n) => api<{ state: string }>(`repos/${m.repo}/issues/${n}`).state === "closed") &&
+    mergedSince(m.repo, since).items.some((i) => i.number === m.pr);
+  for (let waited = 0; mergedPrs.some((m) => !settled(m)); waited += 3000) {
+    if (waited >= 30000) {
+      console.error("merge not yet reflected by GitHub after 30 s; reading anyway");
+      break;
+    }
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 3000);
+  }
   const plans = first.map((p, k) => (mergedIn.has(p.repo) ? planRepo(repos[k], since) : p));
   const pick = <K extends ListKey>(k: K): RepoPlan[K] => plans.flatMap((p) => p[k] as unknown[]) as RepoPlan[K];
 
   // Follow-ups first: finishing beats starting. Follow-ups go newest PR first and
-  // dispatches oldest issue first, as in Meridian, each across every repo
+  // dispatches newest issue first, each across every repo
   // whichever repo it is in.
   const followups = pick("followups").sort(newestFirst);
-  const dispatches = pick("dispatches").sort(oldestFirst);
+  const dispatches = pick("dispatches").sort(newestFirst);
   const sessions = [...followups, ...dispatches].slice(0, MAX_SESSIONS);
   const queue = dispatches.slice(Math.max(0, MAX_SESSIONS - followups.length));
   // What the workshop is working on: this run's sessions, PRs waiting on CI or
@@ -243,7 +257,7 @@ main(() => {
         repos: repos.map((r) => r.repo),
         missingLabels,
         sessions: sessions.map(({ created, item, ...s }) => s),
-        automerge: automerge.map(({ created, ...m }) => m),
+        automerge: automerge.map(({ created, body, ...m }) => m),
         deferred: [...followups, ...dispatches]
           .slice(MAX_SESSIONS)
           .map((s) => `${s.repo}: ${s.title}`),
@@ -374,7 +388,7 @@ function planRepo({ repo, name, path }: Repo, since: string): RepoPlan {
         out.review.push(v.why ? { ...it, why: v.why } : it);
         break;
       case "merge":
-        out.automerge.push({ repo, pr: pr.number, sha: pr.head.sha, title: pr.title, created: pr.created_at });
+        out.automerge.push({ repo, pr: pr.number, sha: pr.head.sha, title: pr.title, created: pr.created_at, body: pr.body });
         break;
       case "unstick":
         out.unstick.push({ ...it, why: v.why });
@@ -550,15 +564,7 @@ function planRepo({ repo, name, path }: Repo, since: string): RepoPlan {
   }
 
   // What merged in this digest's window, each with the issue it closed and its labels.
-  out.merged = api<GhSearch>(
-    "search/issues",
-    "-X",
-    "GET",
-    "-f",
-    `q=repo:${repo} is:pr is:merged merged:>=${since}`,
-    "-f",
-    "per_page=100",
-  )
+  out.merged = mergedSince(repo, since)
     .items.sort((a, b) => a.number - b.number)
     .map((pr) => {
       const closes = linkedIssues(pr.body).map(
@@ -570,6 +576,11 @@ function planRepo({ repo, name, path }: Repo, since: string): RepoPlan {
   const have = all<{ name: string }>(`repos/${repo}/labels?per_page=100`).map((l) => l.name);
   out.missingLabels = Object.keys(LABELS).filter((l) => !have.includes(l));
   return out;
+}
+
+// The PRs merged in a repo since a date, from the search index.
+function mergedSince(repo: string, since: string) {
+  return api<GhSearch>("search/issues", "-X", "GET", "-f", `q=repo:${repo} is:pr is:merged merged:>=${since}`, "-f", "per_page=100");
 }
 
 // The lines that put a session in its own worktree of its repo's clone.
