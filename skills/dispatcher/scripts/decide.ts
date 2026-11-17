@@ -235,26 +235,13 @@ export const prVerdict = (pr: PrFacts): PrVerdict => {
 
 /**
  * An assigned issue with no open PR: `notPicked` when assigned by hand (no
- * dispatch marker) and tier-labelled, `unstick` when dispatched over `staleDays`
- * ago, `inProgress` when dispatched more recently, `none` otherwise.
+ * dispatch marker) and tier-labelled, `unstick` when dispatched (every session
+ * of the run has finished by the time the digest reads it, so no PR means the
+ * session ended without one), `none` otherwise.
  */
-export type ClaimState =
-  | { kind: "notPicked" }
-  | { kind: "unstick" }
-  | { kind: "inProgress" }
-  | { kind: "none" };
+export type ClaimState = { kind: "notPicked" } | { kind: "unstick" } | { kind: "none" };
 
-export const claimState = ({
-  tiered,
-  dispatchedAt,
-  today,
-  staleDays,
-}: {
-  tiered: boolean;
-  dispatchedAt: string | null;
-  today: Date;
-  staleDays: number;
-}): ClaimState => {
+export const claimState = ({ tiered, dispatchedAt }: { tiered: boolean; dispatchedAt: string | null }): ClaimState => {
   if (!dispatchedAt) return { kind: tiered ? "notPicked" : "none" };
-  return { kind: days(today, dispatchedAt) > staleDays ? "unstick" : "inProgress" };
+  return { kind: "unstick" };
 };
