@@ -62,7 +62,7 @@ main(() => {
       const activity =
         scope === "sessions"
           ? sessionPrs(repo, since).length
-          : git("log", "--first-parent", "-m", `--since=${since}`, "--format=%H", "--", ...words(scope))
+          : git("log", "--first-parent", "-m", `--since=${since}T00:00:00Z`, "--format=%H", "--", ...words(scope))
               .split("\n")
               .filter(Boolean).length;
       const days = Math.round((today.getTime() - new Date(since).getTime()) / 864e5);
