@@ -60,7 +60,11 @@ that skips a finding's acceptance check is not noise.
 
 Read with `mcp__claude-code-remote__list_events`, not from disk. Cloud sessions
 are reclaimed, and their logs aren't kept on the machine. Pass
-`kinds: ["user","assistant","result"]` and `limit: 100`. A result that is too big
+`kinds: ["user","assistant","result"]` and `limit: 100`. Scheduled runs may lack
+that tool (ToolSearch finds no `list_events`); then read each session's PR bodies,
+its `Claude-Session:` commits and its failed CI job logs
+(`gh api repos/<owner/repo>/actions/jobs/<id>/logs`) instead, and say so in the
+coverage statement. A result that is too big
 is saved to a file. Don't slice that file by hand. Condense it to one line per
 tool call:
 
