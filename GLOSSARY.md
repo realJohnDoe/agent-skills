@@ -29,5 +29,5 @@ The stage for work the workshop can't move without the maintainer stepping in. T
 _Avoid_: Blocked, failed
 
 **Parked**:
-An issue the workshop deliberately won't pick up: `deferred`, a `plan`, no tier label, or assigned by hand. Parked items are counted under Waiting, not shown as cards that need you.
+An issue the workshop deliberately won't pick up: a `plan`, no tier label, or assigned by hand. Parked items are counted under Waiting, not shown as cards that need you.
 _Avoid_: Skipped, ignored

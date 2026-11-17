@@ -71,7 +71,7 @@ main(() => {
         .map((r) => ({
           parent: r.number,
           findings: all<GhIssue>(`repos/${repo}/issues/${r.number}/sub_issues?per_page=100`).filter(
-            (f) => f.state === "open" && !names(f).includes("deferred") && !openQuestion(f.body),
+            (f) => f.state === "open" && !openQuestion(f.body),
           ).length,
         }))
         .find((r) => r.findings > 0);

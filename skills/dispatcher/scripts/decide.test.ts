@@ -3,7 +3,6 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
-  DEFERRED,
   afterMerge,
   claimState,
   isDigest,
@@ -48,7 +47,6 @@ test("isDigest matches workshop and pre-rename farm digests", () => {
 });
 
 const ELSEWHERE = { kind: "elsewhere" };
-const DEFERRED_STATE = { kind: "deferred" };
 const NO_TIER = { kind: "notPicked", reason: "no tier label; add `haiku`, `sonnet` or `opus` to queue it" };
 const PLAN_STATE = { kind: "notPicked", reason: "`plan`; start a plan session by hand" };
 
@@ -96,21 +94,11 @@ describe("issueState", () => {
         issueState(issue({ labels: ["sonnet"], question: "Which API?", blockers: [3] })),
         { kind: "blocked", blockers: [3] },
       ));
-    test("deferred before the decision", () =>
-      assert.deepEqual(
-        issueState(issue({ labels: ["deferred"], question: "Which API?" })),
-        DEFERRED_STATE,
-      ));
     test("assigned before the decision", () =>
       assert.deepEqual(issueState(issue({ labels: [], assignees: 1, question: "Which API?" })), ELSEWHERE));
   });
 
   describe("not picked up, with the reason", () => {
-    test("deferred", () =>
-      assert.deepEqual(
-        issueState(issue({ labels: ["sonnet", "deferred"] })),
-        DEFERRED_STATE,
-      ));
     test("no tier label", () =>
       assert.deepEqual(
         issueState(issue({ labels: ["bug"] })),
@@ -139,17 +127,8 @@ describe("issueState", () => {
   describe("order: the first matching reason wins", () => {
     test("digest before everything", () =>
       assert.deepEqual(
-        issueState(issue({ title: "Workshop digest — x", labels: ["deferred"], blockers: [1] })),
+        issueState(issue({ title: "Workshop digest — x", labels: [], blockers: [1] })),
         ELSEWHERE,
-      ));
-    test("linked before deferred", () =>
-      assert.deepEqual(issueState(issue({ linked: true, labels: ["deferred"] })), ELSEWHERE));
-    test("assigned before deferred", () =>
-      assert.deepEqual(issueState(issue({ assignees: 1, labels: ["deferred"] })), ELSEWHERE));
-    test("deferred before no tier", () =>
-      assert.deepEqual(
-        issueState(issue({ labels: ["deferred"] })),
-        DEFERRED_STATE,
       ));
     test("plan beats a tier label", () =>
       assert.deepEqual(
@@ -163,11 +142,6 @@ describe("issueState", () => {
       ));
     test("blocked before awaiting triage", () =>
       assert.deepEqual(issueState(issue({ labels: ["sonnet"], blockers: [3] })), { kind: "blocked", blockers: [3] }));
-    test("deferred before awaiting triage", () =>
-      assert.deepEqual(
-        issueState(issue({ labels: ["sonnet", "deferred"] })),
-        DEFERRED_STATE,
-      ));
     test("plan before blocked", () =>
       assert.deepEqual(
         issueState(issue({ labels: ["plan"], blockers: [3] })),
