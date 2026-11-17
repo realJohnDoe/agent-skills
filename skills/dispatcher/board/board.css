@@ -1,0 +1,190 @@
+/* The workshop board: the control panel of a workshop flying from repo to repo.
+   Dark only. A banner, a status strip, then one column of riveted stage modules
+   holding glass readout cards. Plants and robots live only in banner.jpg. */
+:root {
+  --sky-top: #181444;       /* the banner image's own sky, so the seam above 1400px doesn't show */
+  --sky-low: #5e3e80;
+  --deck: #0e0c1d;          /* hull behind the modules */
+  --metal: #1d1938;         /* module face */
+  --metal-hi: #2c2652;      /* module bevel, light edge */
+  --metal-lo: #0a0817;      /* module bevel, dark edge */
+  --glass: #0c1424;         /* readout screen */
+  --seam: #332c5e;
+  --fg: #e9e6ff;
+  --muted: #9a93c8;
+  --holo: #5ee7f2;
+  --holo-dim: rgba(94, 231, 242, .13);
+  --lamp: #ffc36b;
+  --ok: #6fd38a;
+  --warn: #ffd34d;
+  --bad: #ff5d76;
+  --bad-dim: rgba(255, 93, 118, .12);
+  --indigo: #9d8cff;
+  --f-display: "Chakra Petch", "Segoe UI", system-ui, sans-serif;
+  --f-body: "Atkinson Hyperlegible", system-ui, -apple-system, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --r: 3px;                 /* the one radius for every chip */
+  --gutter: max(16px, env(safe-area-inset-left, 0px));
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { background: var(--deck); }
+body {
+  margin: 0; color: var(--fg);
+  background: linear-gradient(var(--seam) 1px, transparent 1px) 0 0 / 100% 120px, var(--deck);
+  font: 15px/1.45 var(--f-body);
+  padding: 0 max(16px, env(safe-area-inset-right, 0px)) 64px var(--gutter);
+}
+a { color: inherit; }
+h1, h2 { font-family: var(--f-display); text-wrap: balance; margin: 0; }
+:focus-visible { outline: 2px solid var(--holo); outline-offset: 2px; }
+
+/* ---------- banner: one 3:1 image, crops come off the sky and the sides ---------- */
+.banner {
+  margin-inline: calc(-1 * var(--gutter));
+  position: relative; overflow: hidden;
+  height: clamp(200px, 26vw, 340px);
+  background: linear-gradient(180deg, var(--sky-top), var(--sky-low));
+  border-bottom: 3px solid var(--metal-hi);
+}
+.banner img {
+  display: block; height: 100%; width: 100%; max-width: 1400px; margin: 0 auto;
+  object-fit: cover; object-position: center bottom;
+}
+@media (min-width: 1401px) { /* wider than the image: its sides fade into the CSS sky */
+  .banner img {
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+  }
+}
+.banner-title { color: #fff; }
+.banner-title h1 { font-size: clamp(26px, 4vw, 38px); letter-spacing: .03em; text-shadow: 0 2px 12px #0009; }
+.banner-sub { max-width: 1080px; margin: 14px auto 0; color: var(--muted); }
+@media (min-width: 601px) { /* the title sits on the image's upper-left sky */
+  .banner-title {
+    position: absolute; top: clamp(28px, 4.5vw, 64px);
+    left: max(var(--gutter), calc(max(0px, (100vw - 1400px) / 2) + min(100vw, 1400px) * .04));
+  }
+}
+@media (max-width: 600px) { /* phones: the title moves below the image */
+  .banner-title { padding-top: 16px; }
+  .banner-title h1 { text-shadow: none; }
+  .banner-sub { margin-top: 4px; }
+}
+
+main { max-width: 1080px; margin: 0 auto; }
+
+/* ---------- notices: paused, stale, load error ---------- */
+.notice {
+  margin: 18px 0 0; padding: 10px 14px; border-radius: 6px;
+  font: 600 14px var(--f-display); letter-spacing: .04em;
+  border: 1px solid var(--n); color: var(--n);
+  background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--n) 12%, transparent) 0 10px, transparent 10px 20px), var(--metal);
+}
+.notice.paused { --n: var(--lamp); }
+.notice.stale { --n: var(--warn); }
+.notice.error { --n: var(--bad); }
+
+/* ---------- status strip ---------- */
+.status {
+  margin: 18px 0 22px; display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center;
+  padding: 10px 14px; border-radius: 6px;
+  background: var(--metal); border: 1px solid var(--metal-lo);
+  box-shadow: inset 0 1px 0 var(--metal-hi);
+  font: 12px var(--f-mono); color: var(--muted); letter-spacing: .04em; text-transform: uppercase;
+}
+.status b { color: var(--fg); font-weight: 600; }
+.status b.bad { color: var(--bad); }
+.status b.warn { color: var(--warn); }
+.status a { color: var(--holo); }
+.status .sep { width: 1px; height: 14px; background: var(--seam); }
+
+/* ---------- stage modules ---------- */
+.line { display: grid; gap: 22px; }
+.module {
+  position: relative; border-radius: 8px; padding: 0 0 14px;
+  border: 1px solid var(--metal-lo);
+  box-shadow: inset 0 1px 0 var(--metal-hi), 0 8px 20px #0006;
+  background: /* a rivet in each corner */
+    radial-gradient(circle at 9px 9px, var(--metal-hi) 2px, transparent 2.5px),
+    radial-gradient(circle at calc(100% - 9px) 9px, var(--metal-hi) 2px, transparent 2.5px),
+    radial-gradient(circle at 9px calc(100% - 9px), var(--metal-hi) 2px, transparent 2.5px),
+    radial-gradient(circle at calc(100% - 9px) calc(100% - 9px), var(--metal-hi) 2px, transparent 2.5px),
+    var(--metal);
+}
+.module-head {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 10px 22px; border-bottom: 1px solid var(--metal-lo);
+  box-shadow: 0 1px 0 var(--metal-hi);
+}
+.led { width: 12px; height: 12px; border-radius: 50%; flex: none; background: var(--c); box-shadow: 0 0 8px var(--c), inset 0 -2px 3px #0005; }
+.module h2 { font-size: 16px; letter-spacing: .08em; text-transform: uppercase; }
+.module .hint { font: 12px var(--f-mono); color: var(--muted); }
+.readout { /* the count, as a recessed digital display */
+  margin-left: auto; font: 600 15px var(--f-mono); color: var(--c); min-width: 3.2ch; text-align: right;
+  padding: 2px 8px; border-radius: var(--r); background: var(--glass);
+  box-shadow: inset 0 1px 3px #000c; text-shadow: 0 0 6px var(--c);
+  font-variant-numeric: tabular-nums;
+}
+.stack { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; padding: 14px 22px 0; }
+
+.m-stuck { --c: var(--bad); border-color: var(--bad); }
+.m-stuck .module-head { background: repeating-linear-gradient(135deg, var(--bad-dim) 0 10px, transparent 10px 20px); }
+.m-stuck .led { animation: blink 1.2s steps(2, start) infinite; }
+@keyframes blink { 50% { opacity: .25; } }
+.m-waiting { --c: var(--warn); }
+.m-closed { --c: var(--ok); }
+.m-afterMerge { --c: var(--lamp); }
+.m-pr { --c: var(--holo); }
+.m-queue { --c: var(--indigo); }
+
+/* ---------- readout cards ---------- */
+.card {
+  position: relative; min-width: 0; display: grid; gap: 7px; align-content: start;
+  padding: 10px 12px; border-radius: 4px;
+  background: repeating-linear-gradient(0deg, rgba(255, 255, 255, .018) 0 1px, transparent 1px 3px), var(--glass);
+  border: 1px solid #000;
+  box-shadow: inset 0 0 0 1px var(--holo-dim), inset 0 0 18px rgba(94, 231, 242, .05);
+}
+.card::before { /* the stage's colour as a thin lit edge */
+  content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 2px; background: var(--c); box-shadow: 0 0 6px var(--c);
+}
+.card .title { font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
+.card .title a { text-decoration: none; }
+.card .title a:hover { text-decoration: underline; text-decoration-color: var(--holo); }
+.card .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.card .why { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+.card.compact { gap: 5px; padding-block: 8px; }
+.card.compact .title { font-weight: 400; font-size: 14px; }
+
+/* every chip is the same rectangle; only its fill or outline changes */
+.chip { font: 600 11px/1 var(--f-mono); padding: 4px 7px; border-radius: var(--r); letter-spacing: .03em; border: 1px solid transparent; }
+.chip.repo { color: var(--repo); border-color: currentColor; }
+.chip.ref { color: var(--muted); padding-inline: 0; }
+.chip.tier { background: var(--holo-dim); color: var(--holo); }
+.chip.sub { background: var(--metal-hi); color: var(--fg); }
+.chip.prlink { color: var(--holo); border-color: var(--holo); text-decoration: none; }
+.chip.prlink:hover { background: var(--holo-dim); }
+.chip.review { background: var(--warn); color: #241a00; }
+.chip.auto { background: var(--ok); color: #062312; }
+.check { display: inline-flex; align-items: center; gap: 5px; font: 11px var(--f-mono); color: var(--muted); }
+.check::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--l); box-shadow: 0 0 6px var(--l); }
+.check.green { --l: var(--ok); }
+.check.red { --l: var(--bad); }
+.check.pending { --l: var(--lamp); }
+
+.empty { grid-column: 1 / -1; font: 12px var(--f-mono); color: var(--muted); padding: 4px 0; letter-spacing: .04em; text-transform: uppercase; }
+.empty::before { content: "◦ "; color: var(--c); }
+
+/* the parked fold at the foot of Waiting */
+details.parked { margin: 14px 22px 0; padding: 8px 0 0; border-top: 1px dashed var(--seam); color: var(--muted); }
+details.parked summary { cursor: pointer; font: 600 13px var(--f-display); letter-spacing: .06em; text-transform: uppercase; }
+details.parked .stack { padding: 10px 0 0; }
+
+@media (max-width: 560px) {
+  .module-head, .stack { padding-inline: 12px; }
+  details.parked { margin-inline: 12px; }
+  .stack { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) { .m-stuck .led { animation: none; } }
