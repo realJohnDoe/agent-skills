@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2400 800" width="2400" height="800">
+  <!-- PROTOTYPE placeholder for the board banner: 3:1, zones drawn where the real image must put things. -->
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1c1640"/>
+      <stop offset="1" stop-color="#5b3a86"/>
+    </linearGradient>
+    <pattern id="stars" width="160" height="120" patternUnits="userSpaceOnUse">
+      <circle cx="20" cy="18" r="1.6" fill="#ffffff" opacity=".6"/>
+      <circle cx="95" cy="62" r="1.2" fill="#ffffff" opacity=".45"/>
+      <circle cx="140" cy="30" r="2" fill="#ffffff" opacity=".7"/>
+      <circle cx="60" cy="100" r="1.1" fill="#ffffff" opacity=".4"/>
+    </pattern>
+  </defs>
+  <rect width="2400" height="800" fill="url(#sky)"/>
+  <rect width="2400" height="520" fill="url(#stars)"/>
+
+  <!-- distant islands in the quiet side zones -->
+  <ellipse cx="260" cy="610" rx="170" ry="26" fill="#3b2a66"/>
+  <ellipse cx="2150" cy="590" rx="200" ry="30" fill="#3b2a66"/>
+  <ellipse cx="2380" cy="660" rx="120" ry="18" fill="#3b2a66"/>
+
+  <!-- station sketch, anchored bottom-centre -->
+  <ellipse cx="1200" cy="470" rx="420" ry="90" fill="none" stroke="#ffffff" stroke-width="5" opacity=".55"/>
+  <ellipse cx="1200" cy="470" rx="330" ry="66" fill="none" stroke="#5ee7f2" stroke-width="4" opacity=".75"/>
+  <rect x="1080" y="300" width="50" height="220" rx="8" fill="#ece8ff" opacity=".85"/>
+  <rect x="1150" y="240" width="64" height="280" rx="8" fill="#ffffff" opacity=".95"/>
+  <rect x="1234" y="320" width="46" height="200" rx="8" fill="#ece8ff" opacity=".8"/>
+  <rect x="1300" y="370" width="40" height="150" rx="8" fill="#ece8ff" opacity=".7"/>
+  <circle cx="1182" cy="270" r="9" fill="#ffc36b"/><circle cx="1105" cy="340" r="7" fill="#ffc36b"/><circle cx="1257" cy="350" r="7" fill="#5ee7f2"/>
+  <!-- deck: bench line, plants, robots -->
+  <rect x="0" y="690" width="2400" height="110" fill="#2a1d48"/>
+  <rect x="560" y="660" width="1280" height="34" rx="6" fill="#8a5a3b"/>
+  <g fill="#6fd38a">
+    <ellipse cx="640" cy="640" rx="36" ry="26"/><ellipse cx="760" cy="630" rx="44" ry="34"/><ellipse cx="1540" cy="636" rx="40" ry="30"/><ellipse cx="1680" cy="626" rx="50" ry="38"/><ellipse cx="1780" cy="644" rx="30" ry="22"/>
+  </g>
+  <g>
+    <rect x="960" y="604" width="40" height="56" rx="12" fill="#f4f2ff"/><circle cx="972" cy="622" r="5" fill="#3fb6ff"/><circle cx="988" cy="622" r="5" fill="#3fb6ff"/>
+    <rect x="1400" y="610" width="36" height="50" rx="11" fill="#f4f2ff"/><circle cx="1411" cy="627" r="4.5" fill="#3fb6ff"/><circle cx="1425" cy="627" r="4.5" fill="#3fb6ff"/>
+  </g>
+
+  <!-- zone guides -->
+  <g font-family="ui-monospace, Menlo, monospace" font-size="26" fill="#ffffff" opacity=".85">
+    <rect x="600" y="4" width="1200" height="792" fill="none" stroke="#5ee7f2" stroke-width="4" stroke-dasharray="18 12"/>
+    <text x="620" y="790" fill="#5ee7f2" dy="-14">SAFE ZONE (central half): always visible</text>
+    <line x1="0" y1="230" x2="2400" y2="230" stroke="#ffc36b" stroke-width="3" stroke-dasharray="10 10"/>
+    <text x="1820" y="215" fill="#ffc36b">sky above: cropped on wide screens</text>
+    <text x="24" y="790" dy="-14">quiet: cropped on phones</text>
+    <text x="1824" y="790" dy="-14">quiet: cropped on phones</text>
+    <rect x="70" y="250" width="500" height="150" fill="none" stroke="#ffffff" stroke-width="3" stroke-dasharray="6 8" opacity=".6"/>
+    <text x="90" y="290">calm sky: the title</text>
+    <text x="90" y="326">sits here on wide screens</text>
+  </g>
+</svg>

@@ -60,17 +60,38 @@ a { color: inherit; }
 h1, h2 { font-family: var(--f-display); text-wrap: balance; margin: 0; }
 :focus-visible { outline: 2px solid var(--holo); outline-offset: 2px; }
 
-/* ---------- banner placeholder: the generated image goes here ---------- */
+/* ---------- banner: one 3:1 image, safe zone in the central half, CSS sky continues past its edges ---------- */
 .banner {
   margin-inline: calc(-1 * max(16px, env(safe-area-inset-left, 0px)));
-  padding: 34px max(16px, env(safe-area-inset-left, 0px)) 26px;
-  background: linear-gradient(180deg, var(--sky-top), var(--sky-low));
-  color: #fff; border-bottom: 3px solid var(--metal-hi);
+  position: relative; overflow: hidden;
+  height: clamp(200px, 26vw, 340px);
+  background: linear-gradient(180deg, var(--sky-top), var(--sky-low)); /* same colors as the image's sky */
+  border-bottom: 3px solid var(--metal-hi);
 }
-.banner-inner { max-width: 1080px; margin: 0 auto; }
-.banner-note { font: 11px var(--f-mono); color: #ffffff99; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 8px; }
-.banner h1 { font-size: clamp(26px, 4vw, 38px); letter-spacing: .03em; }
-.banner p { margin: 4px 0 0; color: #ffffffcc; max-width: 60ch; }
+.banner img {
+  display: block; height: 100%; width: 100%; max-width: 1400px; margin: 0 auto;
+  object-fit: cover; object-position: center bottom; /* crops come off the sky and the sides */
+}
+@media (min-width: 1401px) { /* wider than the image: its sides fade into the CSS sky */
+  .banner img { -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+                mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent); }
+}
+.banner-title { color: #fff; }
+.banner-title h1 { font-size: clamp(26px, 4vw, 38px); letter-spacing: .03em; text-shadow: 0 2px 12px #0009; }
+.banner-sub { max-width: 1080px; margin: 14px auto 0; color: var(--muted); }
+@media (min-width: 601px) { /* wide: the title sits on the image's calm patch of sky, left of the safe zone */
+  .banner-title { position: absolute; top: clamp(28px, 4.5vw, 64px);
+    left: max(16px, env(safe-area-inset-left, 0px), calc(max(0px, (100vw - 1400px) / 2) + min(100vw, 1400px) * .04)); }
+}
+@media (max-width: 600px) { /* phone: the title moves below the image */
+  .banner-title { padding: 16px 0 0; }
+  .banner-title h1 { text-shadow: none; }
+  .banner-sub { margin-top: 4px; }
+}
+.banner-debug { /* prototype only: what the crop is doing at this size */
+  position: absolute; right: max(10px, env(safe-area-inset-right, 0px)); bottom: 8px;
+  font: 11px system-ui, sans-serif; background: #111d; color: #fff; padding: 3px 8px; border-radius: 999px;
+}
 
 main { max-width: 1080px; margin: 0 auto; }
 
@@ -218,12 +239,11 @@ details.parked .chip.ref { padding: 0; }
 </style>
 
 <header class="banner">
-  <div class="banner-inner">
-    <div class="banner-note">banner image goes here: the station, its robots and plants</div>
-    <h1>Workshop board</h1>
-    <p>Every open issue and PR of the workshop, by stage. Read-only: decide on the digest.</p>
-  </div>
+  <img src="banner-placeholder.svg" alt="" id="banner-img">
+  <div class="banner-debug" id="banner-debug"></div>
 </header>
+<div class="banner-title"><h1>Workshop board</h1></div>
+<p class="banner-sub">Every open issue and PR of the workshop, by stage. Read-only: decide on the digest.</p>
 
 <main>
   <div class="status" id="status"></div>
@@ -236,6 +256,17 @@ details.parked .chip.ref { padding: 0; }
 </nav>
 
 <script>
+// Prototype only: report how the 3:1 image is cropped at the current banner size.
+function bannerDebug() {
+  const b = document.querySelector(".banner"), W = Math.min(b.clientWidth, 1400), H = b.clientHeight;
+  const ratio = W / H, out = document.getElementById("banner-debug");
+  out.textContent = ratio >= 3
+    ? `${b.clientWidth}×${H}px · ${b.clientWidth > 1400 ? "image 1400px, sides fade into the sky, " : "full width shown, "}top ${Math.round((1 - 3 / ratio) * 100)}% of the image cropped`
+    : `${b.clientWidth}×${H}px · central ${Math.round((ratio / 3) * 100)}% of the width shown`;
+}
+addEventListener("resize", bannerDebug);
+addEventListener("load", bannerDebug);
+
 // REAL: dispatch.ts dry run, 2026-11-17, repos covered: realJohnDoe/agent-skills.
 const GH = "https://github.com/";
 const REAL = [
