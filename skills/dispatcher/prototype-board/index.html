@@ -4,287 +4,238 @@
 <!--
   PROTOTYPE, throw away. Answers wayfinder ticket realJohnDoe/agent-skills#63
   ("Board look and layout, prototyped on real dispatcher data") for the map #61.
-  Three structurally different variants of the workshop board, switchable from
-  the floating bar at the bottom (or ← / →, or #a / #b / #c in the address).
-  Two toggles on the bar: automerge as a chip or as its own stage, and real data
-  only or real data plus sample cards for the other repos.
+  Round 2, after the maintainer's reaction to three variants: the vertical
+  layout, the stages in reverse happy-path order (Stuck, Closed, After merge,
+  PR in progress, Queue, Waiting), the UI drawn as the control panel of a
+  workshop/farm/spaceship (plants and robots belong in the banner image only),
+  dark only, every chip rectangular, and needs-review PRs at the top of their stage.
   Real data: `node skills/dispatcher/scripts/dispatch.ts` dry run of 2026-11-17,
-  which covered realJohnDoe/agent-skills only. Cards marked "sample" are made up.
-  Open the file in a browser; nothing to build.
+  which covered realJohnDoe/agent-skills only. Cards marked "sample" are made up;
+  the button at the bottom hides them. Open the file in a browser; nothing to build.
 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
 <style>
-/* Layout: one deck header (sky band + station), then the variant's own layout of the stage line, Stuck kept apart. */
+/* Layout: a banner, a cockpit status strip, then one column of console modules joined by a conduit
+   whose light flows upward, from Waiting at the bottom to Closed; Stuck is the alarm module at the top. */
 :root {
-  /* dark-first: the dusk deck */
-  --sky-top: #1c1640;      /* indigo night */
-  --sky-low: #5b3a86;      /* purple dusk */
-  --bg: #15122b;           /* deck floor */
-  --panel: #211c3f;        /* console surface */
-  --panel-2: #2a2450;
-  --line: #3d3570;
-  --fg: #ece8ff;
-  --muted: #a49cd0;
-  --holo: #5ee7f2;         /* cyan hologram */
-  --holo-dim: rgba(94, 231, 242, .14);
-  --lamp: #ffc36b;         /* warm lamp */
-  --leaf: #6fd38a;         /* plants, success */
-  --wood: #8a5a3b;
-  --wood-hi: #b57b53;
-  --warn: #ffd34d;         /* needs review */
-  --bad: #ff6b81;          /* red checks, stuck */
-  --bad-dim: rgba(255, 107, 129, .14);
-  --robot: #f4f2ff;
-  --eye: #3fb6ff;
+  --sky-top: #1c1640;
+  --sky-low: #5b3a86;
+  --deck: #0e0c1d;          /* hull behind the modules */
+  --metal: #1d1938;         /* module face */
+  --metal-hi: #2c2652;      /* module bevel, light edge */
+  --metal-lo: #0a0817;      /* module bevel, dark edge */
+  --glass: #0c1424;         /* readout screen */
+  --seam: #332c5e;
+  --fg: #e9e6ff;
+  --muted: #9a93c8;
+  --holo: #5ee7f2;
+  --holo-dim: rgba(94, 231, 242, .13);
+  --lamp: #ffc36b;
+  --ok: #6fd38a;
+  --warn: #ffd34d;
+  --bad: #ff5d76;
+  --bad-dim: rgba(255, 93, 118, .12);
+  --indigo: #9d8cff;
   --f-display: "Chakra Petch", "Segoe UI", system-ui, sans-serif;
   --f-body: "Atkinson Hyperlegible", system-ui, -apple-system, sans-serif;
   --f-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --r: 3px;                 /* the one radius for every chip */
   color-scheme: dark;
-}
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) {
-    --sky-top: #7d6bd6; --sky-low: #f2b6c9;
-    --bg: #f3f0fb; --panel: #ffffff; --panel-2: #f6f3ff; --line: #d9d2f2;
-    --fg: #221c45; --muted: #625a8c;
-    --holo: #0f8f9c; --holo-dim: rgba(15, 143, 156, .1);
-    --lamp: #c47a12; --leaf: #23864a; --wood: #9b6644; --wood-hi: #c8936b;
-    --warn: #a77800; --bad: #c42848; --bad-dim: rgba(196, 40, 72, .09);
-    --robot: #ffffff; --eye: #1f7fd1;
-    color-scheme: light;
-  }
-}
-:root[data-theme="light"] {
-  --sky-top: #7d6bd6; --sky-low: #f2b6c9;
-  --bg: #f3f0fb; --panel: #ffffff; --panel-2: #f6f3ff; --line: #d9d2f2;
-  --fg: #221c45; --muted: #625a8c;
-  --holo: #0f8f9c; --holo-dim: rgba(15, 143, 156, .1);
-  --lamp: #c47a12; --leaf: #23864a; --wood: #9b6644; --wood-hi: #c8936b;
-  --warn: #a77800; --bad: #c42848; --bad-dim: rgba(196, 40, 72, .09);
-  --robot: #ffffff; --eye: #1f7fd1;
-  color-scheme: light;
 }
 
 * { box-sizing: border-box; }
+html { background: var(--deck); }
 body {
-  margin: 0; background: var(--bg); color: var(--fg);
+  margin: 0; color: var(--fg);
+  background:
+    linear-gradient(var(--seam) 1px, transparent 1px) 0 0 / 100% 120px,
+    var(--deck);
   font: 15px/1.45 var(--f-body);
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
   padding-block: 0 96px;
 }
 a { color: inherit; }
-h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; margin: 0; }
-.mono { font-family: var(--f-mono); }
+h1, h2 { font-family: var(--f-display); text-wrap: balance; margin: 0; }
 :focus-visible { outline: 2px solid var(--holo); outline-offset: 2px; }
 
-/* ---------- deck header (shared) ---------- */
-.deck {
+/* ---------- banner placeholder: the generated image goes here ---------- */
+.banner {
   margin-inline: calc(-1 * max(16px, env(safe-area-inset-left, 0px)));
-  padding: 28px max(16px, env(safe-area-inset-left, 0px)) 22px;
+  padding: 34px max(16px, env(safe-area-inset-left, 0px)) 26px;
   background: linear-gradient(180deg, var(--sky-top), var(--sky-low));
-  position: relative; overflow: hidden; color: #fff;
+  color: #fff; border-bottom: 3px solid var(--metal-hi);
 }
-.deck svg.station { position: absolute; right: -40px; top: -30px; width: 360px; max-width: 70%; opacity: .55; pointer-events: none; }
-.deck .stars { position: absolute; inset: 0; background-image:
-  radial-gradient(1px 1px at 12% 20%, #fff8 50%, transparent 51%),
-  radial-gradient(1px 1px at 34% 60%, #fff6 50%, transparent 51%),
-  radial-gradient(1.5px 1.5px at 58% 18%, #fff9 50%, transparent 51%),
-  radial-gradient(1px 1px at 72% 70%, #fff5 50%, transparent 51%),
-  radial-gradient(1px 1px at 88% 40%, #fff7 50%, transparent 51%);
-  pointer-events: none; }
-.deck-inner { position: relative; max-width: 1280px; margin: 0 auto; display: flex; gap: 16px; align-items: end; flex-wrap: wrap; }
-.deck h1 { font-size: clamp(26px, 4vw, 38px); letter-spacing: .02em; }
-.deck p { margin: 4px 0 0; color: #ffffffcc; max-width: 60ch; }
-.deck .meta { flex-basis: 100%; font: 12px/1.4 var(--f-mono); color: #ffffffb3; }
-.banner-note { font: 11px var(--f-mono); color: #ffffff99; letter-spacing: .06em; text-transform: uppercase; margin-bottom: 6px; }
+.banner-inner { max-width: 1080px; margin: 0 auto; }
+.banner-note { font: 11px var(--f-mono); color: #ffffff99; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 8px; }
+.banner h1 { font-size: clamp(26px, 4vw, 38px); letter-spacing: .03em; }
+.banner p { margin: 4px 0 0; color: #ffffffcc; max-width: 60ch; }
 
-main { max-width: 1280px; margin: 24px auto 0; }
+main { max-width: 1080px; margin: 0 auto; }
 
-/* ---------- cards & chips (shared look, each variant frames them) ---------- */
+/* ---------- cockpit status strip ---------- */
+.status {
+  margin: 18px 0 22px; display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center;
+  padding: 10px 14px; border-radius: 6px;
+  background: var(--metal); border: 1px solid var(--metal-lo);
+  box-shadow: inset 0 1px 0 var(--metal-hi);
+  font: 12px var(--f-mono); color: var(--muted); letter-spacing: .04em; text-transform: uppercase;
+}
+.status b { color: var(--fg); font-weight: 600; }
+.status .sep { width: 1px; height: 14px; background: var(--seam); }
+
+/* ---------- the line: modules joined by a conduit ---------- */
+.line { position: relative; display: grid; gap: 22px; padding-left: 34px; }
+.line::before { /* the conduit */
+  content: ""; position: absolute; left: 10px; top: 24px; bottom: 24px; width: 6px; border-radius: 3px;
+  background: var(--metal-lo); box-shadow: inset 0 0 0 1px var(--seam);
+}
+.line::after { /* light flowing up the conduit, toward Closed */
+  content: ""; position: absolute; left: 12px; top: 24px; bottom: 24px; width: 2px;
+  background: repeating-linear-gradient(0deg, var(--holo) 0 10px, transparent 10px 30px);
+  opacity: .8; animation: flow 1.6s linear infinite;
+}
+@keyframes flow { from { background-position: 0 0; } to { background-position: 0 -30px; } }
+
+.module {
+  position: relative; border-radius: 8px; padding: 0 0 14px;
+  background: var(--metal);
+  border: 1px solid var(--metal-lo);
+  box-shadow: inset 0 1px 0 var(--metal-hi), 0 8px 20px #0006;
+}
+.module::before { /* the joint where the conduit plugs in */
+  content: ""; position: absolute; left: -29px; top: 20px; width: 20px; height: 6px;
+  background: var(--metal-lo); box-shadow: inset 0 0 0 1px var(--seam);
+}
+/* rivets in the four corners */
+.module { background-image:
+  radial-gradient(circle at 9px 9px, var(--metal-hi) 2px, transparent 2.5px),
+  radial-gradient(circle at calc(100% - 9px) 9px, var(--metal-hi) 2px, transparent 2.5px),
+  radial-gradient(circle at 9px calc(100% - 9px), var(--metal-hi) 2px, transparent 2.5px),
+  radial-gradient(circle at calc(100% - 9px) calc(100% - 9px), var(--metal-hi) 2px, transparent 2.5px); }
+
+.module-head {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 10px 22px 10px 22px; border-bottom: 1px solid var(--metal-lo);
+  box-shadow: 0 1px 0 var(--metal-hi);
+}
+.led { width: 12px; height: 12px; border-radius: 50%; flex: none; background: var(--c); box-shadow: 0 0 8px var(--c), inset 0 -2px 3px #0005; }
+.module h2 { font-size: 16px; letter-spacing: .08em; text-transform: uppercase; }
+.module .hint { font: 12px var(--f-mono); color: var(--muted); }
+.readout { /* the count, as a recessed digital display */
+  margin-left: auto; font: 600 15px var(--f-mono); color: var(--c); min-width: 3.2ch; text-align: right;
+  padding: 2px 8px; border-radius: var(--r); background: var(--glass);
+  box-shadow: inset 0 1px 3px #000c; text-shadow: 0 0 6px var(--c);
+  font-variant-numeric: tabular-nums;
+}
+.module .stack { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; padding: 14px 22px 0; }
+
+.m-stuck { --c: var(--bad); border-color: var(--bad); }
+.m-stuck .module-head {
+  background: repeating-linear-gradient(135deg, var(--bad-dim) 0 10px, transparent 10px 20px);
+}
+.m-stuck .led { animation: blink 1.2s steps(2, start) infinite; }
+@keyframes blink { 50% { opacity: .25; } }
+.m-closed { --c: var(--ok); }
+.m-afterMerge { --c: var(--lamp); }
+.m-pr { --c: var(--holo); }
+.m-queue { --c: var(--indigo); }
+.m-waiting { --c: var(--warn); }
+
+/* ---------- readout cards ---------- */
 .card {
-  background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
-  padding: 10px 12px; display: grid; gap: 6px; min-width: 0; position: relative;
+  position: relative; min-width: 0; display: grid; gap: 7px;
+  padding: 10px 12px; border-radius: 4px;
+  background:
+    repeating-linear-gradient(0deg, rgba(255,255,255,.018) 0 1px, transparent 1px 3px),
+    var(--glass);
+  border: 1px solid #000;
+  box-shadow: inset 0 0 0 1px var(--holo-dim), inset 0 0 18px rgba(94, 231, 242, .05);
+}
+.card::before { /* the module's color as a thin lit edge */
+  content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 2px; background: var(--c); box-shadow: 0 0 6px var(--c);
 }
 .card .title { font-weight: 700; line-height: 1.3; }
 .card .title a { text-decoration: none; }
 .card .title a:hover { text-decoration: underline; text-decoration-color: var(--holo); }
 .card .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .card .why { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
-.card.sample { border-style: dashed; }
+.card.sample { border-style: dashed; border-color: var(--seam); }
 .card.sample .title { padding-right: 54px; }
 .card.sample::after {
-  content: "sample"; position: absolute; top: 6px; right: 8px;
+  content: "sample"; position: absolute; top: 7px; right: 9px;
   font: 10px var(--f-mono); color: var(--muted); letter-spacing: .08em; text-transform: uppercase;
 }
-.ref { font: 12px var(--f-mono); color: var(--muted); }
-.tag { /* repo tag */
-  font: 600 11px var(--f-mono); padding: 1px 7px; border-radius: 999px;
-  border: 1px solid currentColor; color: var(--repo, var(--holo)); background: transparent;
+
+/* every chip is the same rectangle; only its fill or outline changes */
+.chip {
+  font: 600 11px/1 var(--f-mono); padding: 4px 7px; border-radius: var(--r); letter-spacing: .03em;
+  border: 1px solid transparent;
 }
-.chip { font: 600 11px var(--f-mono); padding: 2px 8px; border-radius: 4px; letter-spacing: .03em; }
+.chip.repo { color: var(--repo); border-color: currentColor; }
+.chip.ref { color: var(--muted); padding-inline: 0; }
 .chip.tier { background: var(--holo-dim); color: var(--holo); }
+.chip.sub { background: var(--metal-hi); color: var(--fg); }
 .chip.review { background: var(--warn); color: #241a00; }
-.chip.auto { background: var(--leaf); color: #062312; }
-.check { display: inline-flex; align-items: center; gap: 4px; font: 11px var(--f-mono); color: var(--muted); }
-.check::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--c); box-shadow: 0 0 6px var(--c); }
-.check.green { --c: var(--leaf); } .check.red { --c: var(--bad); } .check.pending { --c: var(--lamp); }
-.empty { color: var(--muted); font-size: 13px; font-style: italic; padding: 6px 2px; }
-.count { font: 600 12px var(--f-mono); color: var(--holo); }
-details.parked { margin-top: 28px; border-top: 1px dashed var(--line); padding-top: 12px; color: var(--muted); }
-details.parked summary { cursor: pointer; font-family: var(--f-display); }
-details.parked ul { margin: 8px 0 0; padding-left: 18px; }
+.chip.auto { background: var(--ok); color: #062312; }
+.check { display: inline-flex; align-items: center; gap: 5px; font: 11px var(--f-mono); color: var(--muted); }
+.check::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--l); box-shadow: 0 0 6px var(--l); }
+.check.green { --l: var(--ok); } .check.red { --l: var(--bad); } .check.pending { --l: var(--lamp); }
+
+.empty { grid-column: 1 / -1; font: 12px var(--f-mono); color: var(--muted); padding: 4px 0; letter-spacing: .04em; text-transform: uppercase; }
+.empty::before { content: "◦ "; color: var(--c); }
+
+details.parked {
+  margin-top: 22px; margin-left: 34px; padding: 10px 16px; border-radius: 6px;
+  background: var(--metal); border: 1px dashed var(--seam); color: var(--muted);
+}
+details.parked summary { cursor: pointer; font: 600 13px var(--f-display); letter-spacing: .06em; text-transform: uppercase; }
+details.parked ul { margin: 10px 0 2px; padding-left: 18px; }
 details.parked li { margin: 4px 0; }
+details.parked .chip.ref { padding: 0; }
 
-/* ---------- Variant A: conveyor ---------- */
-.va .line { display: grid; grid-template-columns: repeat(var(--n), minmax(210px, 1fr)); gap: 14px; overflow-x: auto; padding-bottom: 8px; }
-.va .station { display: grid; grid-template-rows: auto auto 1fr; gap: 10px; min-width: 0; }
-.va .station-head { display: flex; align-items: center; gap: 8px; }
-.va .station-head h2 { font-size: 16px; letter-spacing: .04em; text-transform: uppercase; }
-.va .station-head svg { width: 28px; height: 32px; flex: none; }
-.va .belt {
-  height: 14px; border-radius: 7px; border: 1px solid var(--line);
-  background: repeating-linear-gradient(90deg, var(--panel-2) 0 14px, var(--line) 14px 16px);
-  background-size: 32px 100%; animation: belt 2.4s linear infinite;
+@media (max-width: 560px) {
+  .line { padding-left: 18px; }
+  .line::before { left: 3px; } .line::after { left: 5px; }
+  .module::before { left: -15px; width: 14px; }
+  .module-head, .module .stack { padding-inline: 12px; }
+  .module .stack { grid-template-columns: 1fr; }
+  details.parked { margin-left: 18px; }
 }
-@keyframes belt { to { background-position: 32px 0; } }
-.va .stack { display: grid; gap: 10px; align-content: start; }
-.va .card { border-top: 3px solid var(--holo); }
-.va .bay {
-  margin-top: 26px; border: 1px solid var(--bad); border-radius: 12px; padding: 14px;
-  background: repeating-linear-gradient(135deg, var(--bad-dim) 0 12px, transparent 12px 24px);
-}
-.va .bay h2 { font-size: 16px; color: var(--bad); letter-spacing: .05em; text-transform: uppercase; display: flex; gap: 8px; align-items: center; }
-.va .bay .stack { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); margin-top: 10px; }
-.va .bay .card { border-top-color: var(--bad); }
+@media (prefers-reduced-motion: reduce) { .line::after, .m-stuck .led { animation: none; } }
 
-/* ---------- Variant B: flight path ---------- */
-.vb { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 28px; align-items: start; }
-.vb .route { position: relative; padding-left: 46px; }
-.vb .route::before {
-  content: ""; position: absolute; left: 16px; top: 10px; bottom: 10px; width: 2px;
-  background: repeating-linear-gradient(180deg, var(--holo) 0 8px, transparent 8px 16px);
-  opacity: .7;
-}
-.vb .wp { position: relative; padding-bottom: 26px; }
-.vb .wp::before {
-  content: ""; position: absolute; left: -38px; top: 2px; width: 18px; height: 18px; border-radius: 50%;
-  background: var(--bg); border: 2px solid var(--holo); box-shadow: 0 0 12px var(--holo);
-}
-.vb .wp.done::before { border-color: var(--leaf); box-shadow: 0 0 10px var(--leaf); }
-.vb .wp h2 { font-size: 18px; display: flex; gap: 10px; align-items: baseline; }
-.vb .wp h2 small { font: 12px var(--f-mono); color: var(--muted); font-weight: 400; }
-.vb .wp .stack { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; margin-top: 10px; }
-.vb .card { background: linear-gradient(180deg, var(--panel-2), var(--panel)); border-color: var(--holo-dim); }
-.vb .drift { position: sticky; top: 16px; border-radius: 14px; padding: 14px; background: var(--panel); border: 1px solid var(--bad); }
-.vb .drift h2 { font-size: 16px; color: var(--bad); }
-.vb .drift p { margin: 4px 0 10px; color: var(--muted); font-size: 13px; }
-.vb .drift .stack { display: grid; gap: 10px; }
-.vb .drift .card { transform: rotate(var(--tilt, 0deg)); border-color: var(--bad-dim); }
-
-/* ---------- Variant C: greenhouse ---------- */
-.vc .beds { display: grid; gap: 18px; }
-.vc .bed { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 14px; align-items: stretch; }
-.vc .bed-label { display: grid; align-content: start; gap: 6px; padding-top: 6px; }
-.vc .bed-label h2 { font-size: 17px; }
-.vc .bed-label svg { width: 44px; height: 44px; }
-.vc .soil {
-  border-radius: 10px; padding: 12px 12px 22px; position: relative;
-  background: linear-gradient(180deg, var(--panel-2), var(--panel));
-  border: 1px solid var(--line);
-}
-.vc .soil::after { /* wooden bench edge */
-  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 10px; border-radius: 0 0 10px 10px;
-  background: repeating-linear-gradient(90deg, var(--wood) 0 38px, var(--wood-hi) 38px 40px);
-}
-.vc .soil .stack { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
-.vc .card { border-left: 4px solid var(--leaf); }
-.vc .sickbay { margin-bottom: 22px; border-radius: 12px; padding: 12px 14px; background: var(--bad-dim); border: 1px solid var(--bad); display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 14px; }
-.vc .sickbay h2 { font-size: 17px; color: var(--bad); }
-.vc .sickbay p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
-.vc .sickbay .stack { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
-.vc .sickbay .card { border-left-color: var(--bad); }
-
-@media (max-width: 760px) {
-  .vb { grid-template-columns: 1fr; }
-  .vb .drift { position: static; order: -1; }
-  .vc .bed, .vc .sickbay { grid-template-columns: 1fr; }
-  .vc .bed-label { display: flex; align-items: center; gap: 10px; padding: 0; }
-  .va .line { grid-template-columns: repeat(var(--n), minmax(240px, 82vw)); scroll-snap-type: x mandatory; }
-  .va .station { scroll-snap-align: start; }
-}
-@media (prefers-reduced-motion: reduce) { .va .belt { animation: none; } }
-
-/* ---------- prototype switcher (not part of the design) ---------- */
+/* ---------- prototype controls (not part of the design) ---------- */
 .switcher {
   position: fixed; left: 50%; transform: translateX(-50%);
   bottom: calc(14px + env(safe-area-inset-bottom, 0px));
-  display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: center;
+  display: flex; gap: 6px; align-items: center;
   background: #111; color: #fff; border: 2px solid #fff; border-radius: 999px;
-  padding: 6px 10px; box-shadow: 0 6px 24px #0008; z-index: 50;
-  font: 13px system-ui, sans-serif; max-width: calc(100vw - 24px);
+  padding: 6px 8px; box-shadow: 0 6px 24px #0008; z-index: 50; font: 13px system-ui, sans-serif;
 }
-.switcher button { font: inherit; color: #fff; background: #333; border: 0; border-radius: 999px; padding: 5px 10px; cursor: pointer; }
+.switcher button { font: inherit; color: #fff; background: #333; border: 0; border-radius: 999px; padding: 5px 12px; cursor: pointer; }
 .switcher button:hover { background: #555; }
-.switcher .label { min-width: 150px; text-align: center; font-weight: 600; }
 </style>
 
-<svg width="0" height="0" style="position:absolute" aria-hidden="true">
-  <defs>
-    <!-- small white robot with glowing blue eyes -->
-    <symbol id="robot" viewBox="0 0 28 32">
-      <line x1="14" y1="1" x2="14" y2="5" stroke="var(--muted)" stroke-width="1.5"/>
-      <circle cx="14" cy="2" r="1.6" fill="var(--lamp)"/>
-      <rect x="4" y="5" width="20" height="13" rx="5" fill="var(--robot)"/>
-      <circle cx="10" cy="11.5" r="2.2" fill="var(--eye)"/><circle cx="18" cy="11.5" r="2.2" fill="var(--eye)"/>
-      <rect x="7" y="19" width="14" height="10" rx="3" fill="var(--robot)"/>
-      <rect x="11" y="22" width="6" height="3" rx="1" fill="var(--holo)"/>
-    </symbol>
-    <!-- plant growth stages for the greenhouse -->
-    <symbol id="seed" viewBox="0 0 44 44"><rect x="8" y="28" width="28" height="12" rx="3" fill="var(--wood)"/><ellipse cx="22" cy="26" rx="4" ry="3" fill="var(--lamp)"/></symbol>
-    <symbol id="sprout" viewBox="0 0 44 44"><rect x="8" y="28" width="28" height="12" rx="3" fill="var(--wood)"/><path d="M22 28V18" stroke="var(--leaf)" stroke-width="2.5"/><ellipse cx="17" cy="18" rx="5" ry="3" fill="var(--leaf)"/><ellipse cx="27" cy="16" rx="5" ry="3" fill="var(--leaf)"/></symbol>
-    <symbol id="leafy" viewBox="0 0 44 44"><rect x="8" y="28" width="28" height="12" rx="3" fill="var(--wood)"/><path d="M22 28V8" stroke="var(--leaf)" stroke-width="2.5"/><ellipse cx="15" cy="20" rx="7" ry="4" fill="var(--leaf)"/><ellipse cx="29" cy="15" rx="7" ry="4" fill="var(--leaf)"/><ellipse cx="16" cy="10" rx="6" ry="3.5" fill="var(--leaf)"/></symbol>
-    <symbol id="bloom" viewBox="0 0 44 44"><rect x="8" y="28" width="28" height="12" rx="3" fill="var(--wood)"/><path d="M22 28V10" stroke="var(--leaf)" stroke-width="2.5"/><ellipse cx="15" cy="21" rx="7" ry="4" fill="var(--leaf)"/><circle cx="22" cy="9" r="6" fill="var(--lamp)"/><circle cx="22" cy="9" r="2.5" fill="var(--holo)"/></symbol>
-    <symbol id="crate" viewBox="0 0 44 44"><rect x="6" y="18" width="32" height="22" rx="2" fill="var(--wood)"/><path d="M6 25h32M6 32h32" stroke="var(--wood-hi)" stroke-width="2"/><circle cx="15" cy="15" r="5" fill="var(--bad)"/><circle cx="25" cy="14" r="5" fill="var(--lamp)"/><circle cx="31" cy="16" r="4" fill="var(--leaf)"/></symbol>
-    <symbol id="wilt" viewBox="0 0 44 44"><rect x="8" y="28" width="28" height="12" rx="3" fill="var(--wood)"/><path d="M22 28c0-8 2-12 8-14" stroke="var(--muted)" stroke-width="2.5" fill="none"/><ellipse cx="31" cy="19" rx="5" ry="3" fill="var(--muted)" transform="rotate(50 31 19)"/></symbol>
-  </defs>
-</svg>
-
-<header class="deck">
-  <div class="stars"></div>
-  <svg class="station" viewBox="0 0 360 240" aria-hidden="true">
-    <ellipse cx="200" cy="120" rx="150" ry="36" fill="none" stroke="#ffffff" stroke-width="2" opacity=".5"/>
-    <ellipse cx="200" cy="120" rx="118" ry="26" fill="none" stroke="#5ee7f2" stroke-width="1.5" opacity=".7"/>
-    <rect x="160" y="70" width="18" height="70" rx="3" fill="#ffffff" opacity=".8"/>
-    <rect x="184" y="52" width="22" height="88" rx="3" fill="#ffffff" opacity=".9"/>
-    <rect x="212" y="80" width="16" height="60" rx="3" fill="#ffffff" opacity=".75"/>
-    <rect x="234" y="96" width="14" height="44" rx="3" fill="#ffffff" opacity=".65"/>
-    <circle cx="195" cy="62" r="3" fill="#ffc36b"/><circle cx="168" cy="84" r="2.5" fill="#ffc36b"/><circle cx="220" cy="92" r="2.5" fill="#5ee7f2"/>
-    <ellipse cx="200" cy="146" rx="70" ry="10" fill="#6fd38a" opacity=".55"/>
-  </svg>
-  <div class="deck-inner">
-    <div>
-      <div class="banner-note">banner image goes here (the banner task)</div>
-      <h1>Workshop board</h1>
-      <p>Every open issue and PR of the workshop, by stage. Read-only: decide on the digest.</p>
-    </div>
-    <div class="meta" id="meta"></div>
+<header class="banner">
+  <div class="banner-inner">
+    <div class="banner-note">banner image goes here: the station, its robots and plants</div>
+    <h1>Workshop board</h1>
+    <p>Every open issue and PR of the workshop, by stage. Read-only: decide on the digest.</p>
   </div>
 </header>
 
-<main id="board"></main>
+<main>
+  <div class="status" id="status"></div>
+  <div class="line" id="line"></div>
+  <div id="parked"></div>
+</main>
 
-<nav class="switcher" aria-label="Prototype variant switcher">
-  <button id="prev" aria-label="Previous variant">←</button>
-  <span class="label" id="vlabel"></span>
-  <button id="next" aria-label="Next variant">→</button>
-  <button id="am"></button>
+<nav class="switcher" aria-label="Prototype controls">
   <button id="data"></button>
-  <button id="theme">theme</button>
 </nav>
 
 <script>
-// ---------- data ----------
 // REAL: dispatch.ts dry run, 2026-11-17, repos covered: realJohnDoe/agent-skills.
 const GH = "https://github.com/";
 const REAL = [
@@ -312,9 +263,9 @@ const REAL = [
 // SAMPLE: invented cards for the other workshop repos, to judge density and repo tags.
 const SAMPLE = [
   { stage: "waiting", repo: "meridian", n: 41, kind: "issue", tier: "opus", sub: "Decide",
-    title: "Store recurring events as rules or as expanded rows?", why: "Decide: rules (smaller) or rows (simpler queries)?" },
+    title: "Store recurring events as rules or as expanded rows?", why: "Rules (smaller) or rows (simpler queries)?" },
   { stage: "waiting", repo: "kenpo-notes", n: 18, kind: "issue", tier: "sonnet", sub: "Go ahead?",
-    title: "Add a print stylesheet for the technique cards", why: "Go ahead? sonnet, unblocked" },
+    title: "Add a print stylesheet for the technique cards", why: "Unblocked, needs ready-for-agent" },
   { stage: "waiting", repo: "structra", n: 77, kind: "issue", tier: "haiku", sub: "Blocked",
     title: "Rename Node to Block in the public API", why: "Blocked by structra#75" },
   { stage: "queue", repo: "tracemap", n: 93, kind: "issue", tier: "sonnet",
@@ -323,14 +274,16 @@ const SAMPLE = [
     title: "Round the gap to whole euros in the summary", why: "Second in line" },
   { stage: "queue", repo: "meridian", n: 39, kind: "issue", tier: "sonnet",
     title: "Show the week number in the month view", why: "Third in line" },
-  { stage: "pr", repo: "tracemap", n: 95, kind: "pr", tier: "opus", check: "green",
-    title: "Lay out traces with a force-directed pass", why: "Green and quiet: needs your review" },
   { stage: "pr", repo: "structra", n: 80, kind: "pr", tier: "sonnet", check: "pending",
     title: "Validate schema references on load", why: "Waiting on CI" },
   { stage: "pr", repo: "kenpo-notes", n: 21, kind: "pr", check: "green", automerge: true,
     title: "Bump astro from 5.3.0 to 5.4.1", why: "Dependabot minor: merges on the next run" },
+  { stage: "pr", repo: "tracemap", n: 95, kind: "pr", tier: "opus", check: "green",
+    title: "Lay out traces with a force-directed pass", why: "Green and quiet" },
   { stage: "pr", repo: "meridian", n: 44, kind: "pr", tier: "sonnet", check: "red",
     title: "Sync calendars in the background", why: "Red: follow-up 1 of 2 runs today" },
+  { stage: "pr", repo: "kenpo-notes", n: 22, kind: "pr", tier: "opus", check: "green",
+    title: "Group techniques by belt on the index page", why: "Green and quiet" },
   { stage: "afterMerge", repo: "rentenluecke", n: 9, kind: "issue", tier: "sonnet",
     title: "Move the tax tables to 2027 values", why: "Check the 2027 numbers against the Bundesanzeiger (merged in rentenluecke#11)" },
   { stage: "stuck", repo: "structra", n: 70, kind: "pr", tier: "opus", check: "red",
@@ -343,152 +296,77 @@ const SAMPLE = [
   { stage: "parked", repo: "structra", n: 64, title: "Rewrite the CLI in Rust", why: "deferred" },
   { stage: "parked", repo: "meridian", n: 30, tier: "opus", title: "Design the sharing model", why: "plan" },
 ];
-const REPO_COLORS = { "agent-skills": "var(--holo)", meridian: "#b99cff", tracemap: "var(--lamp)", structra: "#7fb2ff", "kenpo-notes": "var(--leaf)", rentenluecke: "#ff9ec2" };
+const REPO_COLORS = { "agent-skills": "#5ee7f2", meridian: "#b99cff", tracemap: "#ffc36b", structra: "#7fb2ff", "kenpo-notes": "#6fd38a", rentenluecke: "#ff9ec2" };
 
-// ---------- state ----------
-const VARIANTS = [
-  { key: "a", name: "Conveyor deck", render: renderA },
-  { key: "b", name: "Flight path", render: renderB },
-  { key: "c", name: "Greenhouse rows", render: renderC },
+// The happy path in reverse: what needs a hand first, then the latest wins, back to what's waiting.
+const STAGES = [
+  { id: "stuck", name: "Stuck", hint: "off the line: needs a hand" },
+  { id: "closed", name: "Closed", hint: "latest 5" },
+  { id: "afterMerge", name: "After merge", hint: "your step after the PR" },
+  { id: "pr", name: "PR in progress", hint: "needs review first" },
+  { id: "queue", name: "Queue", hint: "in pickup order" },
+  { id: "waiting", name: "Waiting", hint: "blocked, decide, go ahead" },
 ];
-const store = {
-  get(k, d) { try { return localStorage.getItem("wb-" + k) ?? d; } catch { return d; } },
-  set(k, v) { try { localStorage.setItem("wb-" + k, v); } catch {} },
-};
-let amMode = store.get("am", "chip");      // chip | stage
-let dataMode = store.get("data", "sample"); // real | sample
-const variantIdx = () => Math.max(0, VARIANTS.findIndex((v) => "#" + v.key === location.hash));
+const EMPTY = { stuck: "All systems nominal", closed: "Nothing closed yet", afterMerge: "No after-merge steps", pr: "No open PRs", queue: "Queue empty", waiting: "Nothing waits on you" };
 
-function stages() {
-  const s = [
-    { id: "waiting", name: "Waiting", hint: "blocked, decide, go ahead" },
-    { id: "queue", name: "Queue", hint: "in pickup order" },
-    { id: "pr", name: "PR in progress", hint: "every open PR" },
-  ];
-  if (amMode === "stage") s.push({ id: "merging", name: "Merging", hint: "automerge, next run" });
-  s.push({ id: "afterMerge", name: "After merge", hint: "your step after the PR" }, { id: "closed", name: "Closed", hint: "latest 5" });
-  return s;
-}
-function items() {
-  let all = dataMode === "real" ? REAL : REAL.concat(SAMPLE.map((x) => ({ ...x, sample: true })));
-  return all.map((x) => (amMode === "stage" && x.stage === "pr" && x.automerge ? { ...x, stage: "merging" } : x));
-}
-const byStage = (id) => {
+let dataMode = (() => { try { return localStorage.getItem("wb-data") || "sample"; } catch { return "sample"; } })();
+const items = () => (dataMode === "real" ? REAL : REAL.concat(SAMPLE.map((x) => ({ ...x, sample: true }))));
+const needsReview = (x) => x.kind === "pr" && x.check === "green" && !x.automerge;
+// PR order: needs review, then red, then pending, then automerge.
+const prRank = (x) => (needsReview(x) ? 0 : x.check === "red" ? 1 : x.check === "pending" ? 2 : 3);
+function byStage(id) {
   const xs = items().filter((x) => x.stage === id);
-  return id === "closed" ? xs.slice(0, 5) : xs;
-};
+  if (id === "pr") return xs.slice().sort((a, b) => prRank(a) - prRank(b));
+  if (id === "closed") return xs.slice(0, 5);
+  return xs;
+}
 
-// ---------- card ----------
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 function card(x) {
-  const path = x.kind === "pr" ? "pull" : "issues";
-  const url = x.n ? `${GH}realJohnDoe/${x.repo}/${path}/${x.n}` : `${GH}realJohnDoe/${x.repo}`;
-  const chips = [];
-  chips.push(`<span class="tag" style="--repo:${REPO_COLORS[x.repo] || "var(--holo)"}">${esc(x.repo)}</span>`);
-  if (x.n) chips.push(`<span class="ref">#${x.n}</span>`);
+  const url = x.n ? `${GH}realJohnDoe/${x.repo}/${x.kind === "pr" ? "pull" : "issues"}/${x.n}` : `${GH}realJohnDoe/${x.repo}`;
+  const chips = [`<span class="chip repo" style="--repo:${REPO_COLORS[x.repo]}">${esc(x.repo)}</span>`];
+  if (x.n) chips.push(`<span class="chip ref">#${x.n}</span>`);
   if (x.tier) chips.push(`<span class="chip tier">${x.tier}</span>`);
+  if (x.sub) chips.push(`<span class="chip sub">${esc(x.sub)}</span>`);
+  if (needsReview(x)) chips.push(`<span class="chip review">needs review</span>`);
+  if (x.automerge) chips.push(`<span class="chip auto">automerge</span>`);
   if (x.check) chips.push(`<span class="check ${x.check}">${x.check}</span>`);
-  if (x.kind === "pr" && x.check === "green" && !x.automerge && x.stage === "pr") chips.push(`<span class="chip review">needs review</span>`);
-  if (x.automerge && amMode === "chip") chips.push(`<span class="chip auto">automerge</span>`);
-  if (x.sub) chips.push(`<span class="chip tier" style="background:var(--panel-2);color:var(--fg)">${esc(x.sub)}</span>`);
   return `<article class="card${x.sample ? " sample" : ""}">
     <div class="title"><a href="${url}" target="_blank" rel="noopener">${esc(x.title)}</a></div>
     <div class="row">${chips.join("")}</div>
     <div class="why">${esc(x.why)}</div>
   </article>`;
 }
-const cards = (xs, emptyText) => xs.length ? xs.map(card).join("") : `<div class="empty">${emptyText}</div>`;
-function parked() {
-  const xs = byStage("parked");
-  if (!xs.length) return "";
-  return `<details class="parked"><summary>${xs.length} parked: deferred, plan, no tier, blocked or assigned by hand</summary><ul>${xs
-    .map((x) => `<li><a href="${GH}realJohnDoe/${x.repo}/issues/${x.n}" target="_blank" rel="noopener">${esc(x.repo)}#${x.n}</a> ${esc(x.title)} <span class="ref">(${esc(x.why)})</span></li>`)
-    .join("")}</ul></details>`;
-}
-const EMPTY = { waiting: "Nothing waits on you.", queue: "Queue empty: every ready issue is dispatched.", pr: "No open PRs.", merging: "Nothing to merge.", afterMerge: "No after-merge steps.", closed: "Nothing closed yet.", stuck: "Nothing stuck." };
 
-// ---------- Variant A: conveyor deck ----------
-function renderA() {
-  const st = stages();
-  const stuck = byStage("stuck");
-  return `<div class="va">
-    <div class="line" style="--n:${st.length}">
-      ${st.map((s) => `<section class="station">
-        <div class="station-head"><svg><use href="#robot"/></svg><div><h2>${s.name}</h2><div class="count">${byStage(s.id).length} · ${s.hint}</div></div></div>
-        <div class="belt"></div>
-        <div class="stack">${cards(byStage(s.id), EMPTY[s.id])}</div>
-      </section>`).join("")}
-    </div>
-    <section class="bay"><h2>⚠ Repair bay: stuck <span class="count">${stuck.length}</span></h2>
-      <div class="stack">${cards(stuck, EMPTY.stuck)}</div></section>
-    ${parked()}
-  </div>`;
-}
-
-// ---------- Variant B: flight path ----------
-function renderB() {
-  const st = stages();
-  const stuck = byStage("stuck");
-  const tilts = [-1.2, 0.8, -0.6, 1.1];
-  return `<div class="vb">
-    <div class="route">
-      ${st.map((s) => `<section class="wp ${s.id === "closed" ? "done" : ""}">
-        <h2>${s.name} <small>${byStage(s.id).length} · ${s.hint}</small></h2>
-        <div class="stack">${cards(byStage(s.id), EMPTY[s.id])}</div>
-      </section>`).join("")}
-      ${parked()}
-    </div>
-    <aside class="drift"><h2>Off course: stuck (${stuck.length})</h2><p>Drifted off the route. Each needs a hand to get back on it.</p>
-      <div class="stack">${stuck.map((x, i) => card(x).replace('<article class="card', `<article style="--tilt:${tilts[i % 4]}deg" class="card`)).join("") || `<div class="empty">${EMPTY.stuck}</div>`}</div>
-    </aside>
-  </div>`;
-}
-
-// ---------- Variant C: greenhouse rows ----------
-function renderC() {
-  const icon = { waiting: "seed", queue: "sprout", pr: "leafy", merging: "bloom", afterMerge: "bloom", closed: "crate" };
-  const stuck = byStage("stuck");
-  return `<div class="vc">
-    <section class="sickbay"><div><h2>Sick bay: stuck (${stuck.length})</h2><p>Plants that stopped growing.</p><svg width="44" height="44"><use href="#wilt"/></svg></div>
-      <div class="stack">${cards(stuck, EMPTY.stuck)}</div></section>
-    <div class="beds">
-      ${stages().map((s) => `<section class="bed">
-        <div class="bed-label"><svg><use href="#${icon[s.id]}"/></svg><h2>${s.name}</h2><div class="count">${byStage(s.id).length} · ${s.hint}</div></div>
-        <div class="soil"><div class="stack">${cards(byStage(s.id), EMPTY[s.id])}</div></div>
-      </section>`).join("")}
-    </div>
-    ${parked()}
-  </div>`;
-}
-
-// ---------- render + switcher ----------
 function render() {
-  const v = VARIANTS[variantIdx()];
-  document.getElementById("board").innerHTML = v.render();
-  document.getElementById("vlabel").textContent = `${v.key.toUpperCase()} (${v.name})`;
-  document.getElementById("am").textContent = `automerge: ${amMode}`;
+  const pad = (n) => String(n).padStart(2, "0");
+  document.getElementById("line").innerHTML = STAGES.map((s) => {
+    const xs = byStage(s.id);
+    return `<section class="module m-${s.id}" aria-label="${s.name}">
+      <div class="module-head"><span class="led"></span><h2>${s.name}</h2><span class="hint">${s.hint}</span><span class="readout">${pad(xs.length)}</span></div>
+      <div class="stack">${xs.length ? xs.map(card).join("") : `<div class="empty">${EMPTY[s.id]}</div>`}</div>
+    </section>`;
+  }).join("");
+
+  const parked = byStage("parked");
+  document.getElementById("parked").innerHTML = parked.length ? `<details class="parked"><summary>${parked.length} parked: deferred, plan, no tier, blocked or assigned by hand</summary><ul>${parked
+    .map((x) => `<li><a href="${GH}realJohnDoe/${x.repo}/issues/${x.n}" target="_blank" rel="noopener">${esc(x.repo)}#${x.n}</a> ${esc(x.title)} <span class="chip ref">(${esc(x.why)})</span></li>`)
+    .join("")}</ul></details>` : "";
+
+  const repos = new Set(items().map((x) => x.repo)).size;
+  const n = (id) => byStage(id).length;
+  document.getElementById("status").innerHTML = [
+    `run <b>2026-11-17</b>`, `repos online <b>${repos}</b>`,
+    `stuck <b style="color:var(--bad)">${n("stuck")}</b>`,
+    `needs review <b style="color:var(--warn)">${items().filter(needsReview).length}</b>`,
+    `waiting <b>${n("waiting")}</b>`, `in queue <b>${n("queue")}</b>`,
+  ].join('<span class="sep"></span>');
   document.getElementById("data").textContent = dataMode === "real" ? "data: real only" : "data: real + samples";
-  const repos = dataMode === "real" ? "agent-skills" : "agent-skills + 5 sample repos";
-  document.getElementById("meta").innerHTML = `dry run 2026-11-17<br>${repos}`;
 }
-function go(d) {
-  const i = (variantIdx() + d + VARIANTS.length) % VARIANTS.length;
-  location.hash = VARIANTS[i].key;
-}
-document.getElementById("prev").onclick = () => go(-1);
-document.getElementById("next").onclick = () => go(1);
-document.getElementById("am").onclick = () => { amMode = amMode === "chip" ? "stage" : "chip"; store.set("am", amMode); render(); };
-document.getElementById("data").onclick = () => { dataMode = dataMode === "real" ? "sample" : "real"; store.set("data", dataMode); render(); };
-document.getElementById("theme").onclick = () => {
-  const root = document.documentElement;
-  const dark = root.dataset.theme ? root.dataset.theme === "dark" : !matchMedia("(prefers-color-scheme: light)").matches;
-  root.dataset.theme = dark ? "light" : "dark";
+document.getElementById("data").onclick = () => {
+  dataMode = dataMode === "real" ? "sample" : "real";
+  try { localStorage.setItem("wb-data", dataMode); } catch {}
+  render();
 };
-addEventListener("keydown", (e) => {
-  if (e.target.closest("input, textarea, [contenteditable]")) return;
-  if (e.key === "ArrowLeft") go(-1);
-  if (e.key === "ArrowRight") go(1);
-});
-addEventListener("hashchange", render);
 render();
 </script>
