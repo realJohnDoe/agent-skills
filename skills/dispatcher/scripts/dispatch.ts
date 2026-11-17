@@ -151,7 +151,37 @@ main(() => {
     (draft ?? published)?.body?.match(marker)?.[1] ??
     new Date(+TODAY - DIGEST_DAYS * 864e5).toISOString().slice(0, 10);
 
-  const plans = repos.map((r) => planRepo(r, since));
+  const first = repos.map((r) => planRepo(r, since));
+  const automerge = first.flatMap((p) => p.automerge);
+  const digestLabels = all<{ name: string }>(`repos/${DIGEST}/labels?per_page=100`).map((l) => l.name);
+  const missingLabels = [
+    ...first
+      .filter((p) => p.missingLabels.length)
+      .map((p) => ({ repo: p.repo, missing: p.missingLabels })),
+    ...(digestLabels.includes(PAUSE_LABEL)
+      ? []
+      : [{ repo: DIGEST, missing: [PAUSE_LABEL] }]),
+  ];
+  // Labels first, then every `automerge` PR, which already has finished, green
+  // CI: merge it now, pinned to the head commit that was checked. (GitHub
+  // refuses to *enable* auto-merge on a PR that is already mergeable.) A
+  // refused merge is logged and retried on the next run, not fatal. A repo
+  // where something merged is read again, so sessions and the digest see it.
+  const mergedIn = new Set<string>();
+  if (APPLY) {
+    for (const { repo, missing } of missingLabels)
+      for (const name of missing)
+        post(`repos/${repo}/labels`, { name, color: name === PAUSE_LABEL ? "fbca04" : LABELS[name] });
+    for (const m of automerge)
+      try {
+        post(`repos/${m.repo}/pulls/${m.pr}/merge`, { sha: m.sha, merge_method: "merge" }, "PUT");
+        mergedIn.add(m.repo);
+      } catch (e) {
+        const err = e as { stderr?: string; message: string };
+        console.error(`merge ${m.repo}#${m.pr} refused: ${err.stderr ?? err.message}`);
+      }
+  }
+  const plans = first.map((p, k) => (mergedIn.has(p.repo) ? planRepo(repos[k], since) : p));
   const pick = <K extends ListKey>(k: K): RepoPlan[K] => plans.flatMap((p) => p[k] as unknown[]) as RepoPlan[K];
 
   // Follow-ups first: finishing beats starting. Follow-ups go newest PR first and
@@ -168,7 +198,6 @@ main(() => {
     ...followups.slice(MAX_SESSIONS).map((s) => ({ ...s.item, why: "follow-up next run" })),
     ...pick("inProgress"),
   ];
-  const automerge = pick("automerge");
   const review = pick("review");
   const unstick = pick("unstick");
   const decide = pick("decide");
@@ -278,39 +307,9 @@ main(() => {
       merged: merged.length,
     },
   };
-  const digestLabels = all<{ name: string }>(`repos/${DIGEST}/labels?per_page=100`).map((l) => l.name);
-  const missingLabels = [
-    ...plans
-      .filter((p) => p.missingLabels.length)
-      .map((p) => ({ repo: p.repo, missing: p.missingLabels })),
-    ...(digestLabels.includes(PAUSE_LABEL)
-      ? []
-      : [{ repo: DIGEST, missing: [PAUSE_LABEL] }]),
-  ];
 
   // --- Apply ----------------------------------------------------------------
   if (APPLY) {
-    for (const { repo, missing } of missingLabels)
-      for (const name of missing)
-        post(`repos/${repo}/labels`, {
-          name,
-          color: name === PAUSE_LABEL ? "fbca04" : LABELS[name],
-        });
-    // Every `automerge` PR already has finished, green CI, so merge it now,
-    // pinned to the head commit that was checked. (GitHub refuses to *enable*
-    // auto-merge on a PR that is already mergeable.) A refused merge is
-    // logged and retried on the next run, not fatal.
-    for (const m of automerge)
-      try {
-        post(
-          `repos/${m.repo}/pulls/${m.pr}/merge`,
-          { sha: m.sha, merge_method: "merge" },
-          "PUT",
-        );
-      } catch (e) {
-        const err = e as { stderr?: string; message: string };
-        console.error(`merge ${m.repo}#${m.pr} refused: ${err.stderr ?? err.message}`);
-      }
     const me = sessions.length ? api<{ login: string }>("user").login : null;
     for (const s of sessions) {
       if (s.kind === "dispatch") {

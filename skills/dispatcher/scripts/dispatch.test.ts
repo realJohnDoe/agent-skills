@@ -301,6 +301,17 @@ describe("an issue with an After merge step", () => {
     assert.match(p.digest.body, /meridian#31\]\(\S+\) Waits on 30 \(blocked by/);
   });
 
+  test("once this run merges its automerge PR, the same run's digest shows the step", () => {
+    const merging = { ...refs, labels: [{ name: "automerge" }] };
+    const dry = plan([merging], []);
+    assert.equal(dry.digest.counts.afterMerge, 0);
+    const res = run("dispatch.ts", ["--repos", M], fixture([merging], []), { apply: true });
+    assert.equal(res.status, 0, res.stderr);
+    assert.deepEqual(res.plan.automerge.map((m: Any) => m.pr), [40]);
+    assert.match(res.plan.digest.body, /\*\*After merge:\*\* \[realJohnDoe\/meridian#30\][^\n]*merged in \[realJohnDoe\/meridian#40\]/);
+    assert.deepEqual(res.plan.sessions, []);
+  });
+
   test("a closed, unmerged PR that Refs it doesn't count", () => {
     const { digest } = plan([], [pr(40, "Abandoned", { body: "Refs #30", merged_at: null })]);
     assert.equal(digest.counts.afterMerge, 0);

@@ -8,6 +8,7 @@
 //   Every write (-X other than GET, or --input) is appended to $FAKE_GH_LOG as
 //   `{method, path, body}`, or fails when FAKE_GH_LOG is unset, so a dry run that
 //   writes fails loudly. A write answers `{"number": 900}`.
+//   A merge (PUT .../pulls/N/merge) also moves PR N to the fixture's closed list.
 // git: `remote get-url origin` answers from $FAKE_GIT_REMOTES ({path: url});
 //   `push --dry-run` fails for paths listed in $FAKE_GIT_NOPUSH; `rev-parse
 //   --show-toplevel` answers the working directory.
@@ -55,6 +56,17 @@ const gh = (args: string[]) => {
       log,
       `${JSON.stringify({ method, path, body: body ? JSON.parse(body) : null })}\n`,
     );
+    // A merge moves the PR from the open list to the closed one, as GitHub does.
+    const merge = path.match(/^(repos\/[^/]+\/[^/]+)\/pulls\/(\d+)\/merge$/);
+    if (merge) {
+      const file = process.env.FAKE_GH_FIXTURE!;
+      const f = JSON.parse(readFileSync(file, "utf8"));
+      const [, r, n] = merge;
+      const pr = f[`${r}/pulls`].find((p: { number: number }) => p.number === +n);
+      f[`${r}/pulls`] = f[`${r}/pulls`].filter((p: unknown) => p !== pr);
+      f[`${r}/pulls?state=closed`] = [{ ...pr, merged_at: "2026-11-13T00:00:00Z" }, ...(f[`${r}/pulls?state=closed`] ?? [])];
+      writeFileSync(file, JSON.stringify(f));
+    }
     process.stdout.write(JSON.stringify({ number: 900 }));
     return;
   }
