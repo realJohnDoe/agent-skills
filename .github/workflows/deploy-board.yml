@@ -1,0 +1,7 @@
+name: Deploy board (push test)
+on: push
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "actor=${{ github.actor }} triggering_actor=${{ github.triggering_actor }} sha=${{ github.sha }}"
