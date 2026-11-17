@@ -100,6 +100,18 @@ const world = ({
     labels: [{ name: "haiku" }, { name: "sonnet" }, { name: "ready-for-agent" }],
   }),
   user: { login: "workshop-bot" },
+  [`search/issues?q=repo:${M} repo:${T} is:issue is:closed reason:completed`]: {
+    items: [
+      issue(1, "Old", ["sonnet"], { closed_at: "2026-11-01T00:00:00Z", repository_url: `https://api.github.com/repos/${M}` }),
+      issue(2, "Done", ["haiku"], { closed_at: "2026-11-12T00:00:00Z", repository_url: `https://api.github.com/repos/${T}` }),
+    ],
+  },
+  [`repos/${M}/issues/1/timeline`]: [],
+  [`repos/${T}/issues/2/timeline`]: [
+    { event: "cross-referenced", source: { issue: { number: 7, pull_request: { merged_at: "2026-11-12T00:00:00Z" } } } },
+    { event: "cross-referenced", source: { issue: { number: 8, pull_request: { merged_at: "2026-11-12T01:00:00Z" } } } },
+    { event: "cross-referenced", source: { issue: { number: 9, pull_request: { merged_at: null } } } },
+  ],
   [`repos/${DIGEST}/issues`]: digestIssues,
   [`repos/${DIGEST}/labels`]: digestLabels,
   ...Object.fromEntries(
@@ -128,7 +140,11 @@ const run = (
   }
   mkdirSync(join(checkouts, "notes"), { recursive: true });
   mkdirSync(join(checkouts, "scratch", ".git"), { recursive: true });
-  writeFileSync(join(dir, "fixture.json"), JSON.stringify(fixture));
+  // The board's closed-issue search names every covered repo; answer it empty unless the fixture does.
+  const only = args.includes("--repos") ? args[args.indexOf("--repos") + 1].split(",") : null;
+  const covered = [M, T].filter((r) => !missing.includes(r) && (!only || only.includes(r)));
+  const closedKey = `search/issues?q=${covered.map((r) => `repo:${r}`).join(" ")} is:issue is:closed reason:completed`;
+  writeFileSync(join(dir, "fixture.json"), JSON.stringify({ [closedKey]: { items: [] }, ...(fixture as object) }));
   const log = join(dir, "writes.jsonl");
   writeFileSync(log, "");
   const res = spawnSync(
@@ -188,6 +204,18 @@ describe("dispatch dry run over two repos", () => {
     const [, followup, dispatch] = res.plan.sessions;
     assert.ok(followup.prompt.includes("- CI failing: build: https://ci/1"));
     assert.ok(dispatch.prompt.includes("Label the PR `automerge`"));
+  });
+
+  test("prints the board: closed issues newest first with their PR, PRs with their check", () => {
+    const { stages, state, repos } = res.plan.board;
+    assert.equal(state, "normal");
+    assert.deepEqual(repos, [M, T]);
+    assert.deepEqual(
+      stages.closed.map((c: Any) => [c.repo, c.number, c.prs]),
+      [[T, 2, [7, 8]], [M, 1, undefined]],
+    );
+    // Needs review (the Dependabot PR) first, then red, then the automerge PR.
+    assert.deepEqual(stages.prInProgress.map((c: Any) => [c.number, c.check]), [[8, "green"], [9, "red"], [21, "red"], [20, "green"]]);
   });
 
   test("merges only the automerge PR, naming its repo", () =>

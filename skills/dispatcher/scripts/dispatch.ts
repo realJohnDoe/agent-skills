@@ -14,6 +14,7 @@ import { type Blocker, bodyBlockers } from "./bodyBlockers.ts";
 import {
   AUTOMERGE,
   afterMerge,
+  FAILED,
   FOLLOWUP,
   assertNever,
   blockedText,
@@ -29,6 +30,7 @@ import {
   READY,
   tierOf,
 } from "./decide.ts";
+import { type Card, type BoardPlan, buildBoard } from "./board.ts";
 import { buildDigest, readDigest, writeDigest } from "./digest.ts";
 import type { GhCheckRuns, GhComment, GhIssue, GhPull, GhReview, GhSearch } from "./github.ts";
 import {
@@ -81,7 +83,15 @@ type Session = {
 };
 type Followup = Session & { kind: "followup"; pr: number; issue: number | undefined; branch: string };
 type Dispatch = Session & { kind: "dispatch"; issue: number };
-type Merge = { repo: string; pr: number; sha: string; title: string; created: string; body: string | null };
+type Merge = {
+  repo: string;
+  pr: number;
+  sha: string;
+  title: string;
+  created: string;
+  body: string | null;
+  item: Item;
+};
 type RepoPlan = {
   repo: string;
   followups: Followup[];
@@ -214,6 +224,27 @@ main(() => {
   const merged = pick("merged");
   const unblocksOf = new Map(plans.flatMap((p) => [...p.unblocks]));
 
+  const board = buildBoard(
+    {
+      cantPush: unpushableRepos,
+      review,
+      unstick: pick("unstick"),
+      decide,
+      afterMerge,
+      triage,
+      inProgress,
+      queue: queue.map((q) => q.item),
+      notPicked,
+      automerge: automerge.filter((m) => !mergedPrs.includes(m)).map((m) => m.item),
+    } satisfies BoardPlan,
+    {
+      generated: NOW,
+      repos: repos.map((r) => r.repo),
+      digest: (state.published ?? state.draft)?.html_url ?? `https://github.com/${DIGEST}/issues`,
+      closed: latestClosed(repos),
+    },
+  );
+
   const built = buildDigest(state, {
     repos,
     review,
@@ -275,11 +306,12 @@ main(() => {
         missingLabels,
         unpushable: unpushableRepos,
         sessions: sessions.map(({ created, item, ...s }) => s),
-        automerge: automerge.map(({ created, body, ...m }) => m),
+        automerge: automerge.map(({ created, body, item, ...m }) => m),
         notStarted: [...followups, ...dispatches]
           .slice(DIGEST_ONLY ? Infinity : MAX_SESSIONS)
           .map((s) => `${s.repo}: ${s.title}`),
         digest: { ...digest, body: built.body },
+        board,
       },
       null,
       2,
@@ -327,12 +359,15 @@ function planRepo({ repo, name, path }: Repo, since: string): RepoPlan {
   const closed = stepIssues.length
     ? all<GhPull>(`repos/${repo}/pulls?state=closed&per_page=100`).filter((p) => p.merged_at)
     : [];
-  const mergedFor = (n: number) => closed.find((p) => referencedIssues(p.body).includes(n));
+  const prsFor = (n: number) => closed.filter((p) => referencedIssues(p.body).includes(n));
+  const mergedFor = (n: number) => prsFor(n)[0];
   const item = (x: GhIssue | GhPull, extra: Partial<Item>): Item => ({
     repo,
     ref: ref(x.number),
     url: x.html_url,
     title: x.title,
+    kind: "head" in x ? "pr" : "issue",
+    tier: tierOf(names(x)) as Item["tier"],
     ...extra,
   });
   const worktree = (kind: string, n: number) => join(tmpdir(), "workshop", `${name}-${kind}-${n}`);
@@ -371,7 +406,19 @@ function planRepo({ repo, name, path }: Repo, since: string): RepoPlan {
       Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 3000);
       mergeable = api<{ mergeable: boolean | null }>(`repos/${repo}/pulls/${pr.number}`).mergeable;
     }
-    const it = item(pr, { pr: pr.number, created: pr.created_at });
+    const finished = runs.length > 0 && runs.every((r) => r.status === "completed");
+    const it = item(pr, {
+      pr: pr.number,
+      created: pr.created_at,
+      tier: issue && (tierOf(names(issue)) as Item["tier"]),
+      automerge: names(pr).includes(AUTOMERGE) || !!pr.auto_merge,
+      check:
+        mergeable === false || (finished && runs.some((r) => FAILED.includes(r.conclusion ?? "")))
+          ? "red"
+          : finished
+            ? "green"
+            : "pending",
+    });
     // CI still running and no conflict: nothing to decide yet, skip the reads below.
     if (mergeable !== false && !(runs.length && runs.every((r) => r.status === "completed"))) {
       out.inProgress.push({ ...it, why: "CI running" });
@@ -402,7 +449,7 @@ function planRepo({ repo, name, path }: Repo, since: string): RepoPlan {
         out.review.push(v.why ? { ...it, why: v.why } : it);
         break;
       case "merge":
-        out.automerge.push({ repo, pr: pr.number, sha: pr.head.sha, title: pr.title, created: pr.created_at, body: pr.body });
+        out.automerge.push({ repo, pr: pr.number, sha: pr.head.sha, title: pr.title, created: pr.created_at, body: pr.body, item: it });
         break;
       case "unstick":
         out.unstick.push({ ...it, why: v.why });
@@ -467,20 +514,20 @@ function planRepo({ repo, name, path }: Repo, since: string): RepoPlan {
     });
     switch (st.kind) {
       case "afterMerge":
-        out.afterMerge.push(item(i, { issue: i.number, why: `${st.step}; merged in ${st.pr}` }));
+        out.afterMerge.push(item(i, { issue: i.number, why: `${st.step}; merged in ${st.pr}`, linkedPrs: prsFor(i.number).map((p) => p.number) }));
         break;
       case "dispatchable":
       case "elsewhere":
         break;
       case "decision":
-        out.decide.push(item(i, { issue: i.number, why: st.question }));
+        out.decide.push(item(i, { issue: i.number, why: st.question, sub: "decide" }));
         break;
       case "awaitingTriage":
-        out.triage.push(item(i, { issue: i.number, why: tierOf(names(i)) }));
+        out.triage.push(item(i, { issue: i.number, why: tierOf(names(i)), sub: "goAhead" }));
         break;
       case "blocked":
         out.notPicked.push(
-          item(i, { issue: i.number, why: blockedText(st.blockers), waiting: true }),
+          item(i, { issue: i.number, why: blockedText(st.blockers), waiting: true, sub: "blocked" }),
         );
         break;
       case "notPicked":
@@ -587,6 +634,43 @@ function planRepo({ repo, name, path }: Repo, since: string): RepoPlan {
 // The PRs merged in a repo since a date, from the search index.
 function mergedSince(repo: string, since: string) {
   return api<GhSearch>("search/issues", "-X", "GET", "-f", `q=repo:${repo} is:pr is:merged merged:>=${since}`, "-f", "per_page=100");
+}
+
+// The latest 5 issues closed as completed across the repos, each with the merged PR
+// that cross-references it: one search, then one timeline read per issue. The
+// search can't sort by closing time, so it sorts by update and this takes the
+// newest `closed_at` of a page.
+function latestClosed(repos: Repo[]): Card[] {
+  const q = `${repos.map((r) => `repo:${r.repo}`).join(" ")} is:issue is:closed reason:completed`;
+  const found = api<{ items: (GhIssue & { closed_at: string })[] }>(
+    "search/issues", "-X", "GET", "-f", `q=${q}`, "-f", "sort=updated", "-f", "per_page=30",
+  ).items;
+  return found
+    .sort((a, b) => b.closed_at.localeCompare(a.closed_at))
+    .slice(0, 5)
+    .map((i): Card => {
+      const repo = i.repository_url!.replace(/^.*\/repos\//, "");
+      const events = all<{ event: string; source?: { issue?: { number: number; pull_request?: { merged_at: string | null } } } }>(
+        `repos/${repo}/issues/${i.number}/timeline?per_page=100`,
+      );
+      const prs = [
+        ...new Set(
+          events
+            .filter((e) => e.event === "cross-referenced" && e.source?.issue?.pull_request?.merged_at)
+            .map((e) => e.source!.issue!.number),
+        ),
+      ];
+      return {
+        repo,
+        kind: "issue",
+        number: i.number,
+        title: i.title,
+        url: i.html_url,
+        ...(tierOf(names(i)) && { tier: tierOf(names(i)) as Card["tier"] }),
+        ...(prs.length && { prs }),
+        reason: `closed ${i.closed_at.slice(0, 10)}${prs.length ? ` by ${prs.map((n) => `${repo}#${n}`).join(", ")}` : ""}`,
+      };
+    });
 }
 
 // The lines that put a session in its own worktree of its repo's clone.

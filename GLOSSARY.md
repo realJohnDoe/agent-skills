@@ -25,7 +25,7 @@ Where an issue or PR stands in the workshop's flow: Stuck, Waiting, Queue, PR in
 _Avoid_: Column, status
 
 **Stuck**:
-The stage for work the workshop can't move without the maintainer stepping in. That covers a PR at its follow-up cap, a stale follow-up, a dispatched issue with no PR, and a repo it can't push to.
+The stage for work the workshop can't move without the maintainer stepping in. That covers a PR at its follow-up cap, a stale follow-up and a dispatched issue with no PR. A repo it can't push to shows as a banner, not a Stuck card.
 _Avoid_: Blocked, failed
 
 **Parked**:
