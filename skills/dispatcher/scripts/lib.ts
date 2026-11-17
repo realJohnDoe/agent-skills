@@ -109,12 +109,11 @@ const startedIn = () => {
 };
 
 /**
- * Stops the run, naming every attached repo that can't be pushed to. A dry-run
- * push writes nothing. A repo attached read-only is a mistake to fix, not one to
- * skip quietly.
+ * The attached repos that can't be pushed to, each with its reason. A dry-run
+ * push writes nothing.
  */
-export const preflight = (repos: Repo[]) => {
-  const problems = [];
+export const unpushable = (repos: Repo[]) => {
+  const out: { repo: string; reason: string }[] = [];
   for (const r of repos) {
     try {
       run("git", [
@@ -128,16 +127,27 @@ export const preflight = (repos: Repo[]) => {
       ]);
     } catch (e) {
       const err = e as { stderr?: Buffer | string; message: string };
-      problems.push(
-        `${r.repo}: can't push (${(err.stderr || err.message).toString().trim().split("\n").at(-1)})`,
-      );
+      out.push({
+        repo: r.repo,
+        reason: `can't push (${(err.stderr || err.message).toString().trim().split("\n").at(-1)})`,
+      });
     }
   }
+  return out;
+};
+
+/**
+ * Stops the run, naming every attached repo that can't be pushed to. For a script
+ * that has nothing to say about a repo it can't write to (`pause.ts`).
+ */
+export const preflight = (repos: Repo[]) => {
+  const problems = unpushable(repos).map((u) => `${u.repo}: ${u.reason}`);
   if (problems.length)
     throw new Error(
       `The workshop can't run on every attached repo:\n- ${problems.join("\n- ")}\nGive the session push access to the repo, or detach it.`,
     );
 };
+
 
 // Runs main(), turning a thrown error into one clear line and exit code 1.
 export const main = (fn: () => void) => {

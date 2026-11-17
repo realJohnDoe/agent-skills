@@ -43,7 +43,7 @@ import {
   main,
   names,
   post,
-  preflight,
+  unpushable,
 } from "./lib.ts";
 
 const APPLY = flag("--apply");
@@ -120,13 +120,18 @@ const lookup = ({ repo, number }: Blocker) => {
 
 main(() => {
   const { digest: DIGEST, repos } = loadConfig();
-  preflight(repos);
+  // A repo it can't push to gets no writes and a digest entry, not a stopped run.
+  const unpushableRepos = unpushable(repos);
+  const noPush = new Set(unpushableRepos.map((u) => u.repo));
 
   // The digest's state is read first: its window bounds "merged since".
   const state = readDigest(DIGEST, TODAY);
   const { since } = state;
 
-  const first = repos.map((r) => planRepo(r, since));
+  const first = repos.map((r) => {
+    const p = planRepo(r, since);
+    return noPush.has(r.repo) ? { ...p, automerge: [], followups: [], dispatches: [], missingLabels: [] } : p;
+  });
   const automerge = first.flatMap((p) => p.automerge);
   const digestLabels = all<{ name: string }>(`repos/${DIGEST}/labels?per_page=100`).map((l) => l.name);
   const missingLabels = [
@@ -189,7 +194,16 @@ main(() => {
     ...pick("inProgress"),
   ];
   const review = pick("review");
-  const unstick = pick("unstick");
+  const unstick = [
+    ...unpushableRepos.map((u) => ({
+      repo: u.repo,
+      ref: u.repo,
+      url: `https://github.com/${u.repo}`,
+      title: u.reason,
+      ask: "Can't push:",
+    })),
+    ...pick("unstick"),
+  ];
   const decide = pick("decide");
   const afterMerge = pick("afterMerge");
   const triage = pick("triage");
@@ -256,6 +270,7 @@ main(() => {
         applied: APPLY,
         repos: repos.map((r) => r.repo),
         missingLabels,
+        unpushable: unpushableRepos,
         sessions: sessions.map(({ created, item, ...s }) => s),
         automerge: automerge.map(({ created, body, ...m }) => m),
         deferred: [...followups, ...dispatches]

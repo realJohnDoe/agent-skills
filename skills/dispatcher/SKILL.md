@@ -9,7 +9,7 @@ The `timetable` skill starts the dispatcher on the ticks its table names (`scrip
 
 ## The run
 
-0. **Every attached repo must have push access.** The scripts check this first and stop with an error naming each repo they can't push to. Don't work around it by skipping the repo: tell the user which repo, and why.
+0. **Every attached repo should have push access.** `pause.ts` stops with an error naming each repo it can't push to. `dispatch.ts` instead skips every write to such a repo (no labels, merges, sessions, follow-ups or claims; its sessions don't count towards `--max-sessions`), lists it under `unpushable` with the reason, puts a **Can't push** entry at the top of the digest's **Unstick** and counts it there, then carries on with the healthy repos. Notify the user which repo, and why.
 1. `node scripts/pause.ts` and act on its `state` (see **Pausing**). Anything but `normal` ends this procedure after that section's steps.
 2. `node scripts/dispatch.ts` is the **dry run**: it prints the plan as JSON and writes nothing. Read it before applying.
 3. `node scripts/dispatch.ts --apply` does what the plan says. It creates any workshop label a repo is missing (`missingLabels`), and merges the `automerge` PRs. It then reads again each repo where something merged, so the rest of the run sees the merge, and claims what the plan starts: it assigns each dispatched issue and leaves a `workshop-dispatch` marker comment, and leaves a `workshop-followup` marker comment on each PR it follows up. Then it rewrites the draft digest and publishes it when due. It prints the plan, which differs from the dry run's only where a merge changed it.
@@ -17,7 +17,7 @@ The `timetable` skill starts the dispatcher on the ticks its table names (`scrip
 5. For each entry in `digest.replies` (the maintainer replying on the digest), work out which issue or PR it is about. Digest items are named `owner/repo#n`. Copy the decision onto that issue or PR in its own repo, as a comment linking the reply. If it answers the issue's `## Decision needed` section, also add a `**Decided:** <answer> ([reply](<link>))` line at the end of that section, so the issue body stays the spec. A `ready` reply naming items adds `ready-for-agent` to each, but only when the reply's `author` is the digest repo's owner: that label is the maintainer's go-ahead, and nobody else's reply grants it. Skip a reply already copied there. Then comment `<!-- workshop-relayed -->` on that digest issue, with the footer, so the next run doesn't relay it again. A reply that names no item gets an answer on the digest instead.
 6. Don't subscribe to PR activity, yours or the sessions'. Tomorrow's run is the follow-up. Don't open PRs or issues yourself beyond what the script writes and what the subagents open.
 7. Check each **In progress** issue that says "no PR yet" and was dispatched before today: look for an open or merged PR on its `claude/issue-<n>` branch. If one exists, its description names the wrong issue. Notify the maintainer with both links, and don't call the run quiet.
-8. If `sessions`, `automerge` and `digest.replies` are all empty and step 7 found nothing, stop. Post nothing.
+8. If `sessions`, `automerge`, `unpushable` and `digest.replies` are all empty and step 7 found nothing, stop. Post nothing.
 
 ### Dry run
 
@@ -25,12 +25,12 @@ When the prompt asks for a dry run (for example after adding a repo), **write no
 
 1. Run `node scripts/pause.ts` and report its `state`. If it is `drain` or `resume`, also report what its plan would defer, unassign, close or mark ready.
 2. Run `node scripts/dispatch.ts` (with `--followups-only` if the state is `drain`) and report the plan as a short summary for the user:
-   - the repos it found attached, and the labels each would get created (`missingLabels`);
+   - the repos it found attached, the labels each would get created (`missingLabels`), and the repos it can't push to (`unpushable`);
    - each session with its repo, kind, issue or PR, and tier, then what's left over (`deferred`);
    - the PRs that would be merged (`automerge`);
    - the digest counts, whether it would be published, and the replies that would be relayed;
    - the digest body as it would be written.
-3. Stop. If a script fails, report its error as it is: a repo that isn't checked out or can't be pushed to is exactly what a dry run is for finding.
+3. Stop. If a script fails, report its error as it is: a repo that isn't checked out is exactly what a dry run is for finding.
 
 Each repo's own rules (how to build and check, PR template, label meanings beyond the ones below) stay in that repo's `CLAUDE.md` and docs. The session prompts point there, and nothing in this skill is specific to one repo.
 
@@ -84,7 +84,7 @@ The two decisions that change what lands on a default branch are in `scripts/dec
 - **Caps**: at most `--max-sessions` (4) sessions per run **across all repos**. Follow-ups come first, then dispatches. Follow-ups go newest PR first, dispatches newest issue first, whichever repo they're in. At most `--max-followups` (2) follow-ups per PR. After that the PR goes in the digest instead.
 - **Digest**: one draft issue in the `digest` repo, `Workshop digest (draft) — from <date>`. It is rewritten on every run (an edit notifies nobody). Every item names its repo as `owner/repo#n`. It lists what waits on the maintainer, PRs first:
   - **Review**: green, quiet PRs without `automerge`, Dependabot majors among them.
-  - **Unstick**: PRs at their follow-up cap, a follow-up with no push after 2 days, and a dispatched issue with no PR after 2 days.
+  - **Unstick**: PRs at their follow-up cap, a follow-up with no push after 2 days, and a dispatched issue with no PR after 2 days. An attached repo the run can't push to comes first, as **Can't push:** with the reason.
   - **Waiting on you**: first issues with an open question (**Decide:**, showing the question), then issues whose PR has merged and that have an `## After merge` section (**After merge:**, showing its first paragraph and the merged PR), then unblocked tier-labelled ones without `ready-for-agent` that only need the go-ahead (**Go ahead?**, showing the tier). Agents file most of these, and nothing runs until the maintainer says so.
 
   Each ask says which issues it unblocks. Then comes what's coming: **In progress** (this run's sessions, follow-ups past the cap, PRs waiting on CI, a follow-up or mergeability, and dispatched issues with no PR yet, so every open non-draft PR shows somewhere), **Queue** (dispatchable issues past today's cap) and **Not picked up**. Blocked and `deferred` issues are only counted, in a collapsed list. Last, also collapsed, is what merged in each repo since the draft opened.

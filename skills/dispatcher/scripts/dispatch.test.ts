@@ -345,11 +345,21 @@ describe("the repos are the ones attached", () => {
 });
 
 describe("dispatch stops on a repo it can't work on", () => {
-  test("can't be pushed to", () => {
+  test("can't be pushed to: skipped, listed and in the digest, the others go on", () => {
     const res = run("dispatch.ts", [], world(), { apply: true, noPush: [M] });
-    assert.equal(res.status, 1);
-    assert.match(res.stderr, /realJohnDoe\/meridian: can't push/);
-    assert.deepEqual(res.writes, []);
+    assert.equal(res.status, 0, res.stderr);
+    assert.equal(res.plan.unpushable.length, 1);
+    assert.equal(res.plan.unpushable[0].repo, M);
+    assert.match(res.plan.unpushable[0].reason, /^can't push/);
+    assert.deepEqual(
+      res.writes.filter((w: Any) => JSON.stringify(w).includes(`repos/${M}/`)),
+      [],
+    );
+    assert.ok(res.plan.sessions.length > 0);
+    assert.ok(res.plan.sessions.every((s: Any) => s.repo === T));
+    assert.ok(res.plan.automerge.every((m: Any) => m.repo === T));
+    assert.match(res.plan.digest.body, /## Unstick\n\n- \[ \] \*\*Can't push:\*\* \[realJohnDoe\/meridian\]/);
+    assert.ok(res.plan.digest.counts.unstick >= 1);
   });
   test("--repos limits the run to one attached repo", () => {
     const res = run("dispatch.ts", ["--repos", M], world());
