@@ -24,7 +24,7 @@ The `workshop-paused` label on an open digest (the `dispatcher` skill's **Pausin
 
 ## Configuring
 
-**The workshop's repos are the ones attached to the `Timetable` routine**, with push access. Every task covers all of them. Create the routine at https://claude.ai/code/scheduled: the cron above, the `model` of the `dispatcher` entry, and the prompt "Run the `timetable` skill."
+**The workshop's repos are the ones attached to the `Timetable` routine**, with push access. Every task covers all of them. Create the routine at https://claude.ai/code/scheduled: the cron above, the `model` of the `dispatcher` entry, and the prompt `Run /joes-workshop:timetable`. Use the full plugin-qualified name there and in the `prompt` of each `TABLE` entry, so a session with other plugins installed can't pick a different skill of the same name.
 
 ## Developing
 

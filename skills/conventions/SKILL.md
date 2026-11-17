@@ -66,8 +66,7 @@ Close the issue from the body with `Fixes #n`. For an issue with an `## After me
 |---|---|---|---|
 | `haiku` / `sonnet` / `opus` | issue | whoever files it | The model a session runs on, once the issue is approved and unblocked |
 | `plan` | issue | whoever files it | A plan spanning several PRs, alongside a tier label; never dispatched |
-| `ready-for-agent` | issue | the maintainer | The go-ahead; with a tier label, the issue is dispatched once unblocked |
-| `deferred` | issue, PR | the maintainer, or a workshop pause | Parked on purpose; listed under Not picked up until removed |
+| `ready-for-agent` | issue | the maintainer | The go-ahead; with a tier label, the issue is dispatched once unblocked; removing it parks the issue under Go ahead? |
 | `automerge` | PR | whoever opens it; a repo's Dependabot workflow for non-major bumps | Merged by the dispatcher once green and quiet |
 | `preview` | PR | whoever opens a PR that changes what a page looks like; the maintainer on any PR | Deploys a live preview of the PR, in a repo with PR previews |
 

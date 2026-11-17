@@ -12,20 +12,20 @@ const DAYS: readonly Day[] = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 export const TICKS: Record<Tick, number> = { am: 5, pm: 17 };
 
 export const TABLE: readonly Entry[] = [
-  { skill: "dispatcher", days: DAYS, tick: "am", model: "sonnet", prompt: "Run the `dispatcher` skill." },
+  { skill: "dispatcher", days: DAYS, tick: "am", model: "sonnet", prompt: "Run the `joes-workshop:dispatcher` skill." },
   {
     skill: "surveys",
     days: DAYS,
     tick: "pm",
     model: "opus",
-    prompt: "Run the `surveys` skill's **Starting the next survey** over every attached repo.",
+    prompt: "Run the `joes-workshop:surveys` skill's **Starting the next survey** over every attached repo.",
   },
   {
     skill: "dependency-maintenance",
     days: ["mon"],
     tick: "am",
     model: "opus",
-    prompt: "Run the `dependency-maintenance` skill over all attached repos.",
+    prompt: "Run the `joes-workshop:dependency-maintenance` skill over all attached repos.",
   },
 ];
 
