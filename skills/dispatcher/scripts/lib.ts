@@ -54,6 +54,13 @@ export type Item = {
   issue?: number;
   pr?: number;
   created?: string;
+  // What the workshop board shows; the digest ignores them.
+  kind?: "issue" | "pr";
+  tier?: "haiku" | "sonnet" | "opus";
+  check?: "green" | "red" | "pending";
+  automerge?: boolean;
+  linkedPrs?: number[]; // the PRs an issue's step waits on
+  sub?: "decide" | "goAhead" | "blocked"; // why an issue waits
 };
 export type Repo = { repo: string; name: string; path: string };
 
