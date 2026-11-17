@@ -15,7 +15,7 @@ export const TABLE: readonly Entry[] = [
   { skill: "dispatcher", days: DAYS, tick: "am", model: "sonnet", prompt: "Run the `joes-workshop:dispatcher` skill." },
   {
     skill: "surveys",
-    days: DAYS,
+    days: ["mon", "wed", "fri"],
     tick: "pm",
     model: "opus",
     prompt: "Run the `joes-workshop:surveys` skill's **Starting the next survey** over every attached repo.",

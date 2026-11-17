@@ -31,7 +31,12 @@ describe("due", () => {
     assert.equal(due(new Date("2026-11-16T05:00Z"), false).run[1].model, "opus");
   });
   test("other mornings: the dispatcher only", () => assert.deepEqual(skills("2026-11-17T05:02Z"), ["dispatcher"]));
-  test("every evening: the survey run", () => assert.deepEqual(skills("2026-11-21T17:00Z"), ["surveys"]));
+  test("Monday, Wednesday and Friday evenings: the survey run", () => {
+    for (const d of ["16", "18", "20"]) assert.deepEqual(skills(`2026-11-${d}T17:00Z`), ["surveys"]);
+  });
+  test("other evenings: nothing", () => {
+    for (const d of ["17", "19", "21", "22"]) assert.deepEqual(skills(`2026-11-${d}T17:00Z`), []);
+  });
   test("paused: only the dispatcher runs, and the rest are held", () => {
     assert.deepEqual(skills("2026-11-16T05:00Z", true), ["dispatcher"]);
     assert.deepEqual(due(new Date("2026-11-16T05:00Z"), true).held, ["dependency-maintenance"]);
