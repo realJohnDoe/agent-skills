@@ -14,7 +14,6 @@ import {
   afterMerge,
   DEFERRED,
   FOLLOWUP,
-  AGENT,
   assertNever,
   blockedText,
   type ResolvedBlocker,
@@ -29,8 +28,10 @@ import {
   READY,
   tierOf,
 } from "./decide.ts";
+import { buildDigest, readDigest, writeDigest } from "./digest.ts";
 import type { GhCheckRuns, GhComment, GhIssue, GhPull, GhReview, GhSearch } from "./github.ts";
 import {
+  type Item,
   type Repo,
   FOOTER,
   PAUSE_LABEL,
@@ -50,15 +51,10 @@ const FOLLOWUPS_ONLY = flag("--followups-only"); // drain: merge and follow up, 
 const MAX_SESSIONS = Number(arg("--max-sessions", 4)); // across all repos
 const MAX_FOLLOWUPS = Number(arg("--max-followups", 2)); // per PR
 const STALE_DAYS = 2; // a claim or follow-up with nothing to show after this is stuck
-// The digest is published on the first run of these days.
-const DIGEST_WEEKDAYS = [2, 5]; // Tue, Fri (UTC getDay)
-const DIGEST_DAYS = 2.5; // minimum window, so a second run that day doesn't publish again
 const TODAY = new Date(arg("--today", new Date().toISOString().slice(0, 10)));
 // When this run's digest window ends; a new digest's window starts here.
 const NOW = arg("--today") ? TODAY.toISOString() : new Date().toISOString();
-const DIGEST_PREFIX = "Workshop digest";
 const DISPATCH = "<!-- workshop-dispatch -->";
-const RELAYED = "<!-- workshop-relayed -->"; // digest replies up to here are copied to their issues
 // Created in each repo on first contact if missing.
 const LABELS: Record<string, string> = {
   haiku: "c5def5",
@@ -71,18 +67,6 @@ const LABELS: Record<string, string> = {
   preview: "1d76db",
 };
 const days = (iso: string) => (+TODAY - +new Date(iso)) / 864e5;
-type Item = {
-  repo: string;
-  ref: string;
-  url: string;
-  title: string;
-  why?: string;
-  ask?: string;
-  waiting?: boolean; // Not picked up, but only counted in the digest
-  issue?: number;
-  pr?: number;
-  created?: string;
-};
 type Dated = { repo: string; created: string };
 type Session = {
   repo: string;
@@ -139,17 +123,9 @@ main(() => {
   const { digest: DIGEST, repos } = loadConfig();
   preflight(repos);
 
-  // --- The shared digest's state, read first: its window bounds "merged since".
-  const digests = all<GhIssue>(`repos/${DIGEST}/issues?state=open&per_page=100`)
-    .filter((i) => !i.pull_request && isDigest(i.title))
-    .sort((a, b) => a.number - b.number);
-  const isDraft = (i: GhIssue) => i.title.includes("(draft)");
-  const draft = digests.findLast(isDraft);
-  const published = digests.findLast((i) => !isDraft(i));
-  const marker = /<!-- digest-(?:date|since): (\S+) -->/;
-  const since =
-    (draft ?? published)?.body?.match(marker)?.[1] ??
-    new Date(+TODAY - DIGEST_DAYS * 864e5).toISOString().slice(0, 10);
+  // The digest's state is read first: its window bounds "merged since".
+  const state = readDigest(DIGEST, TODAY);
+  const { since } = state;
 
   const first = repos.map((r) => planRepo(r, since));
   const automerge = first.flatMap((p) => p.automerge);
@@ -207,105 +183,29 @@ main(() => {
   const merged = pick("merged");
   const unblocksOf = new Map(plans.flatMap((p) => [...p.unblocks]));
 
-  // --- Digest ---------------------------------------------------------------
-  // One issue per digest cycle, in the digest repo. Its body is rewritten on
-  // every run (an edit notifies nobody); publishing it is the ping. Every item
-  // names its repo with a full reference, so links resolve from here.
-  const line = (x: Item, ask?: string) => {
-    const unblocks = ask ? (unblocksOf.get(x.ref) ?? []) : [];
-    const why = [x.why, ...(unblocks.length ? [`unblocks ${unblocks.join(", ")}`] : [])]
-      .filter(Boolean)
-      .join("; ");
-    return `- ${ask ? `[ ] **${ask}** ` : ""}[${x.ref}](${x.url}) ${x.title}${why ? ` (${why})` : ""}`;
-  };
-  const section = (h: string, xs: Item[], ask?: string) =>
-    xs.length ? [`## ${h}`, "", ...xs.map((x) => line(x, x.ask ?? ask)), ""] : [];
-  const ANSWER =
-    "Answer on the issue or PR, or reply here naming the item (e.g. `meridian#12`): the next daily run copies replies onto their issues.";
-  const NOTE = `_The draft digest is rewritten by every daily run and published on Tuesdays and Fridays. ${ANSWER}_\n\n`;
-  // PRs first: they are finished work, and go stale while they wait.
-  const asks = [
-    ...section("Review", review, "Review:"),
-    ...section("Unstick", unstick, "Unstick:"),
-    // Questions first: an answer is real work, a go-ahead is a glance.
-    ...section(
-      `Waiting on you (answer a question, or reply \`ready\` naming items to add \`${READY}\`)`,
-      [
-        ...decide.map((x) => ({ ...x, ask: "Decide:" })),
-        ...afterMerge.map((x) => ({ ...x, ask: "After merge:" })),
-        ...triage.map((x) => ({ ...x, ask: "Go ahead?" })),
-      ],
-    ),
-  ];
-  // Issues that wait on another issue, a decision or the maintainer's own
-  // `deferred` would repeat in every digest, so they are only counted.
-  const waiting = notPicked.filter((x) => x.waiting);
-  const info = [
-    ...section("In progress", inProgress),
-    ...section("Queue (dispatched next, oldest first)", queue.map((q) => q.item)),
-    ...section("Not picked up", notPicked.filter((x) => !x.waiting)),
-    ...(waiting.length
-      ? [
-          `<details><summary>${waiting.length} items waiting on a blocker, a decision or <code>deferred</code></summary>`,
-          "",
-          ...waiting.map((x) => line(x)),
-          "",
-          "</details>",
-          "",
-        ]
-      : []),
-  ];
-  const render = (start: string, mergedLines: string[], prev?: number | null) =>
-    `<!-- digest-since: ${start} -->\n\n${NOTE}${
-      [...asks, ...info].join("\n") || "Nothing is waiting on the maintainer.\n"
-    }\nRepos covered: ${repos.map((r) => r.repo).join(", ")}.\n${prev ? `\nPrevious digest: #${prev}.\n` : ""}${
-      mergedLines.length
-        ? `\n<details><summary>${mergedLines.length} merged since ${start.slice(0, 10)}</summary>\n\n${mergedLines.join("\n")}\n\n</details>\n`
-        : ""
-    }`.trim() + FOOTER;
-  const body = render(since, merged, published?.number);
-  // A quiet cycle (nothing merged, nothing to act on) stays a draft.
-  const publish =
-    !FOLLOWUPS_ONLY &&
-    !!draft &&
-    days(since) >= DIGEST_DAYS &&
-    DIGEST_WEEKDAYS.includes(new Date(NOW).getUTCDay()) &&
-    (merged.length > 0 || asks.length > 0);
-  // Maintainer replies on either digest not yet copied onto their issues.
-  const replies = [draft, published].filter((d) => d !== undefined).flatMap((d) => {
-    const cs = all<GhComment>(`repos/${DIGEST}/issues/${d.number}/comments?per_page=100`);
-    const relayedAt = cs.findLast((c) => marked(c, RELAYED))?.created_at ?? "";
-    return cs
-      .filter(
-        (c) =>
-          c.created_at > relayedAt &&
-          c.user.type !== "Bot" &&
-          !AGENT.test(c.body),
-      )
-      .map((c) => ({
-        digest: d.number,
-        url: c.html_url,
-        author: c.user.login,
-        body: c.body,
-      }));
+  const built = buildDigest(state, {
+    repos,
+    review,
+    unstick,
+    decide,
+    afterMerge,
+    triage,
+    inProgress,
+    queue: queue.map((q) => q.item),
+    notPicked,
+    merged,
+    unblocksOf,
+    today: TODAY,
+    now: NOW,
+    followupsOnly: FOLLOWUPS_ONLY,
   });
   const digest = {
     repo: DIGEST,
-    draft: draft?.number ?? null,
-    published: published?.number ?? null,
-    publish,
-    replies,
-    counts: {
-      decide: decide.length,
-      afterMerge: afterMerge.length,
-      review: review.length,
-      unstick: unstick.length,
-      triage: triage.length,
-      inProgress: inProgress.length,
-      queue: queue.length,
-      notPicked: notPicked.length,
-      merged: merged.length,
-    },
+    draft: state.draft?.number ?? null,
+    published: state.published?.number ?? null,
+    publish: built.publish,
+    replies: built.replies,
+    counts: built.counts,
   };
 
   // --- Apply ----------------------------------------------------------------
@@ -328,43 +228,10 @@ main(() => {
       }
     }
     if (!FOLLOWUPS_ONLY) {
-      const newDraft = (start: string, b: string) =>
-        JSON.parse(
-          post(`repos/${DIGEST}/issues`, {
-            title: `${DIGEST_PREFIX} (draft) — from ${start.slice(0, 10)}`,
-            body: b,
-          }),
-        ).number;
-      const d = draft?.number ?? newDraft(since, body);
-      if (draft && draft.body !== body)
-        post(`repos/${DIGEST}/issues/${d}`, { body }, "PATCH");
-      if (publish) {
-        post(
-          `repos/${DIGEST}/issues/${d}`,
-          // A published digest is no draft: keep only where to answer.
-          {
-            title: `${DIGEST_PREFIX} — ${NOW.slice(0, 10)}`,
-            body: body.replace(NOTE, `_${ANSWER}_\n\n`),
-          },
-          "PATCH",
-        );
-        // A title or body edit notifies nobody; this comment is the ping.
-        const { decide: x, review: r, unstick: u, merged: m } = digest.counts;
-        post(`repos/${DIGEST}/issues/${d}/comments`, {
-          body: `Published: ${r} to review, ${u} to unstick, ${x} to decide, ${m} merged.${FOOTER}`,
-        });
-        if (published) {
-          post(`repos/${DIGEST}/issues/${published.number}/comments`, {
-            body: `Superseded by #${d}.${FOOTER}`,
-          });
-          post(
-            `repos/${DIGEST}/issues/${published.number}`,
-            { state: "closed", state_reason: "completed" },
-            "PATCH",
-          );
-        }
-        digest.draft = newDraft(NOW, render(NOW, [], d));
-        digest.published = d;
+      const w = writeDigest(state, built, NOW);
+      if (built.publish) {
+        digest.draft = w.draft;
+        digest.published = w.published;
       }
     }
   }
@@ -380,7 +247,7 @@ main(() => {
         deferred: [...followups, ...dispatches]
           .slice(MAX_SESSIONS)
           .map((s) => `${s.repo}: ${s.title}`),
-        digest: { ...digest, body },
+        digest: { ...digest, body: built.body },
       },
       null,
       2,

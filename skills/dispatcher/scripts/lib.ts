@@ -43,6 +43,18 @@ export const names = (x: { labels: (string | { name: string })[] }): string[] =>
  * working directory itself when that isn't a clone): the repos attached to the
  * session. `--repos a/b,c/d` limits the run to some of them.
  */
+export type Item = {
+  repo: string;
+  ref: string;
+  url: string;
+  title: string;
+  why?: string;
+  ask?: string;
+  waiting?: boolean; // Not picked up, but only counted in the digest
+  issue?: number;
+  pr?: number;
+  created?: string;
+};
 export type Repo = { repo: string; name: string; path: string };
 
 export const loadConfig = (): { digest: string; checkouts: string; repos: Repo[] } => {
