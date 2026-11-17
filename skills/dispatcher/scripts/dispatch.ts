@@ -14,7 +14,6 @@ import { type Blocker, bodyBlockers } from "./bodyBlockers.ts";
 import {
   AUTOMERGE,
   afterMerge,
-  DEFERRED,
   FOLLOWUP,
   assertNever,
   blockedText,
@@ -64,7 +63,6 @@ const LABELS: Record<string, string> = {
   sonnet: "0075ca",
   opus: "5319e7",
   plan: "d4c5f9",
-  deferred: "cccccc",
   [READY]: "0e8a16",
   [AUTOMERGE]: "0e8a16",
   preview: "1d76db",
@@ -278,7 +276,7 @@ main(() => {
         unpushable: unpushableRepos,
         sessions: sessions.map(({ created, item, ...s }) => s),
         automerge: automerge.map(({ created, body, ...m }) => m),
-        deferred: [...followups, ...dispatches]
+        notStarted: [...followups, ...dispatches]
           .slice(DIGEST_ONLY ? Infinity : MAX_SESSIONS)
           .map((s) => `${s.repo}: ${s.title}`),
         digest: { ...digest, body: built.body },
@@ -358,10 +356,6 @@ function planRepo({ repo, name, path }: Repo, since: string): RepoPlan {
   // --- PR follow-up ---------------------------------------------------------
   // Ours to follow up: every non-draft PR (draft = keep out of the workshop).
   for (const pr of prs.filter((p) => !p.draft)) {
-    if (names(pr).includes("deferred")) {
-      out.notPicked.push(item(pr, { pr: pr.number, created: pr.created_at, why: DEFERRED, waiting: true }));
-      continue;
-    }
     const issue = referencedIssues(pr.body)
       .map((n) => byNumber.get(n))
       .find((i) => i && tierOf(names(i)));
@@ -483,9 +477,6 @@ function planRepo({ repo, name, path }: Repo, since: string): RepoPlan {
         break;
       case "awaitingTriage":
         out.triage.push(item(i, { issue: i.number, why: tierOf(names(i)) }));
-        break;
-      case "deferred":
-        out.notPicked.push(item(i, { issue: i.number, why: DEFERRED, waiting: true }));
         break;
       case "blocked":
         out.notPicked.push(

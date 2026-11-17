@@ -96,8 +96,8 @@ export function buildDigest({ repo, draft, published, since }: DigestState, plan
       ],
     ),
   ];
-  // Issues that wait on another issue, a decision or the maintainer's own
-  // `deferred` would repeat in every digest, so they are only counted.
+  // Issues that wait on another issue, or a decision
+  // would repeat in every digest, so they are only counted.
   const waiting = notPicked.filter((x) => x.waiting);
   const info = [
     ...section("In progress", inProgress),
@@ -105,7 +105,7 @@ export function buildDigest({ repo, draft, published, since }: DigestState, plan
     ...section("Not picked up", notPicked.filter((x) => !x.waiting)),
     ...(waiting.length
       ? [
-          `<details><summary>${waiting.length} items waiting on a blocker, a decision or <code>deferred</code></summary>`,
+          `<details><summary>${waiting.length} items waiting on a blocker or a decision</summary>`,
           "",
           ...waiting.map((x) => line(x)),
           "",

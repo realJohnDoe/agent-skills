@@ -42,7 +42,7 @@ const pr = (n: number, title: string, extra: Any = {}) => ({
   created_at: "2026-10-01T00:00:00Z",
   ...extra,
 });
-const ALL_LABELS = ["haiku", "sonnet", "opus", "plan", "deferred", "ready-for-agent", "automerge", "preview"].map(
+const ALL_LABELS = ["haiku", "sonnet", "opus", "plan", "ready-for-agent", "automerge", "preview"].map(
   (name) => ({ name }),
 );
 const green = [{ name: "build", status: "completed", conclusion: "success" }];
@@ -169,7 +169,7 @@ describe("dispatch dry run over two repos", () => {
         ["dispatch", T, 4],
       ],
     );
-    assert.deepEqual(res.plan.deferred, [
+    assert.deepEqual(res.plan.notStarted, [
       `${M}: meridian#10 Meridian sonnet task`,
       `${T}: tracemap#3 Tracemap haiku task`,
     ]);
@@ -195,7 +195,7 @@ describe("dispatch dry run over two repos", () => {
 
   test("lists the labels each repo is missing", () =>
     assert.deepEqual(res.plan.missingLabels, [
-      { repo: T, missing: ["opus", "plan", "deferred", "automerge", "preview"] },
+      { repo: T, missing: ["opus", "plan", "automerge", "preview"] },
     ]));
 
   test("one digest naming every item's repo", () => {
@@ -226,7 +226,7 @@ describe("dispatch apply", () => {
 
   test("creates missing labels first, in the repo missing them", () => {
     const created = writes("POST", `repos/${T}/labels`).map((w) => w.body.name);
-    assert.deepEqual(created, ["opus", "plan", "deferred", "automerge", "preview"]);
+    assert.deepEqual(created, ["opus", "plan", "automerge", "preview"]);
     assert.equal(res.writes[0].path, `repos/${T}/labels`);
     assert.equal(writes("POST", `repos/${M}/labels`).length, 0);
   });
@@ -267,7 +267,7 @@ describe("dispatch --apply --digest-only", () => {
     assert.match(digests[0].body.title, /^Workshop digest \(draft\) — from /);
     assert.match(digests[0].body.body, /realJohnDoe\/meridian#13/);
     assert.deepEqual(res.plan.sessions, []);
-    assert.deepEqual(res.plan.deferred, []);
+    assert.deepEqual(res.plan.notStarted, []);
     assert.doesNotMatch(res.plan.digest.body, /\(dispatched\)/);
   });
 
@@ -433,7 +433,7 @@ describe("dispatch stops on a repo it can't work on", () => {
   });
 });
 
-describe("cross-repo blockers and deferred PRs", () => {
+describe("cross-repo blockers", () => {
   const X = "realJohnDoe/other";
   const open = (n: number, title: string, extra: Any = {}) =>
     issue(n, title, ["sonnet", "ready-for-agent"], { created_at: "2026-10-01T00:00:00Z", ...extra });
@@ -488,21 +488,6 @@ describe("cross-repo blockers and deferred PRs", () => {
     assert.ok(!dispatched(res).includes(15));
     assert.match(res.plan.digest.body, /Waits natively \(blocked by realJohnDoe\/other#10\)/);
   });
-
-  test("a green automerge PR labelled deferred is not merged, and is listed as not picked up", () => {
-    const res = plan(
-      [],
-      [
-        pr(22, "Deferred green", { labels: [{ name: "automerge" }, { name: "deferred" }], runs: green, mergeable: true }),
-        pr(23, "Deferred red", { labels: [{ name: "deferred" }], runs: red, mergeable: true }),
-      ],
-    );
-    assert.equal(res.status, 0, res.stderr);
-    assert.deepEqual(res.plan.automerge.map((m: Any) => m.pr), [20]);
-    assert.ok(!res.plan.sessions.some((s: Any) => s.repo === M && s.pr === 23));
-    assert.match(res.plan.digest.body, /\[realJohnDoe\/meridian#22\]\(\S+\) Deferred green \(`deferred`; remove the label to queue it\)/);
-    assert.match(res.plan.digest.body, /\[realJohnDoe\/meridian#23\]\(\S+\) Deferred red \(`deferred`/);
-  });
 });
 
 describe("pause over two repos", () => {
@@ -543,6 +528,66 @@ describe("pause over two repos", () => {
   test("without a digest the workshop runs normally", () => {
     const res = run("pause.ts", [], world());
     assert.equal(res.plan.state, "normal");
+  });
+});
+
+describe("pause drain closes red PRs", () => {
+  const draft = { number: 50, title: "Workshop digest (draft) — from 2026-11-10", labels: [{ name: "workshop-paused" }], body: "" };
+  const linkedIssue = (n: number, tier: string) =>
+    issue(n, `Issue ${n}`, [tier, "ready-for-agent"], { assignees: [{ login: "workshop-bot" }] });
+  const prs = [
+    pr(30, "Red sonnet", { body: "Fixes #60", runs: red, mergeable: true }),
+    pr(31, "Red opus", { body: "Fixes #61", runs: red, mergeable: true }),
+    pr(32, "Green sonnet", { body: "Fixes #62", runs: green, mergeable: true }),
+    pr(33, "Conflicting sonnet", { body: "Fixes #63", runs: green, mergeable: false }),
+  ];
+  const issues = [60, 62, 63].map((n) => linkedIssue(n, "sonnet")).concat(linkedIssue(61, "opus"));
+  const w: Any = world({
+    digestIssues: [draft],
+    digestComments: { 50: [] },
+    extra: {
+      [`repos/${DIGEST}/issues/50/events`]: [
+        { event: "labeled", label: { name: "workshop-paused" }, created_at: "2026-11-12T00:00:00Z" },
+      ],
+      ...Object.fromEntries(issues.map((i) => [`repos/${M}/issues/${i.number}`, i])),
+    },
+  });
+  Object.assign(w, repoFixture(M, { issues, prs }));
+  const res = run("pause.ts", [], w, { apply: true });
+  const wrote = (method: string, path: string) => res.writes.filter((x) => x.method === method && x.path === path);
+
+  test("closes the red and the conflicting sonnet PRs, with a comment", () => {
+    assert.equal(res.status, 0, res.stderr);
+    for (const n of [30, 33]) {
+      assert.equal(wrote("PATCH", `repos/${M}/pulls/${n}`)[0].body.state, "closed");
+      assert.equal(wrote("POST", `repos/${M}/issues/${n}/comments`).length, 1);
+    }
+  });
+
+  test("their issues lose ready-for-agent and are unassigned", () => {
+    for (const n of [60, 63]) {
+      assert.equal(wrote("DELETE", `repos/${M}/issues/${n}/labels/ready-for-agent`).length, 1);
+      assert.equal(wrote("DELETE", `repos/${M}/issues/${n}/assignees`).length, 1);
+    }
+  });
+
+  test("an opus PR stays open and a green one is untouched", () => {
+    for (const n of [31, 32]) assert.equal(res.writes.filter((x) => x.path.includes(`/${n}`)).length, 0);
+    for (const n of [61, 62]) assert.equal(res.writes.filter((x) => x.path.includes(`/issues/${n}/`)).length, 0);
+  });
+
+  test("the snapshot lists what was closed", () =>
+    assert.match(res.writes.at(-1).body.body, /Closed PRs: realJohnDoe\/meridian#30 \(CI red\), realJohnDoe\/meridian#33 \(conflicts with main\)/));
+});
+
+describe("pause resume", () => {
+  const snap = { body: "<!-- workshop-snapshot -->", created_at: "2026-11-12T00:00:00Z" };
+  const res = run("pause.ts", [], world({ digestIssues: [{ number: 50, title: "Workshop digest (draft) — from 2026-11-10", labels: [], body: "" }], digestComments: { 50: [snap] } }), { apply: true });
+
+  test("only posts the resumed comment", () => {
+    assert.equal(res.plan.state, "resume");
+    assert.deepEqual(res.writes.map((w) => w.path), [`repos/${DIGEST}/issues/50/comments`]);
+    assert.match(res.writes[0].body.body, /workshop-resumed/);
   });
 });
 

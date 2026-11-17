@@ -59,7 +59,7 @@ const clone = (checkouts: string, repo: string, commits: [string, string, string
 
 const world = ({ trackerPrs = [pr(5, "2026-11-10", `https://claude.ai/code/${SESSION}`)], trackerFindings = 3 } = {}) => ({
   // Meridian: health ran 2026-10-01 (a parent from before the `survey` label) and closed; ui has an open run with a workable
-  // finding; retro's open run has only a deferred finding and an undecided one left.
+  // finding; retro's open run has only an undecided finding left.
   [`repos/${M}/issues?labels=health&state=all&per_page=100`]: [
     issue(51, ["health", "survey-finding"], { state: "closed", created_at: "2026-10-02T00:00:00Z" }),
     issue(50, ["health"], { state: "closed", sub_issues_summary: { total: 1 } }),
@@ -71,12 +71,10 @@ const world = ({ trackerPrs = [pr(5, "2026-11-10", `https://claude.ai/code/${SES
   ],
   [`repos/${M}/issues?labels=survey-finding&state=open&per_page=100`]: [
     issue(46, ["survey-finding", "ui"]),
-    issue(61, ["survey-finding", "retro", "deferred"]),
     { ...issue(99, []), pull_request: {} },
   ],
   [`repos/${M}/issues/45/sub_issues?per_page=100`]: [issue(46, ["survey-finding", "ui"])],
   [`repos/${M}/issues/60/sub_issues?per_page=100`]: [
-    issue(61, ["survey-finding", "retro", "deferred"]),
     issue(62, ["survey-finding", "retro"], { body: "## Decision needed\n\nKeep it?\n" }),
     issue(63, ["survey-finding", "retro"], { state: "closed" }),
   ],

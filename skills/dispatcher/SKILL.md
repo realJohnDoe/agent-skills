@@ -27,7 +27,7 @@ When the prompt asks for a dry run (for example after adding a repo), **write no
 1. Run `node scripts/pause.ts` and report its `state`. If it is `drain` or `resume`, also report what its plan would defer, unassign, close or mark ready.
 2. Run `node scripts/dispatch.ts` (with `--followups-only` if the state is `drain`) and report the plan as a short summary for the user:
    - the repos it found attached, the labels each would get created (`missingLabels`), and the repos it can't push to (`unpushable`);
-   - each session with its repo, kind, issue or PR, and tier, then what's left over (`deferred`);
+   - each session with its repo, kind, issue or PR, and tier, then what's left over (`notStarted`);
    - the PRs that would be merged (`automerge`);
    - the digest counts, whether it would be published, and the replies that would be relayed;
    - the digest body as it would be written.
@@ -64,18 +64,18 @@ The two decisions that change what lands on a default branch are in `scripts/dec
 
 - **Dispatch**: an open issue is dispatched when it:
   - has a `haiku`/`sonnet`/`opus` label and the `ready-for-agent` label;
-  - has no `plan` (or retired `opus-plan`) or `deferred` label;
+  - has no `plan` (or retired `opus-plan`) label;
   - has no assignee;
   - has no open blocker, whether native or named in the body by a `Blocked by: #n` line or a `## Blocked by` section, which may name `owner/repo#n` in another repo (one that can't be read blocks);
   - has no sub-issues;
   - has no open PR that closes it.
 
-  Every other open issue is somewhere else in the digest (its PR, Unstick, Waiting on you), or under **Not picked up** with its reason, so nothing is skipped silently. The reasons are `plan`, no tier label, `deferred`, blocked by `owner/repo#N`, and assigned by hand.
+  Every other open issue is somewhere else in the digest (its PR, Unstick, Waiting on you), or under **Not picked up** with its reason, so nothing is skipped silently. The reasons are `plan`, no tier label, blocked by `owner/repo#N`, and assigned by hand.
 
   A PR for an issue with an `## After merge` section says `Refs #n`, which keeps the issue open after merge. An open PR that `Refs` an issue counts as linked to it, as one that closes it does. Once that PR has merged and no open one remains, the issue is Waiting on you, never dispatched again nor Unstick, until the maintainer closes it. Finding the merged PR reads the newest page of closed PRs, and only for issues that have the section.
 
   An issue that needs the maintainer to decide something has a `## Decision needed` section in its body: the question and its options. The section is open until it has a `Decided:` line. Until then, and while the issue has no `ready-for-agent`, it is listed under Waiting on you with its question, tier label or not. `ready-for-agent` settles it either way.
-- **Follow-up**: every open, non-draft PR without a `deferred` label gets one narrow session (on `opus` for Dependabot's, `sonnet` for one with no tier-labelled issue) when it:
+- **Follow-up**: every open, non-draft PR gets one narrow session (on `opus` for Dependabot's, `sonnet` for one with no tier-labelled issue) when it:
   - conflicts with its base branch, which is checked without waiting for CI because GitHub runs none on a conflicting PR. The session merges the base in and pushes. GitHub computes mergeability lazily, so the script reads it a second time after a short pause. A green PR whose mergeability is still unknown waits for the next run, and is neither reviewed nor merged.
   - has a failing check, once CI has finished;
   - has review feedback newer than its head commit that isn't an agent's (no Claude Code footer).
@@ -88,7 +88,7 @@ The two decisions that change what lands on a default branch are in `scripts/dec
   - **Unstick**: PRs at their follow-up cap, a follow-up with no push after 2 days, and a dispatched issue with no PR after 2 days. An attached repo the run can't push to comes first, as **Can't push:** with the reason.
   - **Waiting on you**: first issues with an open question (**Decide:**, showing the question), then issues whose PR has merged and that have an `## After merge` section (**After merge:**, showing its first paragraph and the merged PR), then unblocked tier-labelled ones without `ready-for-agent` that only need the go-ahead (**Go ahead?**, showing the tier). Agents file most of these, and nothing runs until the maintainer says so.
 
-  Each ask says which issues it unblocks. Then comes what's coming: **In progress** (follow-ups not yet run, PRs waiting on CI, a follow-up or mergeability, and dispatched issues with no PR yet, so every open non-draft PR shows somewhere), **Queue** (dispatchable issues past today's cap) and **Not picked up**. Blocked and `deferred` issues are only counted, in a collapsed list. Last, also collapsed, is what merged in each repo since the draft opened.
+  Each ask says which issues it unblocks. Then comes what's coming: **In progress** (follow-ups not yet run, PRs waiting on CI, a follow-up or mergeability, and dispatched issues with no PR yet, so every open non-draft PR shows somewhere), **Queue** (dispatchable issues past today's cap) and **Not picked up**. Blocked issues are only counted, in a collapsed list. Last, also collapsed, is what merged in each repo since the draft opened.
 
   The first run on a Tuesday or Friday publishes the draft, if something merged or waits. Publishing retitles it `Workshop digest — <date>` and comments the counts (that comment is the ping). It also closes the previous published digest and opens the next draft. A quiet cycle stays a draft. Nothing is decided on silence.
 
@@ -113,18 +113,17 @@ Each transition posts its marker comment (`workshop-snapshot`, `workshop-resumed
 
 **Drain**
 
-1. Dry runs: `node scripts/dispatch.ts --followups-only` lists what would merge and be followed up, and `node scripts/pause.ts` lists, per repo, what would be deferred and unassigned, plus the snapshot.
+1. Dry runs: `node scripts/dispatch.ts --followups-only` lists what would merge and be followed up, and `node scripts/pause.ts` lists, per repo, what would be closed and unassigned, plus the snapshot.
 2. `node scripts/dispatch.ts --apply --followups-only` merges green PRs, gives red ones their last follow-up, and starts no new issue. Run its sessions as in step 4 and wait for them.
 3. `node scripts/pause.ts --apply` handles each repo:
-   - PRs still red or conflicting are converted to draft, labelled `deferred` and commented. `opus` PRs stay open for review.
+   - PRs still red or conflicting are closed with a comment. Their issues lose `ready-for-agent` and are unassigned, so they wait under Go ahead?. `opus` PRs stay open for review.
    - Issues assigned with no PR are unassigned.
 
-   Then it posts one snapshot on the digest: per repo, the date, the base commit, what was deferred, and open decisions.
+   Then it posts one snapshot on the digest: per repo, the date, the base commit, what was closed, and open decisions.
 
 **Resume**
 
-1. Dry run: `node scripts/pause.ts` lists, per repo, the deferred PRs to close (over 100 commits behind their base; their issues go back to the dispatcher by unassigning) and the ones to mark ready again.
-2. `node scripts/pause.ts --apply` does it and posts the "resumed" comment. Then continue with the normal run. The digest goes out as usual.
+1. `node scripts/pause.ts --apply` posts the "resumed" comment. Then continue with the normal run. The digest goes out as usual.
 
 ## Developing
 
