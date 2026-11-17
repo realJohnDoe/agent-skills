@@ -160,18 +160,18 @@ describe("dispatch dry run over two repos", () => {
     assert.match(res.plan.digest.body, /\nRepos covered: realJohnDoe\/meridian, realJohnDoe\/tracemap\.\n/);
   });
 
-  test("one session cap across repos: newest follow-ups first, then the oldest issues anywhere", () => {
+  test("one session cap across repos: newest follow-ups first, then the newest issues anywhere", () => {
     assert.deepEqual(
       res.plan.sessions.map((s: Any) => [s.kind, s.repo, s.pr ?? s.issue]),
       [
         ["followup", T, 9],
         ["followup", M, 21],
-        ["dispatch", T, 3],
+        ["dispatch", T, 4],
       ],
     );
     assert.deepEqual(res.plan.deferred, [
       `${M}: meridian#10 Meridian sonnet task`,
-      `${T}: tracemap#4 Tracemap sonnet task`,
+      `${T}: tracemap#3 Tracemap haiku task`,
     ]);
   });
 
@@ -208,10 +208,10 @@ describe("dispatch dry run over two repos", () => {
     );
     assert.match(
       body,
-      /## In progress\n\n- \[realJohnDoe\/tracemap#9\]\(\S+\) Tracemap red \(follow-up\)\n- \[realJohnDoe\/meridian#21\]\(\S+\) Meridian red \(follow-up\)\n- \[realJohnDoe\/tracemap#3\]\(\S+\) .* \(dispatched\)\n/,
+      /## In progress\n\n- \[realJohnDoe\/tracemap#9\]\(\S+\) Tracemap red \(follow-up\)\n- \[realJohnDoe\/meridian#21\]\(\S+\) Meridian red \(follow-up\)\n- \[realJohnDoe\/tracemap#4\]\(\S+\) .* \(dispatched\)\n/,
     );
     assert.equal(res.plan.digest.counts.inProgress, 3);
-    assert.match(body, /## Queue[^]*\[realJohnDoe\/meridian#10\][^]*\[realJohnDoe\/tracemap#4\]/);
+    assert.match(body, /## Queue[^]*\[realJohnDoe\/meridian#10\][^]*\[realJohnDoe\/tracemap#3\]/);
     assert.match(body, /\[realJohnDoe\/meridian#14\]\(\S+\) Meridian filed by an agent \(haiku\)/);
     assert.match(body, /\[realJohnDoe\/meridian#12\]\(\S+\) Meridian untriaged \(no tier label/);
     assert.match(body, /\[realJohnDoe\/meridian#11\]\(\S+\) Meridian waits on 10 \(blocked by realJohnDoe\/meridian#10\)/);
@@ -238,10 +238,10 @@ describe("dispatch apply", () => {
 
   test("claims each session in its own repo", () => {
     assert.equal(writes("POST", `repos/${M}/issues/21/comments`).length, 1);
-    assert.equal(writes("POST", `repos/${T}/issues/3/assignees`).length, 1);
+    assert.equal(writes("POST", `repos/${T}/issues/4/assignees`).length, 1);
     assert.equal(writes("POST", `repos/${T}/issues/9/comments`).length, 1);
     assert.equal(writes("POST", `repos/${M}/issues/10/assignees`).length, 0);
-    assert.equal(writes("POST", `repos/${T}/issues/4/assignees`).length, 0);
+    assert.equal(writes("POST", `repos/${T}/issues/3/assignees`).length, 0);
   });
 
   test("writes one digest, in the digest repo", () => {

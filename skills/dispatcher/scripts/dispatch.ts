@@ -115,7 +115,6 @@ type RepoPlan = {
 };
 type ListKey = Exclude<keyof RepoPlan, "repo" | "unblocks" | "missingLabels">;
 const byRepo = (a: Dated, b: Dated) => a.repo.localeCompare(b.repo);
-const oldestFirst = (a: Dated, b: Dated) => a.created.localeCompare(b.created) || byRepo(a, b);
 const newestFirst = (a: Dated, b: Dated) => b.created.localeCompare(a.created) || byRepo(a, b);
 
 // Other repos' issues named as blockers, each looked up once per run; one that
@@ -185,10 +184,10 @@ main(() => {
   const pick = <K extends ListKey>(k: K): RepoPlan[K] => plans.flatMap((p) => p[k] as unknown[]) as RepoPlan[K];
 
   // Follow-ups first: finishing beats starting. Follow-ups go newest PR first and
-  // dispatches oldest issue first, as in Meridian, each across every repo
+  // dispatches newest issue first, each across every repo
   // whichever repo it is in.
   const followups = pick("followups").sort(newestFirst);
-  const dispatches = pick("dispatches").sort(oldestFirst);
+  const dispatches = pick("dispatches").sort(newestFirst);
   const sessions = [...followups, ...dispatches].slice(0, MAX_SESSIONS);
   const queue = dispatches.slice(Math.max(0, MAX_SESSIONS - followups.length));
   // What the workshop is working on: this run's sessions, PRs waiting on CI or
@@ -242,7 +241,7 @@ main(() => {
   const waiting = notPicked.filter((x) => x.waiting);
   const info = [
     ...section("In progress", inProgress),
-    ...section("Queue (dispatched next, oldest first)", queue.map((q) => q.item)),
+    ...section("Queue (dispatched next, newest first)", queue.map((q) => q.item)),
     ...section("Not picked up", notPicked.filter((x) => !x.waiting)),
     ...(waiting.length
       ? [
