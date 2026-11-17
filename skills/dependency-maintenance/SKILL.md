@@ -1,6 +1,6 @@
 ---
 name: dependency-maintenance
-description: Run the dependency maintenance pass over one repository or several, in any language. Finds the dependency decisions Dependabot can't make (major upgrades, held-back pins, replacements, removals, gaps in Dependabot's own coverage), files one issue per decision in the repo it belongs to, and publishes a report linking them. Use when asked to run or edit the dependency maintenance pass, or to find which dependencies to bump or replace.
+description: Run the dependency maintenance pass over one repository or several, in any language. Finds the dependency decisions Dependabot can't make (major upgrades, held-back pins, replacements, removals, gaps in Dependabot's own coverage), files one issue per decision in the repo it belongs to, and publishes a report linking them. Use when the `timetable` skill starts it, when asked to run or edit the dependency maintenance pass, or to find which dependencies to bump or replace.
 ---
 
 # Dependency maintenance

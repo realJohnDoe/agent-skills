@@ -1,6 +1,6 @@
 ---
 name: surveys
-description: Shared conventions for every survey skill (`survey-*`, the plugin's and a repo's own), and the chooser that picks which survey runs next in which workshop repo. Use when the scheduled survey run fires, before running or editing any survey, or to see which survey is due.
+description: Shared conventions for every survey skill (`survey-*`, the plugin's and a repo's own), and the chooser that picks which survey runs next in which workshop repo. Use when the `timetable` skill starts the survey run, before running or editing any survey, or to see which survey is due.
 ---
 
 # Surveys
@@ -9,7 +9,7 @@ A survey reviews one repo for one kind of problem and files what it finds as iss
 
 ## Starting the next survey
 
-The scheduled survey run follows these steps. Each run surveys one repo, with one survey.
+The survey run, which the `timetable` skill starts, follows these steps. Each run surveys one repo, with one survey.
 
 1. **Close finished parents.** In each attached repo, every open issue labelled `survey` whose sub-issues are all closed gets a comment linking its findings (`#n` each), then is closed as completed:
 
