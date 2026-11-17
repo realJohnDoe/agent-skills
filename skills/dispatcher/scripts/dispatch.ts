@@ -2,10 +2,12 @@
 // The daily dispatcher's plan over every attached repo: which issues to start,
 // which PRs need a follow-up session or get merged, and the one shared digest.
 // See ../SKILL.md.
-// Usage: node dispatch.ts --digest owner/repo [--apply] [--followups-only]
+// Usage: node dispatch.ts --digest owner/repo [--apply] [--followups-only] [--digest-only]
 //   [--max-sessions N] [--max-followups N] [--today YYYY-MM-DD] [--repos o/r,...]
 //   [--checkouts dir]
-// Without --apply it is a dry run: it prints the plan and writes nothing.
+// Without --apply it is a dry run: it prints the plan and writes nothing. The
+// digest is written only by --apply --digest-only, the last step of a run, once
+// the sessions have finished; --apply alone does not write it.
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type Blocker, bodyBlockers } from "./bodyBlockers.ts";
@@ -48,6 +50,7 @@ import {
 
 const APPLY = flag("--apply");
 const FOLLOWUPS_ONLY = flag("--followups-only"); // drain: merge and follow up, start nothing new
+const DIGEST_ONLY = flag("--digest-only"); // end of run: write only the digest
 const MAX_SESSIONS = Number(arg("--max-sessions", 4)); // across all repos
 const MAX_FOLLOWUPS = Number(arg("--max-followups", 2)); // per PR
 const STALE_DAYS = 2; // a claim or follow-up with nothing to show after this is stuck
@@ -144,7 +147,7 @@ main(() => {
   // where something merged is read again, so sessions and the digest see it.
   const mergedIn = new Set<string>();
   const mergedPrs: Merge[] = [];
-  if (APPLY) {
+  if (APPLY && !DIGEST_ONLY) {
     for (const { repo, missing } of missingLabels)
       for (const name of missing)
         post(`repos/${repo}/labels`, { name, color: name === PAUSE_LABEL ? "fbca04" : LABELS[name] });
@@ -179,13 +182,15 @@ main(() => {
   // whichever repo it is in.
   const followups = pick("followups").sort(newestFirst);
   const dispatches = pick("dispatches").sort(newestFirst);
-  const sessions = [...followups, ...dispatches].slice(0, MAX_SESSIONS);
-  const queue = dispatches.slice(Math.max(0, MAX_SESSIONS - followups.length));
+  // --digest-only starts nothing: what is left is not started yet, so it is queued.
+  const cap = DIGEST_ONLY ? 0 : MAX_SESSIONS;
+  const sessions = [...followups, ...dispatches].slice(0, cap);
+  const queue = dispatches.slice(Math.max(0, cap - followups.length));
   // What the workshop is working on: this run's sessions, PRs waiting on CI or
   // a follow-up, follow-ups past today's cap, and dispatched issues with no PR yet.
   const inProgress = [
     ...sessions.map((s) => ({ ...s.item, why: s.kind === "followup" ? "follow-up" : "dispatched" })),
-    ...followups.slice(MAX_SESSIONS).map((s) => ({ ...s.item, why: "follow-up next run" })),
+    ...followups.slice(cap).map((s) => ({ ...s.item, why: "follow-up next run" })),
     ...pick("inProgress"),
   ];
   const review = pick("review");
@@ -241,7 +246,7 @@ main(() => {
         });
       }
     }
-    if (!FOLLOWUPS_ONLY) {
+    if (DIGEST_ONLY) {
       const w = writeDigest(state, built, NOW);
       if (built.publish) {
         digest.draft = w.draft;
@@ -259,7 +264,7 @@ main(() => {
         sessions: sessions.map(({ created, item, ...s }) => s),
         automerge: automerge.map(({ created, body, ...m }) => m),
         deferred: [...followups, ...dispatches]
-          .slice(MAX_SESSIONS)
+          .slice(DIGEST_ONLY ? Infinity : MAX_SESSIONS)
           .map((s) => `${s.repo}: ${s.title}`),
         digest: { ...digest, body: built.body },
       },
