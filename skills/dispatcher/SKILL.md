@@ -1,11 +1,11 @@
 ---
 name: dispatcher
-description: Run the daily workshop over several repositories at once: dispatch tier-labelled issues to subagent sessions, follow up on red or conflicting PRs, merge `automerge` PRs, and keep one shared digest of what waits on the maintainer. Also pauses, drains and resumes it. Use when the daily dispatcher fires, when asked to run, pause, resume or configure the workshop, or to add a repo to it.
+description: Run the workshop dispatcher over several repositories at once: dispatch tier-labelled issues to subagent sessions, follow up on red or conflicting PRs, merge `automerge` PRs, and keep one shared digest of what waits on the maintainer. Also pauses, drains and resumes it. Use when the `timetable` skill starts it, when asked to run, pause, resume or configure the workshop, or to add a repo to it.
 ---
 
 # Dispatcher
 
-One scheduled run a day moves open work forward in every repo attached to its session, and the maintainer's part comes down to one twice-weekly digest issue in **`realJohnDoe/agent-skills`** (the digest repo), which also says why anything isn't moving. The scripts live in `scripts/` next to this file: run them as `node <this skill's directory>/scripts/<name>.ts --digest realJohnDoe/agent-skills`. Every command below needs that `--digest` flag; it's left out for brevity.
+The `timetable` skill starts the dispatcher on the ticks its table names (`scripts/schedule.ts` in that skill). Each run moves open work forward in every repo attached to the `Timetable` routine, and the maintainer's part comes down to one twice-weekly digest issue in **`realJohnDoe/agent-skills`** (the digest repo), which also says why anything isn't moving. The scripts live in `scripts/` next to this file: run them as `node <this skill's directory>/scripts/<name>.ts --digest realJohnDoe/agent-skills`. Every command below needs that `--digest` flag; it's left out for brevity.
 
 ## The run
 
@@ -21,7 +21,7 @@ One scheduled run a day moves open work forward in every repo attached to its se
 
 ### Dry run
 
-When the prompt asks for a dry run (for example the first run of a new scheduled task, or after adding a repo), **write nothing**. Never pass `--apply`, start no subagents, relay no replies, and post no comments, issues or labels. Instead:
+When the prompt asks for a dry run (for example after adding a repo), **write nothing**. Never pass `--apply`, start no subagents, relay no replies, and post no comments, issues or labels. Instead:
 
 1. Run `node scripts/pause.ts` and report its `state`. If it is `drain` or `resume`, also report what its plan would defer, unassign, close or mark ready.
 2. Run `node scripts/dispatch.ts` (with `--followups-only` if the state is `drain`) and report the plan as a short summary for the user:
@@ -36,7 +36,7 @@ Each repo's own rules (how to build and check, PR template, label meanings beyon
 
 ## Configuring
 
-**The workshop's repos are the ones attached to the scheduled task.** To add a repo, attach it with push access; to remove one, detach it. The workshop labels a repo lacks are created on its first apply run. Every repo attached to that task is dispatched, so attach nothing there that the workshop shouldn't touch.
+**The workshop's repos are the ones attached to the `Timetable` routine** (the `timetable` skill's **Configuring**). To add a repo, attach it with push access; to remove one, detach it. The workshop labels a repo lacks are created on its first apply run. Every repo attached to that routine is dispatched, so attach nothing there that the workshop shouldn't touch.
 
 The scripts find the repos as every clone with a GitHub `origin` directly under the checkouts folder: `--checkouts`, else `$WORKSHOP_CHECKOUTS`, else the folder that holds the clone the run started in (or the working directory, when that isn't a clone). That is how a cloud session lays out its repos. A repo that isn't attached is simply not covered, so the digest ends with a `Repos covered:` line: a repo missing from it has lost its attachment. `--repos owner/a,owner/b` limits one run to some of them, and stops if one isn't attached.
 
