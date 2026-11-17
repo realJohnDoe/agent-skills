@@ -8,7 +8,8 @@
 //   Every write (-X other than GET, or --input) is appended to $FAKE_GH_LOG as
 //   `{method, path, body}`, or fails when FAKE_GH_LOG is unset, so a dry run that
 //   writes fails loudly. A write answers `{"number": 900}`.
-//   A merge (PUT .../pulls/N/merge) also moves PR N to the fixture's closed list.
+//   A merge (PUT .../pulls/N/merge) also moves PR N to the fixture's closed list, closes
+//   the issues it closes and adds it to the merged-PR search, so the dispatcher's wait settles at once.
 // git: `remote get-url origin` answers from $FAKE_GIT_REMOTES ({path: url});
 //   `push --dry-run` fails for paths listed in $FAKE_GIT_NOPUSH; `rev-parse
 //   --show-toplevel` answers the working directory.
@@ -65,6 +66,14 @@ const gh = (args: string[]) => {
       const pr = f[`${r}/pulls`].find((p: { number: number }) => p.number === +n);
       f[`${r}/pulls`] = f[`${r}/pulls`].filter((p: unknown) => p !== pr);
       f[`${r}/pulls?state=closed`] = [{ ...pr, merged_at: "2026-11-13T00:00:00Z" }, ...(f[`${r}/pulls?state=closed`] ?? [])];
+      // GitHub then closes the issues the PR closes and lists it in search.
+      for (const [, k] of (pr.body ?? "").matchAll(/(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?) #(\d+)/gi))
+        if (f[`${r}/issues/${k}`]) {
+          f[`${r}/issues/${k}`].state = "closed";
+          f[`${r}/issues`] = f[`${r}/issues`].filter((i: { number: number }) => i.number !== +k);
+        }
+      for (const k of Object.keys(f))
+        if (k.startsWith(`search/issues?q=repo:${r.slice(6)} is:pr is:merged`)) f[k].items.push(pr);
       writeFileSync(file, JSON.stringify(f));
     }
     process.stdout.write(JSON.stringify({ number: 900 }));

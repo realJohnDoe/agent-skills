@@ -470,3 +470,25 @@ describe("pause over two repos", () => {
     assert.equal(res.plan.state, "normal");
   });
 });
+
+describe("a merge that closes an issue", () => {
+  const sent = issue(51, "Closed by the merge", ["sonnet", "ready-for-agent"], { assignees: [{ login: "workshop-bot" }], state: "open" });
+  const fixture = {
+    ...world(),
+    ...repoFixture(M, {
+      issues: [sent, issue(52, "Waits on 51", ["sonnet", "ready-for-agent"], { body: "Blocked by: #51" })],
+      prs: [pr(50, "Fix it", { body: "Fixes #51", labels: [{ name: "automerge" }], runs: green, mergeable: true })],
+    }),
+    [`repos/${M}/issues/51`]: { ...sent, state: "open" },
+    [`repos/${M}/issues/51/comments`]: [{ body: "<!-- workshop-dispatch -->", created_at: "2026-11-12T00:00:00Z", html_url: "u", user: { login: "b", type: "User" } }],
+  };
+
+  test("waits for GitHub: the PR is listed merged and its issue is not in progress", () => {
+    const res = run("dispatch.ts", ["--repos", M], fixture, { apply: true });
+    assert.equal(res.status, 0, res.stderr);
+    const body: string = res.plan.digest.body;
+    assert.match(body, /meridian#50\]\(\S+\) Fix it \(closes realJohnDoe\/meridian#51 · sonnet, ready-for-agent\)/);
+    assert.doesNotMatch(body, /meridian#51\]\(\S+\)[^\n]*no PR yet/);
+    assert.deepEqual(res.plan.sessions.map((s: Any) => s.issue), [52]);
+  });
+});
