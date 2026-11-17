@@ -1,6 +1,6 @@
 ---
 name: conventions
-description: The labels and body sections the workshop dispatcher reads on issues and PRs, what an agent sets on each, and when and how to open a PR. Use when creating, labelling, ordering or triaging an issue, or opening or updating a PR, in a repo the workshop dispatches (meridian, tracemap, structra, kenpo-notes, rentenluecke, agent-skills).
+description: The labels and body sections the workshop dispatcher reads on issues and PRs, what an agent sets on each, and when and how to open a PR. Use when creating, labelling, ordering or triaging an issue, or opening or updating a PR, in a repo whose CLAUDE.md or AGENTS.md points to this skill.
 ---
 
 # Conventions
@@ -56,7 +56,7 @@ The tier rates the work **as the issue is written**, so write it down a tier whe
 
 ## Opening a PR
 
-When a task leaves pushed commits on a branch with no open PR, open one, even if nobody asked. Fill in the repo's PR template if it has one. Then use the `tracemap-pr` skill (from realJohnDoe/tracemap) to add trace maps to the description; it decides itself when none would help, and if it can't attach them, say so in your reply. When the PR changes what a page looks like, add before and after screenshots of each affected screen at desktop (1280px) and phone (390px) width under an `Acceptance check` heading. Take them with headless Chromium from builds of the base branch and the PR branch, and attach them the way `tracemap-pr` attaches its images. If you can't, say why under that heading. In a repo with PR previews, also label such a PR `preview`, so the reviewer can click through it. Push later changes to the same PR, and refresh its description, trace maps and screenshots when the PR's purpose changes.
+When a task leaves pushed commits on a branch with no open PR, open one, even if nobody asked. Fill in the repo's PR template if it has one. Then use the `tracemap-pr` skill (from realJohnDoe/tracemap) to add trace maps to the description; it decides itself when none would help, and if it can't attach them, say so in your reply. When the PR changes what a page looks like, add before and after screenshots of each affected screen at desktop (1280px) and phone (390px) width under an `Acceptance check` heading. Take them with headless Chromium from builds of the base branch and the PR branch, and attach them the way `tracemap-pr` attaches its images. If you can't, say why under that heading. In a repo with PR previews, also label such a PR `preview`, so the reviewer can click through it. Push later changes to the same PR only while it is still open: check its state right before you push, because it may have been merged or closed since you last looked. If it isn't open, start a new branch from the latest default branch and open a new PR for the changes. When an open PR's purpose changes, refresh its description, trace maps and screenshots.
 
 Close the issue from the body with `Fixes #n`. For an issue with an `## After merge` section write `Refs #n` instead, so it stays open until the maintainer has done the step; the PR is otherwise handled the same, `automerge` included. Label a PR for a `haiku` or `sonnet` issue `automerge`: the dispatcher merges it once CI is green and nobody has left review feedback. A PR for an `opus` issue goes without the label and waits for review. A draft PR is outside the workshop.
 
