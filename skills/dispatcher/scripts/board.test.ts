@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
+import { render } from "../board/render.js";
 import { type BoardPlan, buildBoard } from "./board.ts";
 import type { Item } from "./lib.ts";
 
@@ -76,5 +77,50 @@ describe("buildBoard", () => {
     assert.equal(board.state, "normal");
     assert.equal(board.paused, undefined);
     assert.deepEqual([board.generated, board.repos, board.digest], ["2026-11-17T00:00:00Z", [R], "d"]);
+  });
+});
+
+describe("render", () => {
+  const now = new Date("2026-11-17T12:00:00Z");
+  const html = render(board, now);
+  const section = (h: string, id: string) => h.match(new RegExp(`<section class="module m-${id}"[\\s\\S]*?</section>`))?.[0] ?? "";
+
+  test("one module per stage, each holding its cards", () => {
+    const ids = [...html.matchAll(/class="module m-(\w+)"/g)].map((m) => m[1]);
+    assert.deepEqual(ids, ["stuck", "waiting", "closed", "afterMerge", "pr", "queue"]);
+    const cards = { stuck: stages.stuck, waiting: stages.waiting.cards, closed: stages.closed, afterMerge: stages.afterMerge, pr: stages.prInProgress, queue: stages.queue };
+    for (const [id, cs] of Object.entries(cards)) for (const c of cs) assert.match(section(html, id), new RegExp(`>${c.title}</a>`), `${id}: ${c.title}`);
+    assert.match(section(html, "stuck"), /Can&#39;t push to o\/x/);
+    assert.match(section(html, "waiting"), /<summary>1 parked<\/summary>[\s\S]*>T5<\/a>/);
+    assert.match(section(html, "afterMerge"), /href="https:\/\/github.com\/o\/r\/pull\/40"[^>]*>PR #40</);
+    assert.match(section(html, "pr"), /needs review/);
+    assert.match(html, /as of <b>2026-11-17 00:00 UTC<\/b>/);
+  });
+
+  test("Stuck hides when empty; the other modules show an empty message", () => {
+    const empty = buildBoard(
+      { cantPush: [], review: [], unstick: [], decide: [], afterMerge: [], triage: [], inProgress: [], queue: [], notPicked: [], automerge: [] },
+      { generated: board.generated, repos: [R], digest: "d", closed: [] },
+    );
+    const h = render(empty, now);
+    assert.doesNotMatch(h, /m-stuck/);
+    assert.equal(h.match(/class="empty"/g)?.length, 5);
+  });
+
+  test("a paused board shows the paused banner and no stale warning", () => {
+    const paused = { ...board, state: "paused" as const, paused: { since: "2026-11-01", snapshot: "https://snap" } };
+    const h = render(paused, new Date("2026-11-30T00:00:00Z"));
+    assert.match(h, /href="https:\/\/snap"[^>]*>Paused since 2026-11-01\. Nothing is dispatched or merged\./);
+    assert.doesNotMatch(h, /stale/);
+  });
+
+  test("a board more than 2 days old is stale", () => {
+    assert.doesNotMatch(render(board, new Date("2026-11-18T23:00:00Z")), /stale/);
+    assert.match(render(board, new Date("2026-11-19T01:00:00Z")), /class="notice stale">This board is 2 days old/);
+  });
+
+  test("escapes what it shows", () => {
+    const h = render({ ...board, stages: { ...stages, queue: [{ ...stages.queue[0], title: "<b>&" }] } }, now);
+    assert.match(h, />&lt;b&gt;&amp;</);
   });
 });
