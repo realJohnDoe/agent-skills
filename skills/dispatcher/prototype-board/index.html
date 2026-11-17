@@ -5,8 +5,8 @@
   PROTOTYPE, throw away. Answers wayfinder ticket realJohnDoe/agent-skills#63
   ("Board look and layout, prototyped on real dispatcher data") for the map #61.
   Round 2, after the maintainer's reaction to three variants: the vertical
-  layout, the stages in reverse happy-path order (Stuck, Closed, After merge,
-  PR in progress, Queue, Waiting), no moving rail, a PR link on every issue card with a PR, the UI drawn as the control panel of a
+  layout, Stuck and Waiting on top, then the rest in reverse happy-path order
+  (Closed, After merge, PR in progress, Queue), no moving rail, a PR link on every issue card with a PR, the UI drawn as the control panel of a
   workshop/farm/spaceship (plants and robots belong in the banner image only),
   dark only, every chip rectangular, and needs-review PRs at the top of their stage.
   Real data: `node skills/dispatcher/scripts/dispatch.ts` dry run of 2026-11-17,
@@ -313,14 +313,14 @@ const SAMPLE = [
 ];
 const REPO_COLORS = { "agent-skills": "#5ee7f2", meridian: "#b99cff", tracemap: "#ffc36b", structra: "#7fb2ff", "kenpo-notes": "#6fd38a", rentenluecke: "#ff9ec2" };
 
-// The happy path in reverse: what needs a hand first, then the latest wins, back to what's waiting.
+// What needs the maintainer first (Stuck, Waiting), then the happy path in reverse: latest wins back to the queue.
 const STAGES = [
   { id: "stuck", name: "Stuck", hint: "off the line: needs a hand" },
+  { id: "waiting", name: "Waiting", hint: "blocked, decide, go ahead" },
   { id: "closed", name: "Closed", hint: "latest 5" },
   { id: "afterMerge", name: "After merge", hint: "your step after the PR" },
   { id: "pr", name: "PR in progress", hint: "needs review first" },
   { id: "queue", name: "Queue", hint: "in pickup order" },
-  { id: "waiting", name: "Waiting", hint: "blocked, decide, go ahead" },
 ];
 const EMPTY = { stuck: "All systems nominal", closed: "Nothing closed yet", afterMerge: "No after-merge steps", pr: "No open PRs", queue: "Queue empty", waiting: "Nothing waits on you" };
 
