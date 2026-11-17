@@ -1,6 +1,6 @@
 ---
 name: conventions
-description: The labels and body sections the workshop dispatcher reads on issues and PRs, what an agent sets on each, and when and how to open a PR. Use when creating, labelling, ordering or triaging an issue, or opening or updating a PR, in a repo the workshop dispatches (meridian, tracemap, structra, kenpo-notes, rentenluecke, agent-skills, realjohndoe.github.io, time-lines, scale-of-economy).
+description: The labels and body sections the workshop dispatcher reads on issues and PRs, what an agent sets on each, and when and how to open a PR. Use when creating, labelling, ordering or triaging an issue, or opening or updating a PR, in a repo whose CLAUDE.md or AGENTS.md points to this skill.
 ---
 
 # Conventions
