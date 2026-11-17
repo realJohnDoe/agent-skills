@@ -10,4 +10,4 @@ Before creating, labelling or ordering an issue, or opening a PR, follow the `co
 
 ### Domain docs
 
-Single-context: one `CONTEXT.md` and `docs/adr/` at the repo root, created when needed. See `docs/agents/domain.md`.
+Single-context: one `GLOSSARY.md` (the glossary; skills that say `CONTEXT.md` mean this file) and `docs/adr/` at the repo root, created when needed. See `docs/agents/domain.md`.
