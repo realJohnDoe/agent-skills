@@ -2,18 +2,17 @@
 // scripts/workshop-dispatch.ts made them before the move (realJohnDoe/meridian#1434).
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
+import { isDigest, openQuestion } from "../../_shared/markers.ts";
 import {
   afterMerge,
   claimState,
-  isDigest,
-  linkedIssues,
-  openQuestion,
   issueState,
+  linkedIssues,
   prVerdict,
+  type PrVerdict,
   referencedIssues,
   tierOf,
 } from "./decide.ts";
-import type { PrVerdict } from "./decide.ts";
 import { WAITING_LABEL } from "./board.ts";
 
 describe("linkedIssues", () => {

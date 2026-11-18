@@ -27,6 +27,7 @@ on:
     branches: [main]
     paths:
       - skills/dispatcher/**
+      - skills/_shared/**
       - .github/workflows/board.yml
   workflow_dispatch:
 

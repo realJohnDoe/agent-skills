@@ -16,46 +16,48 @@
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type Blocker, bodyBlockers } from "./bodyBlockers.ts";
+import type { Repo } from "../../_shared/repos.ts";
 import {
-  AUTOMERGE,
-  afterMerge,
-  FAILED,
-  FOLLOWUP,
-  assertNever,
-  blockedText,
-  type ResolvedBlocker,
-  claimState,
-  isDigest,
-  issueState,
-  linkedIssues,
-  marked,
-  prVerdict,
-  referencedIssues,
-  openQuestion,
-  READY,
-  tierOf,
-} from "./decide.ts";
-import { type Board, type Card, type BoardPlan, type LabelSync, WAITING_LABEL, buildBoard, labelSync } from "./board.ts";
-import { buildDigest, readDigest, writeDigest } from "./digest.ts";
-import type { GhCheckRuns, GhComment, GhIssue, GhPull, GhReview, GhSearch } from "./github.ts";
-import {
-  type Item,
-  type Repo,
-  FOOTER,
-  PAUSE_LABEL,
   all,
   api,
-  arg,
-  flag,
-  digestArg,
-  loadConfig,
-  main,
+  type GhCheckRuns,
+  type GhComment,
+  type GhIssue,
+  type GhPull,
+  type GhReview,
+  type GhSearch,
   names,
   post,
-  readPause,
-  run,
-  unpushable,
-} from "./lib.ts";
+} from "../../_shared/github.ts";
+import { arg, flag, main, run } from "../../_shared/cli.ts";
+import { isDigest, marked, openQuestion, PAUSE_LABEL } from "../../_shared/markers.ts";
+import {
+  afterMerge,
+  assertNever,
+  AUTOMERGE,
+  blockedText,
+  claimState,
+  FAILED,
+  FOLLOWUP,
+  issueState,
+  linkedIssues,
+  prVerdict,
+  READY,
+  referencedIssues,
+  type ResolvedBlocker,
+  tierOf,
+} from "./decide.ts";
+import { digestArg, FOOTER, type Item, loadConfig, readPause, unpushable } from "./lib.ts";
+import {
+  type Board,
+  type Card,
+  type BoardPlan,
+  type LabelSync,
+  WAITING_LABEL,
+  buildBoard,
+  labelSync,
+} from "./board.ts";
+import { buildDigest, readDigest, writeDigest } from "./digest.ts";
 
 const APPLY = flag("--apply");
 const FOLLOWUPS_ONLY = flag("--followups-only"); // drain: merge and follow up, start nothing new

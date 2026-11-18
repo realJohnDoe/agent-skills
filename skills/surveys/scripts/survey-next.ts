@@ -6,10 +6,11 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { openQuestion } from "../../dispatcher/scripts/decide.ts";
-import type { GhIssue } from "../../dispatcher/scripts/github.ts";
-import { all, arg, attachedRepos, main, names, run } from "../../dispatcher/scripts/lib.ts";
-import { sessionPrs } from "../../survey-retro/scripts/retro-candidates.ts";
+import { all, type GhIssue, names } from "../../_shared/github.ts";
+import { arg, main, run } from "../../_shared/cli.ts";
+import { attachedRepos } from "../../_shared/repos.ts";
+import { openQuestion } from "../../_shared/markers.ts";
+import { sessionPrs } from "../../_shared/sessions.ts";
 
 // The plugin's own skills folder: its survey-* skills run in every repo.
 const PLUGIN = join(dirname(fileURLToPath(import.meta.url)), "../..");

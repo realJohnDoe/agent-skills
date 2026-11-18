@@ -5,7 +5,7 @@ description: The labels and body sections the workshop dispatcher reads on issue
 
 # Conventions
 
-The `dispatcher` skill reads these labels and sections to decide what an agent session starts on and what waits for the maintainer. `../dispatcher/scripts/decide.ts` is the authority on how it reads them, and this skill is the authority on what to set. The `surveys` skill adds the survey labels, **Filing a batch of findings** below covers runs that file many issues at once, and a repo's own docs add labels of their own, such as Structra's `wayfinder:*`. Follow those as well.
+The `dispatcher` skill reads these labels and sections to decide what an agent session starts on and what waits for the maintainer. `../dispatcher/scripts/decide.ts` is the authority on how it reads them, with `../_shared/markers.ts` for the parts every skill reads (the digest, the pause label, marker comments, `Decision needed`), and this skill is the authority on what to set. The `surveys` skill adds the survey labels, **Filing a batch of findings** below covers runs that file many issues at once, and a repo's own docs add labels of their own, such as Structra's `wayfinder:*`. Follow those as well.
 
 Whenever you ask the maintainer to do something by hand, in an issue, PR, digest, notification or reply, link the page where they do it, e.g. `https://github.com/<owner>/<repo>/settings/secrets/actions` or `…/labels`, rather than describing how to navigate there. Skip it only where no stable URL exists.
 

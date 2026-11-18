@@ -1,5 +1,5 @@
 // Runs survey-next.ts end to end over two repos: real git clones for the history, a fake
-// `gh` (../../dispatcher/scripts/fake-bin.ts) for the issues and PRs.
+// `gh` (../../_shared/fake-bin.ts) for the issues and PRs.
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { describe, test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { fakeBin } from "../../dispatcher/scripts/fake-bin.ts";
+import { fakeBin } from "../../_shared/fake-bin.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const M = "realJohnDoe/meridian";
