@@ -38,7 +38,7 @@ jobs:
       - name: Assemble the site
         run: |
           mkdir _site
-          cp skills/dispatcher/board/{index.html,board.css,render.js,banner.jpg} _site/
+          cp skills/dispatcher/board/{index.html,board.css,render.js,banner.jpg,favicon.ico,favicon-32.png,apple-touch-icon.png} _site/
           cp pushed/board.json _site/
       - uses: actions/upload-pages-artifact@v4
         with:
