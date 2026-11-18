@@ -49,8 +49,8 @@ export type BuiltDigest = {
 };
 
 const ANSWER =
-  "Answer on the issue or PR, or reply here naming the item (e.g. `meridian#12`): the next daily run copies replies onto their issues.";
-const NOTE = `_The draft digest is rewritten by every daily run and published on Tuesdays and Fridays. ${ANSWER}_\n\n`;
+  "Answer on the issue or PR, or reply here naming the item (e.g. `meridian#12`): the next dispatcher run copies replies onto their issues.";
+const NOTE = `_The draft digest is rewritten by every dispatcher run and published on Tuesdays and Fridays. ${ANSWER}_\n\n`;
 
 // The shared digest's state, read first: its window bounds "merged since".
 export function readDigest(repo: string, today: Date): DigestState {
