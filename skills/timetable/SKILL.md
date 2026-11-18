@@ -5,18 +5,18 @@ description: Run one tick of the workshop's schedule: work out which workshop ta
 
 # Timetable
 
-The `Timetable` routine fires twice a day and runs only this skill. The schedule is one table in git, `TABLE` in `scripts/schedule.ts`: each entry names a skill, its days, its tick (`am` or `pm`) and the `model` its run gets, as a tier (`haiku`, `sonnet` or `opus`), never a model ID. An entry with `everyWeeks: n` runs only every n-th week, counted in whole weeks from `EPOCH`, so its gap is always exactly n weeks; a held or missed run waits for the next one. Schedules stay in this table rather than cron strings: cron has no every-other-week, and an hour other than a tick's would never fire. Changing a schedule means a PR that changes that table. The dispatcher runs on both ticks, every day.
+The `Timetable` routine fires twice a day and runs only this skill. The schedule is one table in git, `TABLE` in `scripts/schedule.ts`: each entry names a skill, its days, its tick (`am` or `pm`) and the `model` its run gets, as a tier (`haiku`, `sonnet` or `opus`), never a model ID. An entry with `everyWeeks: n` runs only every n-th week, counted in whole weeks from `EPOCH`, so its gap is always exactly n weeks; a held or missed run waits for the next one. Schedules stay in this table rather than cron strings: cron has no every-other-week. Changing a schedule means a PR that changes that table. The dispatcher runs on both ticks, every day.
 
 ## The run
 
-1. `node <this skill's directory>/scripts/timetable.ts --digest realJohnDoe/agent-skills` prints the tick it computed from the UTC hour, whether the workshop is `paused`, the entries to `run` and the ones `held` by the pause. It fails on an hour that maps to no tick. Then stop and report its error: every entry would silently stop running. Don't work out the schedule yourself, and don't make up a missed tick.
+1. `node <this skill's directory>/scripts/timetable.ts --digest realJohnDoe/agent-skills` prints the tick it computed from the UTC hour, whether the workshop is `paused`, the entries to `run` and the ones `held` by the pause. The tick is `am` before 12:00 UTC and `pm` from then on, so a manual run at any time counts as the tick it falls in. Don't work out the schedule yourself.
 2. For each entry in `run` except `dispatcher`, start one background subagent with the `Agent` tool. Give it the entry's `prompt`, take `description` from its `skill`, and set `model` to its `model`.
 3. If `dispatcher` is in `run`, run the `dispatcher` skill in this session. It can't be a subagent: it starts its sessions as subagents, and a subagent can't start one. So its `model` is the one the routine runs on.
 4. Wait for every subagent to finish. A failing task doesn't stop the others. End with one line per task: its skill and how it ended.
 
 ## Ticks
 
-`TICKS` in `scripts/schedule.ts` maps each tick to a UTC hour, and a run up to an hour late still counts. The routine's cron must fire at those hours: `0 5,17 * * *` (UTC). Change both together.
+`tickOf` in `scripts/schedule.ts` maps a UTC hour to a tick: `am` before 12:00, `pm` from 12:00. Exact hours aren't checked, so the routine's cron (`0 5,17 * * *` UTC) can change freely and the routine can be triggered by hand at any time.
 
 ## Pausing
 
