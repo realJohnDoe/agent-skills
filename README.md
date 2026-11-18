@@ -1,3 +1,5 @@
+![Robots tending a rooftop garden above a floating city](docs/images/banner.jpg)
+
 # agent-skills
 
 Claude Code skills shared across my repositories, as one plugin in a marketplace at the repo root.
