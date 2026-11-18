@@ -17,14 +17,9 @@ test("every entry names an existing skill and a tier, not a model ID", () => {
 test("EPOCH is a Monday, so weeks start on Monday", () => assert.equal(new Date(`${EPOCH}T00:00Z`).getUTCDay(), 1));
 
 describe("tickOf", () => {
-  test("the cron's hours, and an hour late", () => {
-    assert.equal(tickOf(5), "am");
-    assert.equal(tickOf(6), "am");
-    assert.equal(tickOf(17), "pm");
-    assert.equal(tickOf(18), "pm");
-  });
-  test("an hour that maps to no tick fails, naming the ticks", () => {
-    for (const h of [0, 4, 7, 12, 16, 19, 23]) assert.throws(() => tickOf(h), /UTC hour \d+ maps to no tick \(am = 5:00, pm = 17:00\)/);
+  test("am before 12:00 UTC, pm from then on, at any minute or hour", () => {
+    for (const h of [0, 5, 6, 11]) assert.equal(tickOf(h), "am");
+    for (const h of [12, 15, 17, 23]) assert.equal(tickOf(h), "pm");
   });
 });
 

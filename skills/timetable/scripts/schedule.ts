@@ -9,10 +9,6 @@ export type Entry = { skill: string; days: readonly Day[]; everyWeeks?: number; 
 
 const DAYS: readonly Day[] = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 
-// The UTC hour each tick fires at: the `Timetable` routine's cron is `0 5,17 * * *` (UTC).
-// A run up to an hour late still counts as that tick.
-export const TICKS: Record<Tick, number> = { am: 5, pm: 17 };
-
 // A Monday (UTC) that is week 0 for `everyWeeks`. Moving it shifts which weeks run.
 export const EPOCH = "2026-11-16";
 
@@ -36,16 +32,9 @@ export const TABLE: readonly Entry[] = [
   },
 ];
 
-// The tick a UTC hour belongs to. An hour that maps to none throws: every entry
-// would silently stop running.
-export const tickOf = (hour: number): Tick => {
-  const tick = (Object.keys(TICKS) as Tick[]).find((t) => hour - TICKS[t] >= 0 && hour - TICKS[t] <= 1);
-  if (!tick)
-    throw new Error(
-      `UTC hour ${hour} maps to no tick (${Object.entries(TICKS).map(([t, h]) => `${t} = ${h}:00`).join(", ")}): fix the routine's cron or TICKS`,
-    );
-  return tick;
-};
+// The tick a UTC hour belongs to: `am` before 12:00 UTC, `pm` from then on. No exact
+// hour is checked, so a manual or late run still maps to a tick.
+export const tickOf = (hour: number): Tick => (hour < 12 ? "am" : "pm");
 
 // What runs at `now`. While the workshop is paused only the dispatcher runs, since
 // it carries out the drain and the resume itself; everything else waits.
