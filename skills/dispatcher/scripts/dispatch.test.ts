@@ -3,7 +3,7 @@
 // when a repo can't be worked on.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { describe, test } from "node:test";
@@ -558,6 +558,18 @@ describe("the repos are the ones attached", () => {
     const res = spawnSync(process.execPath, [join(here, "dispatch.ts")], { encoding: "utf8" });
     assert.equal(res.status, 1);
     assert.match(res.stderr, /pass --digest owner\/repo/);
+  });
+  test("run from inside the skill's folder without --checkouts stops the run", () => {
+    // An installed plugin's skill folder isn't a git clone, so copy the scripts out of this one.
+    const skillDir = mkdtempSync(join(tmpdir(), "installed-skill-"));
+    cpSync(here, join(skillDir, "scripts"), { recursive: true });
+    const res = spawnSync(process.execPath, [join(skillDir, "scripts", "dispatch.ts"), "--digest", DIGEST], {
+      cwd: skillDir,
+      encoding: "utf8",
+      env: { ...process.env, WORKSHOP_CHECKOUTS: "" },
+    });
+    assert.notEqual(res.status, 0);
+    assert.match(res.stderr, /Run from the session's working directory, not the skill's folder/);
   });
   test("no attached repo stops the run", () => {
     const res = run("dispatch.ts", [], world(), { missing: [M, T] });

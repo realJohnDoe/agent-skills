@@ -3,7 +3,8 @@
 // pushed to.
 import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { isDigest, marked } from "./decide.ts";
 import type { GhIssue } from "./github.ts";
 
@@ -78,9 +79,18 @@ export const loadConfig = (): { digest: string; checkouts: string; repos: Repo[]
 // The checkouts folder and the repos under it, as loadConfig describes; the survey
 // chooser reads them the same way.
 export const attachedRepos = (): { checkouts: string; repos: Repo[] } => {
-  const checkouts = resolve(
-    arg("--checkouts") ?? process.env.WORKSHOP_CHECKOUTS ?? startedIn(),
-  );
+  const given = arg("--checkouts") || process.env.WORKSHOP_CHECKOUTS;
+  const checkouts = resolve(given || startedIn());
+  // The fallback must not land in the installed plugin's skill folder (the usual cause:
+  // a `cd` into it before running a script), or it would silently find no repos.
+  if (!given) {
+    const skills = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+    const rel = relative(skills, checkouts);
+    if (rel === "" || !rel.startsWith(".."))
+      throw new Error(
+        "Run from the session's working directory, not the skill's folder, or pass --checkouts <dir>.",
+      );
+  }
   const found = readdirSync(checkouts, { withFileTypes: true })
     .filter((d) => d.isDirectory() && existsSync(join(checkouts, d.name, ".git")))
     .map((d): Repo | null => {
