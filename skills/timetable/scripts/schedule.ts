@@ -18,6 +18,7 @@ export const EPOCH = "2026-11-16";
 
 export const TABLE: readonly Entry[] = [
   { skill: "dispatcher", days: DAYS, tick: "am", model: "sonnet", prompt: "Run the `joes-workshop:dispatcher` skill." },
+  { skill: "dispatcher", days: DAYS, tick: "pm", model: "sonnet", prompt: "Run the `joes-workshop:dispatcher` skill." },
   {
     skill: "surveys",
     days: ["mon", "wed", "fri"],
