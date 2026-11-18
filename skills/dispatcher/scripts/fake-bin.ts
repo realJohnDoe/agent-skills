@@ -15,6 +15,7 @@
 //   --show-toplevel` answers the working directory. The board push's commands
 //   (fetch, rev-parse FETCH_HEAD, hash-object, mktree, commit-tree, push) answer
 //   made-up ids and are appended to $FAKE_GIT_LOG as `{args, input}` when it is set.
+//   `show FETCH_HEAD:board.json` answers $FAKE_GIT_BOARD, and fails when it is unset.
 import { appendFileSync, chmodSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
@@ -103,6 +104,10 @@ const git = (args: string[]) => {
     if (JSON.parse(process.env.FAKE_GIT_NOPUSH ?? "[]").includes(c))
       fail("remote: Permission denied.\nfatal: unable to access: The requested URL returned error: 403");
     return;
+  }
+  if (cmd === "show FETCH_HEAD:board.json") {
+    if (!process.env.FAKE_GIT_BOARD) fail("fatal: path 'board.json' does not exist");
+    return process.stdout.write(process.env.FAKE_GIT_BOARD);
   }
   const board = ["fetch", "rev-parse", "hash-object", "mktree", "commit-tree", "push"];
   if (board.includes(rest.find((a) => board.includes(a)) ?? "")) {

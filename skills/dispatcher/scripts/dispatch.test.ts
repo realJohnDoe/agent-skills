@@ -127,7 +127,13 @@ const run = (
   script: string,
   args: string[],
   fixture: unknown,
-  { apply = false, missing = [], noPush = [], attach = [] }: { apply?: boolean; missing?: string[]; noPush?: string[]; attach?: string[] } = {},
+  {
+    apply = false,
+    missing = [],
+    noPush = [],
+    attach = [],
+    pushedBoard,
+  }: { apply?: boolean; missing?: string[]; noPush?: string[]; attach?: string[]; pushedBoard?: unknown } = {},
 ) => {
   const dir = mkdtempSync(join(tmpdir(), "workshop-test-"));
   const checkouts = join(dir, "checkouts");
@@ -161,6 +167,7 @@ const run = (
         FAKE_GIT_REMOTES: JSON.stringify(remotes),
         FAKE_GIT_NOPUSH: JSON.stringify(noPush.map((r) => join(checkouts, r.split("/")[1]))),
         FAKE_GIT_LOG: gitLog,
+        ...(pushedBoard ? { FAKE_GIT_BOARD: JSON.stringify(pushedBoard) } : {}),
         ...(apply ? { FAKE_GH_LOG: log } : {}),
       },
     },
@@ -387,6 +394,43 @@ describe("dispatch --apply --board-only", () => {
     assert.equal(paused.plan.board.state, "paused");
     assert.deepEqual(paused.plan.board.paused, { since: "2026-11-13", snapshot: "https://github.com/x/issues/50#c1" });
     assert.deepEqual(paused.writes.filter((w) => w.body?.labels?.[0] !== "waiting-for-human"), []);
+  });
+});
+
+describe("dispatch --apply --board-refresh", () => {
+  // Every repo but agent-skills is unpushable, as on the Actions token.
+  const opts = { apply: true, attach: [DIGEST], noPush: [M, T] };
+  const res = run("dispatch.ts", ["--board-refresh"], withBoardRepo(world()), opts);
+
+  test("pushes the board and writes nothing else: no label, digest, merge or session", () => {
+    assert.equal(res.status, 0, res.stderr);
+    assert.deepEqual(res.writes, []);
+    assert.deepEqual(res.plan.sessions, []);
+    assert.deepEqual(res.plan.waitingLabel, []);
+    assert.ok(boardPush(res.gitCalls));
+    assert.equal(res.plan.board.pushed, true);
+  });
+
+  test("checks no push access, so the Actions token's limits make no Can't push banner", () => {
+    assert.equal(res.gitCalls.some((c) => c.args.includes("--dry-run")), false);
+    assert.deepEqual(res.plan.board.cantPush, []);
+  });
+
+  test("keeps the pushed board's Can't push banners, and skips the push when nothing else changed", () => {
+    const cantPush = [{ repo: T, reason: "can't push (403)" }];
+    const before = run("dispatch.ts", ["--board-refresh"], withBoardRepo(world()), { ...opts, pushedBoard: { ...res.plan.board, cantPush } });
+    assert.equal(before.status, 0, before.stderr);
+    const { pushed, why, ...pushedBoard } = before.plan.board;
+    assert.deepEqual(pushedBoard.cantPush, cantPush);
+    assert.equal(pushed, true); // its banner differed from res's board
+
+    const same = run("dispatch.ts", ["--board-refresh"], withBoardRepo(world()), {
+      ...opts,
+      pushedBoard: { ...pushedBoard, generated: "2026-11-12T00:00:00Z" },
+    });
+    assert.equal(same.status, 0, same.stderr);
+    assert.equal(boardPush(same.gitCalls), undefined);
+    assert.deepEqual([same.plan.board.pushed, same.plan.board.why], [false, "unchanged"]);
   });
 });
 

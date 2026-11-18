@@ -3,13 +3,15 @@
 // which PRs need a follow-up session or get merged, and the one shared digest.
 // See ../SKILL.md.
 // Usage: node dispatch.ts --digest owner/repo [--apply] [--followups-only] [--digest-only]
-//   [--board-only] [--max-sessions N] [--max-followups N] [--today YYYY-MM-DD] [--repos o/r,...]
+//   [--board-only] [--board-refresh] [--max-sessions N] [--max-followups N] [--today YYYY-MM-DD] [--repos o/r,...]
 //   [--checkouts dir]
 // Without --apply it is a dry run: it prints the plan and writes nothing. The
 // digest is written only by --apply --digest-only, the last step of a run, once
 // the sessions have finished; --apply alone does not write it. The same step pushes
 // board.json to the workshop-board branch and puts `waiting-for-human` on exactly the
 // board's Waiting for human cards; --board-only does only those two (drain's last step).
+// --board-refresh only rebuilds and pushes the board, between runs, so manual changes
+// show; it writes to no repo, so it runs on the Actions token (board-refresh.yml).
 import { readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -59,7 +61,9 @@ const APPLY = flag("--apply");
 const FOLLOWUPS_ONLY = flag("--followups-only"); // drain: merge and follow up, start nothing new
 const DIGEST_ONLY = flag("--digest-only"); // end of run: write only the digest
 const BOARD_ONLY = flag("--board-only"); // drain: write only the board, nothing else
-const FINAL = DIGEST_ONLY || BOARD_ONLY; // reads everything, starts nothing, merges nothing
+// between runs: push only the board, and only when it changed; no label, no push check
+const REFRESH = flag("--board-refresh");
+const FINAL = DIGEST_ONLY || BOARD_ONLY || REFRESH; // reads everything, starts nothing, merges nothing
 const BOARD_REPO = "realJohnDoe/agent-skills";
 const BOARD_BRANCH = "workshop-board";
 const MAX_SESSIONS = Number(arg("--max-sessions", 4)); // across all repos
@@ -143,7 +147,10 @@ const lookup = ({ repo, number }: Blocker) => {
 main(() => {
   const { digest: DIGEST, repos } = loadConfig();
   // A repo it can't push to gets no writes and a digest entry, not a stopped run.
-  const unpushableRepos = unpushable(repos);
+  // A refresh writes to no repo and runs where only the board's repo is pushable,
+  // so it keeps the last pushed board's Can't push banners instead of checking.
+  const last = REFRESH ? lastBoard(repos) : undefined;
+  const unpushableRepos = REFRESH ? (last?.cantPush ?? []) : unpushable(repos);
   const noPush = new Set(unpushableRepos.map((u) => u.repo));
 
   // The digest's state is read first: its window bounds "merged since".
@@ -256,7 +263,7 @@ main(() => {
     },
   );
 
-  if (BOARD_ONLY) {
+  if (BOARD_ONLY || REFRESH) {
     const { state: pause, snap } = readPause(DIGEST);
     if (pause === "paused" && snap) {
       board.state = "paused";
@@ -281,8 +288,9 @@ main(() => {
     followupsOnly: FOLLOWUPS_ONLY,
   });
   // The final step mirrors the Waiting for human stage onto GitHub as a label; never
-  // in a repo it can't push to. Read in every final run, dry or not, so the plan shows it.
-  const waitingLabel: LabelSync[] = FINAL
+  // in a repo it can't push to. Read in every final run, dry or not, so the plan shows it;
+  // a refresh leaves it to the next run, as it writes to no repo.
+  const waitingLabel: LabelSync[] = FINAL && !REFRESH
     ? labelSync(
         board,
         repos
@@ -346,7 +354,8 @@ main(() => {
         for (const n of remove)
           write(`unlabel ${repo}#${n}`, `repos/${repo}/issues/${n}/labels/${WAITING_LABEL}`, {}, "DELETE");
       }
-      pushed = pushBoard(board, repos);
+      // A refresh with nothing new pushes nothing, so the branch and Pages stay quiet.
+      pushed = REFRESH && last && sameBoard(board, last) ? { pushed: false, why: "unchanged" } : pushBoard(board, repos);
     }
   }
 
@@ -371,6 +380,22 @@ main(() => {
     ),
   );
 });
+
+// The board.json on the workshop-board branch, or undefined when it can't be read.
+function lastBoard(repos: Repo[]): Board | undefined {
+  const clone = repos.find((r) => r.repo.toLowerCase() === BOARD_REPO.toLowerCase());
+  if (!clone) return undefined;
+  try {
+    run("git", ["-C", clone.path, "fetch", "origin", BOARD_BRANCH]);
+    return JSON.parse(run("git", ["-C", clone.path, "show", "FETCH_HEAD:board.json"]));
+  } catch {
+    return undefined;
+  }
+}
+// Two boards with the same cards and state, whenever each was generated.
+function sameBoard(a: Board, b: Board) {
+  return JSON.stringify({ ...a, generated: "" }) === JSON.stringify({ ...b, generated: "" });
+}
 
 // Commits board.json (and the Pages workflow) onto the tip of the workshop-board branch
 // with plumbing, so the clone's working tree and branches stay untouched, and pushes it.
