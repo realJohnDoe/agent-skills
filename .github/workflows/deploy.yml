@@ -1,0 +1,41 @@
+# Deploys the workshop board to GitHub Pages. The dispatcher pushes this file with
+# board.json to the workshop-board branch (dispatch.ts, pushBoard); it is not run from main.
+name: Deploy board
+
+on:
+  push:
+    branches: [workshop-board]
+
+permissions:
+  pages: write
+  id-token: write
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+      - uses: actions/checkout@v7
+        with:
+          ref: workshop-board
+          path: pushed
+      - name: Assemble the site
+        run: |
+          mkdir _site
+          cp skills/dispatcher/board/{index.html,board.css,render.js,banner.jpg} _site/
+          cp pushed/board.json _site/
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4
