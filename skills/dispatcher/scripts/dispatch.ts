@@ -147,8 +147,11 @@ main(() => {
   // The digest's state is read first: its window bounds "merged since", and a refresh
   // covers the repos the last run did, read from it, rather than attached clones.
   const DIGEST = digestArg();
+  // Attached clones are read before any GitHub call, so a run started from the wrong
+  // folder stops on that, not on a failed lookup.
+  const attached = REFRESH ? [] : loadConfig().repos;
   const state = readDigest(DIGEST, TODAY);
-  const repos = REFRESH ? coveredRepos(state.covered) : loadConfig().repos;
+  const repos = REFRESH ? coveredRepos(state.covered) : attached;
   // A repo it can't push to gets no writes and a digest entry, not a stopped run.
   // A refresh writes nothing, and runs on a token that can push to no other repo.
   const unpushableRepos = REFRESH ? [] : unpushable(repos);
