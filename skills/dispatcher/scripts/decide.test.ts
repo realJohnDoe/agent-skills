@@ -14,6 +14,7 @@ import {
   tierOf,
 } from "./decide.ts";
 import type { PrVerdict } from "./decide.ts";
+import { WAITING_LABEL } from "./board.ts";
 
 describe("linkedIssues", () => {
   test("closing keywords in any case, each named issue once per mention", () => {
@@ -400,4 +401,27 @@ describe("claimState", () => {
     assert.deepEqual(claimState({ tiered: true, dispatchedAt: "2026-11-13T00:00:00Z" }), { kind: "unstick" });
     assert.deepEqual(claimState({ tiered: true, dispatchedAt: "2026-11-10T00:00:00Z" }), { kind: "unstick" });
   });
+});
+
+// `waiting-for-human` is the dispatcher's own output (board.ts, labelSync): reading it
+// back would make a run decide on a stale copy of the last run's stage.
+describe("the waiting-for-human label changes no decision", () => {
+  const facts = [
+    { title: "t", labels: ["sonnet", "ready-for-agent"], assignees: 0, subIssues: 0, linked: false, blockers: [] },
+    { title: "t", labels: ["sonnet"], assignees: 0, subIssues: 0, linked: false, blockers: [] },
+    { title: "t", labels: [], assignees: 0, subIssues: 0, linked: false, blockers: [] },
+    { title: "t", labels: ["opus"], assignees: 0, subIssues: 0, linked: false, blockers: [], question: "Which?" },
+  ];
+  for (const f of facts)
+    test(`issueState with labels [${f.labels.join(", ")}]`, () =>
+      assert.deepEqual(issueState({ ...f, labels: [...f.labels, WAITING_LABEL] }), issueState(f)));
+
+  const green = [{ name: "build", status: "completed", conclusion: "success", html_url: "u/b" }];
+  const base = {
+    dependabot: false, autoMerge: false, runs: green, mergeable: true, headDate: "2026-11-10T12:00:00Z",
+    comments: [], reviewComments: [], reviews: [], today: new Date("2026-11-13"), maxFollowups: 2, staleDays: 2,
+  };
+  for (const labels of [[], ["automerge"]])
+    test(`prVerdict with labels [${labels.join(", ")}]`, () =>
+      assert.deepEqual(prVerdict({ ...base, labels: [...labels, WAITING_LABEL] }), prVerdict({ ...base, labels })));
 });

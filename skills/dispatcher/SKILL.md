@@ -18,7 +18,7 @@ The `timetable` skill starts the dispatcher on the ticks its table names (`scrip
 6. Don't subscribe to PR activity, yours or the sessions'. Tomorrow's run is the follow-up. Don't open PRs or issues yourself beyond what the script writes and what the subagents open.
 7. Check each **Unstick** issue that says "no PR yet" and was dispatched before today: look for an open or merged PR on its `claude/issue-<n>` branch. If one exists, its description names the wrong issue. Notify the maintainer with both links, and don't call the run quiet.
 8. If `sessions`, `automerge`, `unpushable` and `digest.replies` are all empty and step 7 found nothing, the run is quiet: post nothing, but still do step 9.
-9. Last, run `node scripts/dispatch.ts --apply --digest-only`. It reads every repo again and makes no write but the digest: no merges, labels, claims or comments, and it starts no sessions. It rewrites the draft, so it shows the PRs the sessions opened and whatever merged during the run, and it publishes the draft when due. Last it pushes `board.json` to the `workshop-board` branch, whose `deploy.yml` (the template `board/deploy.yml`) deploys the board to Pages; read `board.pushed` in its output, and report `board.why` when it is false. Run it on every non-paused run, even a quiet one, and only after step 5 has posted its `<!-- workshop-relayed -->` comment, or the next run relays the same replies again.
+9. Last, run `node scripts/dispatch.ts --apply --digest-only`. It reads every repo again and makes no write but the digest and the `waiting-for-human` label: no merges, other labels, claims or comments, and it starts no sessions. It rewrites the draft, so it shows the PRs the sessions opened and whatever merged during the run, and it publishes the draft when due. Then it puts the `waiting-for-human` label on every issue and PR in the board's Waiting for human stage and removes it from everything else, closed items included, except in repos it can't push to; `waitingLabel` in its output lists what it added and removed, and a dry run lists the same without writing. Last it pushes `board.json` to the `workshop-board` branch, whose `deploy.yml` (the template `board/deploy.yml`) deploys the board to Pages; read `board.pushed` in its output, and report `board.why` when it is false. Run it on every non-paused run, even a quiet one, and only after step 5 has posted its `<!-- workshop-relayed -->` comment, or the next run relays the same replies again.
 
 ### Dry run
 
@@ -96,7 +96,7 @@ To re-dispatch a stuck issue, unassign it. To keep a PR out of the workshop, mar
 
 ### Labels
 
-What each issue and PR label means, and who sets it, is in the `conventions` skill (`../conventions/SKILL.md`). Change a meaning there and in `decide.ts` together. The one label of the workshop's own is `workshop-paused`, on the digest, which pauses every repo (below).
+What each issue and PR label means, and who sets it, is in the `conventions` skill (`../conventions/SKILL.md`). Change a meaning there and in `decide.ts` together. The labels of the workshop's own are `workshop-paused`, on the digest, which pauses every repo (below), and `waiting-for-human`, which the final step writes (step 9). That one is output only: `labelSync` in `scripts/board.ts` computes it from the board, and `decide.test.ts` pins that no decision reads it.
 
 ## Pausing
 
@@ -120,7 +120,7 @@ Each transition posts its marker comment (`workshop-snapshot`, `workshop-resumed
    - Issues assigned with no PR are unassigned.
 
    Then it posts one snapshot on the digest: per repo, the date, the base commit, what was closed, and open decisions.
-4. `node scripts/dispatch.ts --apply --board-only` pushes the board with `state: paused`, linked to the snapshot. It reads every repo and writes nothing else: no digest, merges, labels, claims, comments or sessions.
+4. `node scripts/dispatch.ts --apply --board-only` pushes the board with `state: paused`, linked to the snapshot, and updates the `waiting-for-human` label as step 9 does. It reads every repo and writes nothing else: no digest, merges, other labels, claims, comments or sessions.
 
 **Resume**
 

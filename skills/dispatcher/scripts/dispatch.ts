@@ -8,7 +8,8 @@
 // Without --apply it is a dry run: it prints the plan and writes nothing. The
 // digest is written only by --apply --digest-only, the last step of a run, once
 // the sessions have finished; --apply alone does not write it. The same step pushes
-// board.json to the workshop-board branch; --board-only does only that (drain's last step).
+// board.json to the workshop-board branch and puts `waiting-for-human` on exactly the
+// board's Waiting for human cards; --board-only does only those two (drain's last step).
 import { readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -33,7 +34,7 @@ import {
   READY,
   tierOf,
 } from "./decide.ts";
-import { type Board, type Card, type BoardPlan, buildBoard } from "./board.ts";
+import { type Board, type Card, type BoardPlan, type LabelSync, WAITING_LABEL, buildBoard, labelSync } from "./board.ts";
 import { buildDigest, readDigest, writeDigest } from "./digest.ts";
 import type { GhCheckRuns, GhComment, GhIssue, GhPull, GhReview, GhSearch } from "./github.ts";
 import {
@@ -77,6 +78,7 @@ const LABELS: Record<string, string> = {
   [READY]: "0e8a16",
   [AUTOMERGE]: "0e8a16",
   preview: "1d76db",
+  [WAITING_LABEL]: "d93f0b",
 };
 const days = (iso: string) => (+TODAY - +new Date(iso)) / 864e5;
 type Dated = { repo: string; created: string };
@@ -278,6 +280,21 @@ main(() => {
     now: NOW,
     followupsOnly: FOLLOWUPS_ONLY,
   });
+  // The final step mirrors the Waiting for human stage onto GitHub as a label; never
+  // in a repo it can't push to. Read in every final run, dry or not, so the plan shows it.
+  const waitingLabel: LabelSync[] = FINAL
+    ? labelSync(
+        board,
+        repos
+          .filter((r) => !noPush.has(r.repo))
+          .flatMap((r) =>
+            all<GhIssue>(`repos/${r.repo}/issues?labels=${WAITING_LABEL}&state=all&per_page=100`)
+              .filter((i) => names(i).includes(WAITING_LABEL))
+              .map((i) => ({ repo: r.repo, number: i.number })),
+          ),
+      ).filter((s) => !noPush.has(s.repo))
+    : [];
+
   const digest = {
     repo: DIGEST,
     draft: state.draft?.number ?? null,
@@ -314,7 +331,23 @@ main(() => {
         digest.published = w.published;
       }
     }
-    if (FINAL) pushed = pushBoard(board, repos);
+    if (FINAL) {
+      // Each write on its own: one refused is logged and corrected on the next run.
+      const write = (what: string, path: string, body: unknown, method?: string) => {
+        try {
+          post(path, body, method);
+        } catch (e) {
+          const err = e as { stderr?: string; message: string };
+          console.error(`${what} refused: ${err.stderr ?? err.message}`);
+        }
+      };
+      for (const { repo, add, remove } of waitingLabel) {
+        for (const n of add) write(`label ${repo}#${n}`, `repos/${repo}/issues/${n}/labels`, { labels: [WAITING_LABEL] });
+        for (const n of remove)
+          write(`unlabel ${repo}#${n}`, `repos/${repo}/issues/${n}/labels/${WAITING_LABEL}`, {}, "DELETE");
+      }
+      pushed = pushBoard(board, repos);
+    }
   }
 
   console.log(
@@ -330,6 +363,7 @@ main(() => {
           .slice(FINAL ? Infinity : MAX_SESSIONS)
           .map((s) => `${s.repo}: ${s.title}`),
         digest: { ...digest, body: built.body },
+        waitingLabel,
         board: { ...board, ...pushed },
       },
       null,

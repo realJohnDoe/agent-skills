@@ -96,3 +96,28 @@ export const buildBoard = (plan: BoardPlan, run: BoardRun): Board => {
     },
   };
 };
+
+// Output only: the dispatcher writes this label to mirror the Waiting for human stage on
+// GitHub, and nothing reads it back. decide.ts must never look at it (decide.test.ts pins that).
+export const WAITING_LABEL = "waiting-for-human";
+
+export type LabelSync = { repo: string; add: number[]; remove: number[] };
+
+/**
+ * The label writes that make `WAITING_LABEL` sit on exactly the Waiting for human cards
+ * (not the parked fold), per repo. `labelled` is every issue or PR in a covered repo that
+ * has the label now, open or closed: a closed one loses it. Repos with nothing to do are left out.
+ */
+export const labelSync = (board: Board, labelled: { repo: string; number: number }[]): LabelSync[] => {
+  const key = (x: { repo: string; number: number }) => `${x.repo.toLowerCase()}#${x.number}`;
+  const want = new Map(board.stages.waiting.cards.map((c) => [key(c), c]));
+  const have = new Set(labelled.map(key));
+  const numbers = (xs: { number: number }[]) => [...new Set(xs.map((x) => x.number))].sort((a, b) => a - b);
+  return board.repos
+    .map((repo) => ({
+      repo,
+      add: numbers([...want.values()].filter((c) => c.repo === repo && !have.has(key(c)))),
+      remove: numbers(labelled.filter((x) => x.repo === repo && !want.has(key(x)))),
+    }))
+    .filter((s) => s.add.length || s.remove.length);
+};

@@ -96,6 +96,7 @@ Close the issue from the body with `Fixes #n`. For an issue with an `## After me
 | `ready-for-agent` | issue | the maintainer | The go-ahead; with a tier label, the issue is dispatched once unblocked; removing it parks the issue under Go ahead? |
 | `automerge` | PR | whoever opens it; a repo's Dependabot workflow for non-major bumps | Merged by the dispatcher once green and quiet |
 | `preview` | PR | whoever opens a PR that changes what a page looks like; the maintainer on any PR | Deploys a live preview of the PR, in a repo with PR previews |
+| `waiting-for-human` | issue, PR | the dispatcher only, at the end of each run | It is in the board's Waiting for human stage: a filter for GitHub, as fresh as the last run. Never set or remove it by hand, and never read it to decide anything: the dispatcher rewrites it from the stage each run |
 
 `decision-required` is retired. A `## Decision needed` section replaces it, and the dispatcher ignores the label. `opus-plan` is retired too: use `plan` with `opus`.
 

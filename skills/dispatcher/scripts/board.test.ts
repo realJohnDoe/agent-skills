@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { render } from "../board/render.js";
-import { type BoardPlan, buildBoard } from "./board.ts";
+import { type BoardPlan, buildBoard, labelSync } from "./board.ts";
 import type { Item } from "./lib.ts";
 
 const R = "o/r";
@@ -127,5 +127,22 @@ describe("render", () => {
   test("escapes what it shows", () => {
     const h = render({ ...board, stages: { ...stages, queue: [{ ...stages.queue[0], title: "<b>&" }] } }, now);
     assert.match(h, />&lt;b&gt;&amp;</);
+  });
+});
+
+describe("labelSync", () => {
+  // Waiting for human here: #16 (after merge), #10 (review), #3 (go-ahead), #2 (decide); #5 is parked.
+  test("adds to every Waiting for human card, never to a parked one or another stage", () =>
+    assert.deepEqual(labelSync(board, []), [{ repo: R, add: [2, 3, 10, 16], remove: [] }]));
+
+  test("removes it from whatever else has it, and leaves cards that have it alone", () =>
+    assert.deepEqual(
+      labelSync(board, [{ repo: R, number: 2 }, { repo: R, number: 5 }, { repo: R, number: 1 }, { repo: "O/R", number: 10 }]),
+      [{ repo: R, add: [3, 16], remove: [1, 5] }],
+    ));
+
+  test("nothing to do, nothing listed; a repo the board doesn't cover is never touched", () => {
+    const all = [2, 3, 10, 16].map((number) => ({ repo: R, number }));
+    assert.deepEqual(labelSync(board, [...all, { repo: "o/other", number: 1 }]), []);
   });
 });
