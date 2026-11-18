@@ -5,7 +5,7 @@ description: Run one tick of the workshop's schedule: work out which workshop ta
 
 # Timetable
 
-The `Timetable` routine fires twice a day and runs only this skill. The schedule is one table in git, `TABLE` in `scripts/schedule.ts`: each entry names a skill, its days, its tick (`am` or `pm`) and the `model` its run gets, as a tier (`haiku`, `sonnet` or `opus`), never a model ID. Changing a schedule means a PR that changes that table.
+The `Timetable` routine fires twice a day and runs only this skill. The schedule is one table in git, `TABLE` in `scripts/schedule.ts`: each entry names a skill, its days, its tick (`am` or `pm`) and the `model` its run gets, as a tier (`haiku`, `sonnet` or `opus`), never a model ID. Changing a schedule means a PR that changes that table. The dispatcher runs on both ticks, every day.
 
 ## The run
 
