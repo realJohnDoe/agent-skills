@@ -48,7 +48,7 @@ describe("buildBoard", () => {
       ...stages.waiting.parked,
       ...stages.queue,
       ...stages.prInProgress,
-      ...stages.blocked,
+      ...stages.behind,
     ];
     const left = 1; // the dispatched issue
     const { cantPush, ...lists } = plan; // a banner, not a card
@@ -69,7 +69,7 @@ describe("buildBoard", () => {
     assert.deepEqual(stages.waiting.cards.find((c) => c.number === 16)?.prs, [40, 41]);
     assert.deepEqual(stages.waiting.parked.map((p) => p.number), [5]);
     assert.deepEqual(stages.queue.map((c) => c.number), [6, 7]);
-    assert.deepEqual(stages.blocked.map((c) => [c.number, c.sub]), [[4, "blocked"]]);
+    assert.deepEqual(stages.behind.map((c) => [c.number, c.sub]), [[4, "blocked"]]);
   });
 
   test("PRs in progress: red, pending, then automerge", () => {
@@ -90,8 +90,8 @@ describe("render", () => {
 
   test("one module per stage, each holding its cards", () => {
     const ids = [...html.matchAll(/class="module m-(\w+)"/g)].map((m) => m[1]);
-    assert.deepEqual(ids, ["stuck", "waiting", "closed", "pr", "queue", "blocked"]);
-    const cards = { stuck: stages.stuck, waiting: stages.waiting.cards, closed: stages.closed, pr: stages.prInProgress, queue: stages.queue, blocked: stages.blocked };
+    assert.deepEqual(ids, ["stuck", "waiting", "closed", "pr", "queue", "behind"]);
+    const cards = { stuck: stages.stuck, waiting: stages.waiting.cards, closed: stages.closed, pr: stages.prInProgress, queue: stages.queue, behind: stages.behind };
     for (const [id, cs] of Object.entries(cards)) for (const c of cs) assert.match(section(html, id), new RegExp(`>${c.title}</a>`), `${id}: ${c.title}`);
     assert.match(section(html, "stuck"), /Can&#39;t push to o\/x/);
     assert.match(section(html, "waiting"), /<summary>1 parked<\/summary>[\s\S]*>T5<\/a>/);

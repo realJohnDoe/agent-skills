@@ -31,7 +31,7 @@ export type Board = {
     queue: Card[];
     prInProgress: Card[];
     closed: Card[];
-    blocked: Card[]; // issues waiting on another open issue
+    behind: Card[]; // Behind another issue: issues blocked by another open issue
   };
 };
 
@@ -92,7 +92,7 @@ export const buildBoard = (plan: BoardPlan, run: BoardRun): Board => {
         .sort((a, b) => prRank(a.c) - prRank(b.c) || a.i - b.i)
         .map(({ c }) => c),
       closed: run.closed,
-      blocked: plan.notPicked.filter(blocked).map(why("blocked")),
+      behind: plan.notPicked.filter(blocked).map(why("blocked")),
     },
   };
 };

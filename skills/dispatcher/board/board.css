@@ -136,7 +136,7 @@ main { max-width: 1080px; margin: 0 auto; }
 .m-closed { --c: var(--ok); }
 .m-pr { --c: var(--holo); }
 .m-queue { --c: var(--indigo); }
-.m-blocked { --c: var(--muted); }
+.m-behind { --c: var(--muted); }
 
 /* ---------- readout cards ---------- */
 .card {
