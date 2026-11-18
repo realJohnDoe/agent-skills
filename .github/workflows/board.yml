@@ -27,6 +27,7 @@ on:
     branches: [main]
     paths:
       - skills/dispatcher/**
+      - skills/_shared/**
       - .github/workflows/board.yml
   workflow_dispatch:
 
@@ -35,10 +36,12 @@ permissions:
   pages: write
   id-token: write
 
-# One build at a time; a newer one supersedes a running one, as it reads fresher state.
+# One build at a time. A running one finishes, so a deploy is never cut off and leaves a
+# cancelled check on the PR that started it; GitHub keeps at most one run waiting and
+# drops older waiting ones, so the newest state still lands right after.
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:

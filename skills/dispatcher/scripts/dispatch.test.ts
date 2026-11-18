@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { describe, test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { fakeBin } from "./fake-bin.ts";
+import { fakeBin } from "../../_shared/fake-bin.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const DIGEST = "realJohnDoe/agent-skills";
