@@ -97,8 +97,8 @@ describe("render", () => {
     assert.match(section(html, "waiting"), /<summary>1 parked<\/summary>[\s\S]*>T5<\/a>/);
     assert.match(section(html, "waiting"), /<h2>Waiting for human<\/h2>/);
     assert.match(section(html, "waiting"), /href="https:\/\/github.com\/o\/r\/pull\/40"[^>]*>PR #40</);
-    assert.match(section(html, "waiting"), /needs review/);
-    assert.doesNotMatch(section(html, "pr"), /needs review/);
+    assert.match(section(html, "waiting"), />Needs review</);
+    assert.doesNotMatch(section(html, "pr"), />Needs review</);
     assert.match(html, /as of <b>2026-11-17 00:00 UTC<\/b>/);
   });
 

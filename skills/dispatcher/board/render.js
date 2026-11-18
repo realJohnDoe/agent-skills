@@ -27,7 +27,7 @@ const card = (c) => {
   if (c.tier) chips.push(`<span class="chip tier">${c.tier}</span>`);
   const sub = c.sub && SUB[/** @type {keyof typeof SUB} */ (c.sub)];
   if (sub) chips.push(`<span class="chip sub">${sub}</span>`);
-  if (c.needsReview) chips.push(`<span class="chip review">needs review</span>`);
+  if (c.needsReview) chips.push(`<span class="chip sub">Needs review</span>`); // styled like the other Waiting for human asks
   if (c.automerge) chips.push(`<span class="chip auto">automerge</span>`);
   if (c.check) chips.push(`<span class="check ${c.check}">${c.check}</span>`);
   return `<article class="card">

@@ -165,7 +165,6 @@ main { max-width: 1080px; margin: 0 auto; }
 .chip.sub { background: var(--metal-hi); color: var(--fg); }
 .chip.prlink { color: var(--holo); border-color: var(--holo); text-decoration: none; }
 .chip.prlink:hover { background: var(--holo-dim); }
-.chip.review { background: var(--warn); color: #241a00; }
 .chip.auto { background: var(--ok); color: #062312; }
 .check { display: inline-flex; align-items: center; gap: 5px; font: 11px var(--f-mono); color: var(--muted); }
 .check::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--l); box-shadow: 0 0 6px var(--l); }
