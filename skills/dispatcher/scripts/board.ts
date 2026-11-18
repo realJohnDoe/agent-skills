@@ -19,10 +19,10 @@ export type Card = {
 };
 export type Parked = { repo: string; number: number; title: string; url: string; reason: string };
 export type Board = {
-  generated: string; // ISO time of the run
+  generated: string; // ISO time it was built: a dispatcher run or the board workflow
+  lastRun?: string; // ISO time of the last dispatcher run, from the digest's marker
   repos: string[]; // owner/name of every repo covered
   digest: string; // URL of the current digest issue
-  cantPush: { repo: string; reason: string }[]; // repos it can't push to: a banner, not a card
   state: "normal" | "paused";
   paused?: { since: string; snapshot: string }; // set only when paused: date, snapshot comment URL
   stages: {
@@ -36,11 +36,11 @@ export type Board = {
 };
 
 /** The plan's lists. Follow-up sessions' PRs sit in `inProgress`; dispatched issues and `merged` have no stage. */
-export type BoardPlan = { cantPush: Board["cantPush"] } & Record<
+export type BoardPlan = Record<
   "review" | "unstick" | "decide" | "afterMerge" | "triage" | "inProgress" | "queue" | "notPicked" | "automerge",
   Item[]
 >;
-export type BoardRun = Pick<Board, "generated" | "repos" | "digest"> & { closed: Card[] };
+export type BoardRun = Pick<Board, "generated" | "repos" | "digest" | "lastRun"> & { closed: Card[] };
 
 const card = (x: Item, reason: string, extra: Partial<Card> = {}): Card => ({
   repo: x.repo,
@@ -68,7 +68,7 @@ export const buildBoard = (plan: BoardPlan, run: BoardRun): Board => {
     generated: run.generated,
     repos: run.repos,
     digest: run.digest,
-    cantPush: plan.cantPush,
+    ...(run.lastRun && { lastRun: run.lastRun }),
     state: "normal",
     stages: {
       stuck: plan.unstick.map(why("stuck")),

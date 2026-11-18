@@ -25,7 +25,7 @@ Where an issue or PR stands in the workshop's flow: Stuck, Waiting for human, Cl
 _Avoid_: Column, status
 
 **Stuck**:
-The stage for work the workshop can't move without the maintainer stepping in. That covers a PR at its follow-up cap, a stale follow-up and a dispatched issue with no PR. A repo it can't push to shows as a banner, not a Stuck card.
+The stage for work the workshop can't move without the maintainer stepping in. That covers a PR at its follow-up cap, a stale follow-up and a dispatched issue with no PR. A repo it can't push to isn't on the board: the digest lists it under Unstick.
 _Avoid_: Blocked, failed
 
 **Waiting for human**:

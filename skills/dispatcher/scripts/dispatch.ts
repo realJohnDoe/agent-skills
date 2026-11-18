@@ -3,17 +3,18 @@
 // which PRs need a follow-up session or get merged, and the one shared digest.
 // See ../SKILL.md.
 // Usage: node dispatch.ts --digest owner/repo [--apply] [--followups-only] [--digest-only]
-//   [--board-only] [--max-sessions N] [--max-followups N] [--today YYYY-MM-DD] [--repos o/r,...]
+//   [--board-only] [--board-refresh] [--max-sessions N] [--max-followups N] [--today YYYY-MM-DD] [--repos o/r,...]
 //   [--checkouts dir]
 // Without --apply it is a dry run: it prints the plan and writes nothing. The
 // digest is written only by --apply --digest-only, the last step of a run, once
-// the sessions have finished; --apply alone does not write it. The same step pushes
-// board.json to the workshop-board branch and puts `waiting-for-human` on exactly the
-// board's Waiting for human cards; --board-only does only those two (drain's last step).
-import { readFileSync } from "node:fs";
+// the sessions have finished; --apply alone does not write it. The same step puts
+// `waiting-for-human` on exactly the board's Waiting for human cards and starts the
+// board workflow; --board-only does only those two (drain's last step).
+// --board-refresh prints the board for that workflow (.github/workflows/board.yml),
+// which deploys it to Pages: it covers the repos the digest says the last run covered,
+// needs no clones, writes nothing and checks no push access, so it runs on the Actions token.
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { type Blocker, bodyBlockers } from "./bodyBlockers.ts";
 import {
   AUTOMERGE,
@@ -46,6 +47,7 @@ import {
   api,
   arg,
   flag,
+  digestArg,
   loadConfig,
   main,
   names,
@@ -58,10 +60,11 @@ import {
 const APPLY = flag("--apply");
 const FOLLOWUPS_ONLY = flag("--followups-only"); // drain: merge and follow up, start nothing new
 const DIGEST_ONLY = flag("--digest-only"); // end of run: write only the digest
-const BOARD_ONLY = flag("--board-only"); // drain: write only the board, nothing else
-const FINAL = DIGEST_ONLY || BOARD_ONLY; // reads everything, starts nothing, merges nothing
+const BOARD_ONLY = flag("--board-only"); // drain: only the label and the board workflow
+const REFRESH = flag("--board-refresh"); // the board workflow: print the board, write nothing
+const FINAL = DIGEST_ONLY || BOARD_ONLY || REFRESH; // reads everything, starts nothing, merges nothing
 const BOARD_REPO = "realJohnDoe/agent-skills";
-const BOARD_BRANCH = "workshop-board";
+const BOARD_WORKFLOW = "board.yml"; // builds the board and deploys it to Pages
 const MAX_SESSIONS = Number(arg("--max-sessions", 4)); // across all repos
 const MAX_FOLLOWUPS = Number(arg("--max-followups", 2)); // per PR
 const STALE_DAYS = 2; // a claim or follow-up with nothing to show after this is stuck
@@ -141,13 +144,16 @@ const lookup = ({ repo, number }: Blocker) => {
 };
 
 main(() => {
-  const { digest: DIGEST, repos } = loadConfig();
+  // The digest's state is read first: its window bounds "merged since", and a refresh
+  // covers the repos the last run did, read from it, rather than attached clones.
+  const DIGEST = digestArg();
+  const state = readDigest(DIGEST, TODAY);
+  const repos = REFRESH ? coveredRepos(state.covered) : loadConfig().repos;
   // A repo it can't push to gets no writes and a digest entry, not a stopped run.
-  const unpushableRepos = unpushable(repos);
+  // A refresh writes nothing, and runs on a token that can push to no other repo.
+  const unpushableRepos = REFRESH ? [] : unpushable(repos);
   const noPush = new Set(unpushableRepos.map((u) => u.repo));
 
-  // The digest's state is read first: its window bounds "merged since".
-  const state = readDigest(DIGEST, TODAY);
   const { since } = state;
 
   const first = repos.map((r) => {
@@ -237,7 +243,6 @@ main(() => {
 
   const board: Board = buildBoard(
     {
-      cantPush: unpushableRepos,
       review,
       unstick: pick("unstick"),
       decide,
@@ -252,11 +257,12 @@ main(() => {
       generated: NOW,
       repos: repos.map((r) => r.repo),
       digest: (state.published ?? state.draft)?.html_url ?? `https://github.com/${DIGEST}/issues`,
+      ...(state.lastRun && { lastRun: state.lastRun }),
       closed: latestClosed(repos),
     },
   );
 
-  if (BOARD_ONLY) {
+  if (BOARD_ONLY || REFRESH) {
     const { state: pause, snap } = readPause(DIGEST);
     if (pause === "paused" && snap) {
       board.state = "paused";
@@ -281,8 +287,9 @@ main(() => {
     followupsOnly: FOLLOWUPS_ONLY,
   });
   // The final step mirrors the Waiting for human stage onto GitHub as a label; never
-  // in a repo it can't push to. Read in every final run, dry or not, so the plan shows it.
-  const waitingLabel: LabelSync[] = FINAL
+  // in a repo it can't push to. Read in every final run, dry or not, so the plan shows it;
+  // a refresh leaves it to the next run, as it writes to no repo.
+  const waitingLabel: LabelSync[] = FINAL && !REFRESH
     ? labelSync(
         board,
         repos
@@ -305,8 +312,8 @@ main(() => {
   };
 
   // --- Apply ----------------------------------------------------------------
-  let pushed: { pushed: boolean; why?: string } | undefined;
-  if (APPLY) {
+  let refresh: { triggered: boolean; why?: string } | undefined;
+  if (APPLY && !REFRESH) {
     const me = sessions.length ? api<{ login: string }>("user").login : null;
     for (const s of sessions) {
       if (s.kind === "dispatch") {
@@ -346,7 +353,7 @@ main(() => {
         for (const n of remove)
           write(`unlabel ${repo}#${n}`, `repos/${repo}/issues/${n}/labels/${WAITING_LABEL}`, {}, "DELETE");
       }
-      pushed = pushBoard(board, repos);
+      refresh = triggerBoard();
     }
   }
 
@@ -365,7 +372,8 @@ main(() => {
           .map((s) => `${s.repo}: ${s.title}`),
         digest: { ...digest, body: built.body },
         waitingLabel,
-        board: { ...board, ...pushed },
+        board,
+        ...(refresh && { boardRefresh: refresh }),
       },
       null,
       2,
@@ -373,35 +381,24 @@ main(() => {
   );
 });
 
-// Commits board.json (and the Pages workflow) onto the tip of the workshop-board branch
-// with plumbing, so the clone's working tree and branches stay untouched, and pushes it.
-// Judged by the push's exit code: the proxy prints "push negotiation failed" on success.
-function pushBoard(board: Board, repos: Repo[]): { pushed: boolean; why?: string } {
-  const clone = repos.find((r) => r.repo.toLowerCase() === BOARD_REPO.toLowerCase());
-  if (!clone) return { pushed: false, why: `${BOARD_REPO} isn't attached` };
-  const git = (input: string | undefined, ...args: string[]) =>
-    run("git", ["-C", clone.path, ...args], input).trim();
+// The repos the last run covered, as the digest names them, without clones: a refresh
+// reads only GitHub, so a repo's path is never used.
+function coveredRepos(covered: string[] | undefined): Repo[] {
+  if (!covered?.length)
+    throw new Error("the digest names no covered repos yet (no digest-repos marker): run the dispatcher once first");
+  return covered.map((repo) => ({ repo, name: repo.split("/")[1], path: "" }));
+}
+
+// Starts the board workflow on main, so the board shows this run's writes now rather
+// than at its next scheduled refresh. A refusal is reported, not fatal: the schedule
+// catches up.
+function triggerBoard(): { triggered: boolean; why?: string } {
   try {
-    git(undefined, "fetch", "origin", BOARD_BRANCH);
-    const tip = git(undefined, "rev-parse", "FETCH_HEAD");
-    const blob = (text: string) => git(text, "hash-object", "-w", "--stdin");
-    const deploy = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../board/deploy.yml"), "utf8");
-    const workflows = git(`100644 blob ${blob(deploy)}\tdeploy.yml\n`, "mktree");
-    const dotGithub = git(`040000 tree ${workflows}\tworkflows\n`, "mktree");
-    const root = git(
-      `100644 blob ${blob(JSON.stringify(board, null, 2) + "\n")}\tboard.json\n040000 tree ${dotGithub}\t.github\n`,
-      "mktree",
-    );
-    const commit = git(
-      undefined,
-      "-c", "user.name=Workshop dispatcher", "-c", "user.email=noreply@anthropic.com",
-      "commit-tree", root, "-p", tip, "-m", `Board ${board.generated}`,
-    );
-    git(undefined, "push", "origin", `${commit}:refs/heads/${BOARD_BRANCH}`);
-    return { pushed: true };
+    post(`repos/${BOARD_REPO}/actions/workflows/${BOARD_WORKFLOW}/dispatches`, { ref: "main" });
+    return { triggered: true };
   } catch (e) {
     const err = e as { stderr?: Buffer | string; message: string };
-    return { pushed: false, why: (err.stderr || err.message).toString().trim().split("\n").at(-1) };
+    return { triggered: false, why: (err.stderr || err.message).toString().trim().split("\n").at(-1) };
   }
 }
 
