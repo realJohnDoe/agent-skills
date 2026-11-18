@@ -74,10 +74,10 @@ export const buildBoard = (plan: BoardPlan, run: BoardRun): Board => {
       stuck: plan.unstick.map(why("stuck")),
       waiting: {
         cards: [
-          ...plan.decide.map((x) => card(x, x.why ?? "needs a decision", { sub: "decide" })),
           ...plan.afterMerge.map((x) => card(x, x.why ?? "after merge", { sub: "afterMerge" })),
           ...plan.review.map((x) => card(x, x.why ?? "green; waiting for your review", { needsReview: true })),
           ...plan.triage.map((x) => card(x, "waiting for your go-ahead", { sub: "goAhead" })),
+          ...plan.decide.map((x) => card(x, x.why ?? "needs a decision", { sub: "decide" })),
         ],
         parked: plan.notPicked
           .filter((x) => !blocked(x))

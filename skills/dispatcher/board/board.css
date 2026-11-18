@@ -96,7 +96,6 @@ main { max-width: 1080px; margin: 0 auto; }
 }
 .status b { color: var(--fg); font-weight: 600; }
 .status b.bad { color: var(--bad); }
-.status b.warn { color: var(--warn); }
 .status a { color: var(--holo); }
 .status .sep { width: 1px; height: 14px; background: var(--seam); }
 

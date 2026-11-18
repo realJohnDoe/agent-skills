@@ -75,13 +75,11 @@ export const render = (board, now = new Date()) => {
     notices.push(`<p class="notice stale">This board is ${age} days old: the workshop has not run since. Check its routine.</p>`);
 
   const stuck = [...board.cantPush.map(cantPushCard), ...s.stuck.map(card)];
-  const review = s.waiting.cards.filter((c) => c.needsReview).length;
   const blocked = s.blocked ?? []; // a board.json from before the Blocked stage has none
   const status = [
     `as of <b>${esc(when(board.generated))}</b>`,
     `repos <b>${board.repos.length}</b>`,
     `stuck <b class="bad">${stuck.length}</b>`,
-    `needs review <b class="warn">${review}</b>`,
     `waiting for human <b>${s.waiting.cards.length}</b>`,
     `queue <b>${s.queue.length}</b>`,
     `blocked <b>${blocked.length}</b>`,
@@ -96,7 +94,7 @@ export const render = (board, now = new Date()) => {
     `<div class="status">${status}</div>`,
     `<div class="line">`,
     stuck.length ? stageModule("stuck", "Stuck", "needs a hand", stuck, "") : "",
-    stageModule("waiting", "Waiting for human", "decide, after merge, review, go ahead", s.waiting.cards.map(card), "Nothing waits on you", parked),
+    stageModule("waiting", "Waiting for human", "after merge, review, go ahead, decide", s.waiting.cards.map(card), "Nothing waits on you", parked),
     stageModule("closed", "Closed", "latest 5", s.closed.map(card), "Nothing closed yet"),
     stageModule("pr", "PR in progress", "red first", s.prInProgress.map(card), "No open PRs"),
     stageModule("queue", "Queue", "in pickup order", s.queue.map(card), "Queue empty"),

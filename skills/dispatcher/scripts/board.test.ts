@@ -64,7 +64,7 @@ describe("buildBoard", () => {
     assert.deepEqual(board.cantPush, plan.cantPush);
     assert.deepEqual(
       stages.waiting.cards.map((c) => [c.number, c.sub ?? (c.needsReview && "review")]),
-      [[2, "decide"], [16, "afterMerge"], [10, "review"], [3, "goAhead"]],
+      [[16, "afterMerge"], [10, "review"], [3, "goAhead"], [2, "decide"]],
     );
     assert.deepEqual(stages.waiting.cards.find((c) => c.number === 16)?.prs, [40, 41]);
     assert.deepEqual(stages.waiting.parked.map((p) => p.number), [5]);

@@ -29,7 +29,7 @@ The stage for work the workshop can't move without the maintainer stepping in. T
 _Avoid_: Blocked, failed
 
 **Waiting for human**:
-The stage for work only the maintainer can move on: an open decision, an after-merge step, a green PR to review, and an issue that needs the go-ahead, in that order.
+The stage for work only the maintainer can move on: an after-merge step, a green PR to review, an issue that needs the go-ahead, and an open decision, in that order.
 
 **Blocked**:
 The stage, at the bottom of the board, for issues waiting on another open issue. Nothing there needs the maintainer until its blocker closes.
