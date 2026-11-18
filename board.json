@@ -1,5 +1,5 @@
 {
-  "generated": "2026-11-18T08:15:53.265Z",
+  "generated": "2026-11-18T12:34:14.693Z",
   "repos": [
     "realJohnDoe/agent-skills",
     "realJohnDoe/kenpo-notes",
@@ -15,9 +15,42 @@
   "cantPush": [],
   "state": "normal",
   "stages": {
-    "stuck": [],
+    "stuck": [
+      {
+        "repo": "realJohnDoe/agent-skills",
+        "kind": "issue",
+        "number": 89,
+        "title": "dispatcher: scripts find no repos when run from inside the installed plugin's skill folder",
+        "url": "https://github.com/realJohnDoe/agent-skills/issues/89",
+        "tier": "sonnet",
+        "reason": "dispatched 2026-11-18, no PR yet; unassign to re-dispatch"
+      },
+      {
+        "repo": "realJohnDoe/realJohnDoe.github.io",
+        "kind": "issue",
+        "number": 45,
+        "title": "Stale docs and identifiers: create-svelte README, gone nav, kenpo-quartz link, dark-mod theme",
+        "url": "https://github.com/realJohnDoe/realJohnDoe.github.io/issues/45",
+        "tier": "haiku",
+        "reason": "dispatched 2026-11-18, no PR yet; unassign to re-dispatch"
+      }
+    ],
     "waiting": {
       "cards": [
+        {
+          "repo": "realJohnDoe/agent-skills",
+          "kind": "issue",
+          "number": 49,
+          "title": "timetable: one routine and one schedule table in git for every workshop task",
+          "url": "https://github.com/realJohnDoe/agent-skills/issues/49",
+          "tier": "opus",
+          "prs": [
+            78,
+            56
+          ],
+          "reason": "Create the `Timetable` routine at https://claude.ai/code/scheduled: fire twice a day at the hours the skill names, attach every workshop repo with push access, and use the prompt \"Run the `timetable`…; merged in [realJohnDoe/agent-skills#78](https://github.com/realJohnDoe/agent-skills/pull/78)",
+          "sub": "afterMerge"
+        },
         {
           "repo": "realJohnDoe/meridian",
           "kind": "issue",
@@ -27,56 +60,6 @@
           "tier": "opus",
           "sub": "goAhead",
           "reason": "waiting for your go-ahead"
-        },
-        {
-          "repo": "realJohnDoe/agent-skills",
-          "kind": "issue",
-          "number": 50,
-          "title": "timetable: move the digest's publish days from the dispatcher into the timetable",
-          "url": "https://github.com/realJohnDoe/agent-skills/issues/50",
-          "tier": "sonnet",
-          "sub": "blocked",
-          "reason": "blocked by realJohnDoe/agent-skills#49"
-        },
-        {
-          "repo": "realJohnDoe/meridian",
-          "kind": "issue",
-          "number": 1391,
-          "title": "Remove old-origin code and infrastructure",
-          "url": "https://github.com/realJohnDoe/meridian/issues/1391",
-          "tier": "sonnet",
-          "sub": "blocked",
-          "reason": "blocked by realJohnDoe/meridian#1390"
-        },
-        {
-          "repo": "realJohnDoe/realJohnDoe.github.io",
-          "kind": "issue",
-          "number": 44,
-          "title": "Homepage content is hand-copied markup: timeline, cards and page wrapper duplicated",
-          "url": "https://github.com/realJohnDoe/realJohnDoe.github.io/issues/44",
-          "tier": "sonnet",
-          "sub": "blocked",
-          "reason": "blocked by realJohnDoe/realJohnDoe.github.io#43"
-        },
-        {
-          "repo": "realJohnDoe/realJohnDoe.github.io",
-          "kind": "issue",
-          "number": 43,
-          "title": "Icon links nest a <button> in an <a>: 144 tab stops on the homepage, plus invalid list and heading outline",
-          "url": "https://github.com/realJohnDoe/realJohnDoe.github.io/issues/43",
-          "tier": "sonnet",
-          "sub": "blocked",
-          "reason": "blocked by realJohnDoe/realJohnDoe.github.io#42"
-        },
-        {
-          "repo": "realJohnDoe/realJohnDoe.github.io",
-          "kind": "issue",
-          "number": 42,
-          "title": "Delete the never-flipped colored_icons toggle, the unused imageFit prop and ~2.6 MB of orphaned images",
-          "url": "https://github.com/realJohnDoe/realJohnDoe.github.io/issues/42",
-          "tier": "haiku",
-          "sub": "blocked",
-          "reason": "blocked by realJohnDoe/realJohnDoe.github.io#41"
         }
       ],
       "parked": []
@@ -84,33 +67,20 @@
     "queue": [],
     "prInProgress": [
       {
-        "repo": "realJohnDoe/realJohnDoe.github.io",
+        "repo": "realJohnDoe/agent-skills",
         "kind": "pr",
-        "number": 51,
-        "title": "fix: self-host Roboto and drop the render-blocking Google Fonts import",
-        "url": "https://github.com/realJohnDoe/realJohnDoe.github.io/pull/51",
-        "tier": "haiku",
+        "number": 92,
+        "title": "Board: home-screen icon and rename to Joe's Workshop",
+        "url": "https://github.com/realJohnDoe/agent-skills/pull/92",
         "check": "pending",
-        "automerge": true,
         "reason": "CI running"
       },
       {
         "repo": "realJohnDoe/realJohnDoe.github.io",
         "kind": "pr",
-        "number": 50,
-        "title": "perf: shrink homepage tech icons (cursor SVG, 64px anime.js)",
-        "url": "https://github.com/realJohnDoe/realJohnDoe.github.io/pull/50",
-        "tier": "haiku",
-        "check": "pending",
-        "automerge": true,
-        "reason": "CI running"
-      },
-      {
-        "repo": "realJohnDoe/realJohnDoe.github.io",
-        "kind": "pr",
-        "number": 49,
-        "title": "docs: remove stale create-svelte README, drop nav, fix Kenpo link",
-        "url": "https://github.com/realJohnDoe/realJohnDoe.github.io/pull/49",
+        "number": 52,
+        "title": "chore: remove dead icon toggle, unused imageFit prop and orphaned images",
+        "url": "https://github.com/realJohnDoe/realJohnDoe.github.io/pull/52",
         "tier": "haiku",
         "check": "pending",
         "automerge": true,
@@ -126,20 +96,58 @@
         "check": "pending",
         "automerge": true,
         "reason": "CI running"
+      }
+    ],
+    "closed": [
+      {
+        "repo": "realJohnDoe/realJohnDoe.github.io",
+        "kind": "issue",
+        "number": 47,
+        "title": "Post frontmatter is unvalidated: a missing title or date publishes a broken page",
+        "url": "https://github.com/realJohnDoe/realJohnDoe.github.io/issues/47",
+        "tier": "haiku",
+        "prs": [
+          48
+        ],
+        "reason": "closed 2026-11-18 by realJohnDoe/realJohnDoe.github.io#48"
       },
       {
         "repo": "realJohnDoe/realJohnDoe.github.io",
-        "kind": "pr",
-        "number": 48,
-        "title": "fix: fail the build when a post's title or date is missing",
-        "url": "https://github.com/realJohnDoe/realJohnDoe.github.io/pull/48",
+        "kind": "issue",
+        "number": 41,
+        "title": "Homepage ships 385 KB of PNG for two ~30 px tech icons",
+        "url": "https://github.com/realJohnDoe/realJohnDoe.github.io/issues/41",
         "tier": "haiku",
-        "check": "green",
-        "automerge": true,
-        "reason": "green; merged by the dispatcher"
-      }
-    ],
-    "afterMerge": [
+        "prs": [
+          50
+        ],
+        "reason": "closed 2026-11-18 by realJohnDoe/realJohnDoe.github.io#50"
+      },
+      {
+        "repo": "realJohnDoe/realJohnDoe.github.io",
+        "kind": "issue",
+        "number": 46,
+        "title": "Roboto loads through a render-blocking CSS @import chain; Fira Mono never loads",
+        "url": "https://github.com/realJohnDoe/realJohnDoe.github.io/issues/46",
+        "tier": "haiku",
+        "prs": [
+          51
+        ],
+        "reason": "closed 2026-11-18 by realJohnDoe/realJohnDoe.github.io#51"
+      },
+      {
+        "repo": "realJohnDoe/agent-skills",
+        "kind": "issue",
+        "number": 61,
+        "title": "Workshop board: a public page showing every issue and PR by stage",
+        "url": "https://github.com/realJohnDoe/agent-skills/issues/61",
+        "tier": "opus",
+        "prs": [
+          67,
+          70
+        ],
+        "reason": "closed 2026-11-18 by realJohnDoe/agent-skills#67, realJohnDoe/agent-skills#70"
+      },
       {
         "repo": "realJohnDoe/agent-skills",
         "kind": "issue",
@@ -150,81 +158,49 @@
         "prs": [
           83
         ],
-        "reason": "Enable Pages with the **GitHub Actions** source at [Settings → Pages](https://github.com/realJohnDoe/agent-skills/settings/pages), then at [Settings → Environments → github-pages](https://github.com/…; merged in [realJohnDoe/agent-skills#83](https://github.com/realJohnDoe/agent-skills/pull/83)"
-      },
-      {
-        "repo": "realJohnDoe/agent-skills",
-        "kind": "issue",
-        "number": 49,
-        "title": "timetable: one routine and one schedule table in git for every workshop task",
-        "url": "https://github.com/realJohnDoe/agent-skills/issues/49",
-        "tier": "opus",
-        "prs": [
-          78,
-          56
-        ],
-        "reason": "Create the `Timetable` routine at https://claude.ai/code/scheduled: fire twice a day at the hours the skill names, attach every workshop repo with push access, and use the prompt \"Run the `timetable`…; merged in [realJohnDoe/agent-skills#78](https://github.com/realJohnDoe/agent-skills/pull/78)"
+        "reason": "closed 2026-11-18 by realJohnDoe/agent-skills#83"
       }
     ],
-    "closed": [
-      {
-        "repo": "realJohnDoe/kenpo-notes",
-        "kind": "issue",
-        "number": 111,
-        "title": "Codebase health survey — whole repo — 2026-11-17",
-        "url": "https://github.com/realJohnDoe/kenpo-notes/issues/111",
-        "prs": [
-          60
-        ],
-        "reason": "closed 2026-11-18 by realJohnDoe/kenpo-notes#60"
-      },
-      {
-        "repo": "realJohnDoe/kenpo-notes",
-        "kind": "issue",
-        "number": 116,
-        "title": "Give the animation player's icon buttons accessible names",
-        "url": "https://github.com/realJohnDoe/kenpo-notes/issues/116",
-        "tier": "haiku",
-        "prs": [
-          121
-        ],
-        "reason": "closed 2026-11-18 by realJohnDoe/kenpo-notes#121"
-      },
+    "behind": [
       {
         "repo": "realJohnDoe/agent-skills",
         "kind": "issue",
-        "number": 74,
-        "title": "Board site: static page in skills/dispatcher/board/ that renders board.json",
-        "url": "https://github.com/realJohnDoe/agent-skills/issues/74",
-        "tier": "opus",
-        "prs": [
-          82
-        ],
-        "reason": "closed 2026-11-17 by realJohnDoe/agent-skills#82"
+        "number": 50,
+        "title": "timetable: move the digest's publish days from the dispatcher into the timetable",
+        "url": "https://github.com/realJohnDoe/agent-skills/issues/50",
+        "tier": "sonnet",
+        "sub": "blocked",
+        "reason": "blocked by realJohnDoe/agent-skills#49"
       },
       {
-        "repo": "realJohnDoe/kenpo-notes",
+        "repo": "realJohnDoe/meridian",
         "kind": "issue",
-        "number": 115,
-        "title": "Migrate the animation player to the Svelte 5 API, type it, and drop debug logging",
-        "url": "https://github.com/realJohnDoe/kenpo-notes/issues/115",
+        "number": 1391,
+        "title": "Remove old-origin code and infrastructure",
+        "url": "https://github.com/realJohnDoe/meridian/issues/1391",
         "tier": "sonnet",
-        "prs": [
-          120
-        ],
-        "reason": "closed 2026-11-17 by realJohnDoe/kenpo-notes#120"
+        "sub": "blocked",
+        "reason": "blocked by realJohnDoe/meridian#1390"
       },
       {
-        "repo": "realJohnDoe/agent-skills",
+        "repo": "realJohnDoe/realJohnDoe.github.io",
         "kind": "issue",
-        "number": 73,
-        "title": "Board data: buildBoard(plan) and board.json in the dispatcher's output",
-        "url": "https://github.com/realJohnDoe/agent-skills/issues/73",
+        "number": 44,
+        "title": "Homepage content is hand-copied markup: timeline, cards and page wrapper duplicated",
+        "url": "https://github.com/realJohnDoe/realJohnDoe.github.io/issues/44",
         "tier": "sonnet",
-        "prs": [
-          80
-        ],
-        "reason": "closed 2026-11-17 by realJohnDoe/agent-skills#80"
+        "sub": "blocked",
+        "reason": "blocked by realJohnDoe/realJohnDoe.github.io#43"
+      },
+      {
+        "repo": "realJohnDoe/realJohnDoe.github.io",
+        "kind": "issue",
+        "number": 43,
+        "title": "Icon links nest a <button> in an <a>: 144 tab stops on the homepage, plus invalid list and heading outline",
+        "url": "https://github.com/realJohnDoe/realJohnDoe.github.io/issues/43",
+        "tier": "sonnet",
+        "sub": "blocked",
+        "reason": "blocked by realJohnDoe/realJohnDoe.github.io#42"
       }
     ]
   }
