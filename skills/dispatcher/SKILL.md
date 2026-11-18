@@ -96,7 +96,7 @@ To re-dispatch a stuck issue, unassign it. To keep a PR out of the workshop, mar
 
 ### Labels
 
-What each issue and PR label means, and who sets it, is in the `conventions` skill (`../conventions/SKILL.md`). Change a meaning there and in `decide.ts` together. The labels of the workshop's own are `workshop-paused`, on the digest, which pauses every repo (below), and `waiting-for-human`, which the final step writes (step 9). That one is output only: `labelSync` in `scripts/board.ts` computes it from the board, and `decide.test.ts` pins that no decision reads it.
+What each issue and PR label means, and who sets it, is in the `workshop-conventions` skill (`../workshop-conventions/SKILL.md`). Change a meaning there and in `decide.ts` together. The labels of the workshop's own are `workshop-paused`, on the digest, which pauses every repo (below), and `waiting-for-human`, which the final step writes (step 9). That one is output only: `labelSync` in `scripts/board.ts` computes it from the board, and `decide.test.ts` pins that no decision reads it.
 
 ## Pausing
 

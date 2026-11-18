@@ -11,7 +11,7 @@ A survey reviews one repo for one kind of problem and files what it finds as iss
 
 The survey run, which the `timetable` skill starts, follows these steps. Each run surveys one repo, with one survey.
 
-1. **Close finished parents.** In each attached repo, close the finished parents labelled `survey`, per the `conventions` skill's **Filing a batch of findings**, **Closing**.
+1. **Close finished parents.** In each attached repo, close the finished parents labelled `survey`, per the `workshop-conventions` skill's **Filing a batch of findings**, **Closing**.
 2. **Choose.** Run `node <this skill's directory>/scripts/survey-next.ts` (see **Choosing the next survey**). If `top` is `null`, stop: post nothing, open nothing.
 3. **List the top five.** Before starting anything, print the five highest-scoring pairs in `pairs` that have no `skip` (fewer if fewer qualify), as a table in rank order: survey, repo, `days`, `activity`, `score`. The first row is `top`.
 4. **Run it.** Run the skill at `top.skill` on `top.repo`, in a worktree of that repo's checkout. The parent issue's body opens with a **Why this survey** line: `top`'s `lastRun`, `since`, `days`, `activity` and `score`, and that it ranked first of the pairs the chooser scored, followed by the top-five table from step 3.
@@ -56,7 +56,7 @@ Nothing in this plugin names a repo, its paths or its issues: those belong in th
 
 Rank by `(impact × breadth) ÷ effort`, where `effort` is the tier read as an ordinal (`haiku` = 1, `sonnet` = 2, `opus` = 3), plus 2 for a `plan`. A decision section doesn't change effort. Report impact, breadth, tier and `plan` as separate fields. Put a short **summary table** above the findings (finding → tier, `plan`, open decision, plus that survey's other columns).
 
-Where findings touch the same code, add a one-line **sequencing note** saying which order avoids rebasing the same file twice, and record it as a native blocked-by edge on the later finding (`conventions`, **Order**). Open findings that can start now:
+Where findings touch the same code, add a one-line **sequencing note** saying which order avoids rebasing the same file twice, and record it as a native blocked-by edge on the later finding (`workshop-conventions`, **Order**). Open findings that can start now:
 
 ```bash
 gh api repos/<owner/repo>/issues/<parent>/sub_issues --jq '.[] | select(.state=="open" and .issue_dependencies_summary.blocked_by==0) | .number'
@@ -64,7 +64,7 @@ gh api repos/<owner/repo>/issues/<parent>/sub_issues --jq '.[] | select(.state==
 
 ## Finding fields
 
-`Title`, `Breadth`, `Tier`, `Evidence`, `Problem`, `Fix` and `Task context` are the shared fields (`conventions`, **Filing a batch of findings**). Each survey adds its own: its `Category` tags, its `Impact` scale, and what "fails silently" looks like in its domain, since that sets the tier. An architecture change spanning several PRs is `plan`, a product decision only the maintainer can make is a `## Decision needed`, and neither raises the tier.
+`Title`, `Breadth`, `Tier`, `Evidence`, `Problem`, `Fix` and `Task context` are the shared fields (`workshop-conventions`, **Filing a batch of findings**). Each survey adds its own: its `Category` tags, its `Impact` scale, and what "fails silently" looks like in its domain, since that sets the tier. An architecture change spanning several PRs is `plan`, a product decision only the maintainer can make is a `## Decision needed`, and neither raises the tier.
 
 Re-rank after writing the Task context, since the tier feeds the ranking. Carry rank as its own column in the parent's summary table; a finding's identity is its issue number.
 
@@ -86,13 +86,13 @@ Every survey caps its findings at a stated top-N. Include everything that makes 
 
 ## Reporting
 
-Search, file and close per the `conventions` skill's **Filing a batch of findings**. What a survey adds:
+Search, file and close per the `workshop-conventions` skill's **Filing a batch of findings**. What a survey adds:
 
 - **One parent issue per run**, in the surveyed repo, titled with the survey, its scope and the date, labelled `survey` plus the survey-type label (on a repo's first run, create these and `survey-finding` with `gh api -X POST repos/<owner/repo>/labels`: the chooser finds runs by them). Its body carries the **Why this survey** line, the coverage statement, the category verdicts and the summary table, with each row linking its finding's sub-issue rather than restating it.
-- **One sub-issue per finding**, attached to the parent (the repo's `survey-finding` issue template, if it has one, is the skeleton). Label each with the survey's `Category` tag(s), `survey-finding`, the survey-type label, a tier label, and `plan` where it applies, plus a `## Decision needed` section when it hinges on a decision only the maintainer can make, all per the `conventions` skill.
+- **One sub-issue per finding**, attached to the parent (the repo's `survey-finding` issue template, if it has one, is the skeleton). Label each with the survey's `Category` tag(s), `survey-finding`, the survey-type label, a tier label, and `plan` where it applies, plus a `## Decision needed` section when it hinges on a decision only the maintainer can make, all per the `workshop-conventions` skill.
 - **Search first** among the repo's open parents with the survey-type label and their sub-issues.
 - A fix that adds a cache, memo or incremental-update path ships a test that its output deep-equals a full recompute. The fixer re-runs the finding's acceptance check before it closes.
 
-**Suggest improvements to the survey itself, as a diff on its skill file.** A real run is evidence about where a survey is unclear, stale or wrong: an ambiguous instruction, an unmeasurable budget item, a category boundary that didn't hold, a scoring rule that produced a counterintuitive order. After the run, edit the survey's `SKILL.md` (a plugin survey's lives in the workshop's own repo) as its own commit, separate from filing the run and from any product fix, on the branch the session is already working on. Open its PR labelled `automerge` (see `conventions`) and note in the parent issue, in one line, that the survey file was updated and why. Keep it to process learnings; findings are issues.
+**Suggest improvements to the survey itself, as a diff on its skill file.** A real run is evidence about where a survey is unclear, stale or wrong: an ambiguous instruction, an unmeasurable budget item, a category boundary that didn't hold, a scoring rule that produced a counterintuitive order. After the run, edit the survey's `SKILL.md` (a plugin survey's lives in the workshop's own repo) as its own commit, separate from filing the run and from any product fix, on the branch the session is already working on. Open its PR labelled `automerge` (see `workshop-conventions`) and note in the parent issue, in one line, that the survey file was updated and why. Keep it to process learnings; findings are issues.
 
 **Bias that diff toward shrinking.** A run's evidence naturally produces an addition, and nothing pushes back, so survey files only grow. Before adding, check whether something should be cut or merged instead: a caveat now enforced by a lint rule, CI check or test (cut it, or shrink it to the line naming what enforces it); two passages making the same point (keep the more precise); a worked example the rule no longer needs at full length. A real new failure mode still earns its bullet, but a survey file that only ever grows is itself a finding about the survey.
