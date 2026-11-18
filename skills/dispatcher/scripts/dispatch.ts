@@ -353,11 +353,12 @@ main(() => {
   console.log(
     JSON.stringify(
       {
+        // First, so a truncated read of the output still sees what to start.
+        sessions: sessions.map(({ created, item, ...s }) => s),
         applied: APPLY,
         repos: repos.map((r) => r.repo),
         missingLabels,
         unpushable: unpushableRepos,
-        sessions: sessions.map(({ created, item, ...s }) => s),
         automerge: automerge.map(({ created, body, item, ...m }) => m),
         notStarted: [...followups, ...dispatches]
           .slice(FINAL ? Infinity : MAX_SESSIONS)
