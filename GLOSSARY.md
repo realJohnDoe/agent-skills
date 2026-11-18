@@ -21,13 +21,20 @@ _Avoid_: Dashboard, kanban
 ### On the board
 
 **Stage**:
-Where an issue or PR stands in the workshop's flow: Stuck, Waiting, Queue, PR in progress, After merge or Closed. Each item is in exactly one stage.
+Where an issue or PR stands in the workshop's flow: Stuck, Waiting for human, Closed, PR in progress, Queue or Behind another issue. Each item is in exactly one stage.
 _Avoid_: Column, status
 
 **Stuck**:
 The stage for work the workshop can't move without the maintainer stepping in. That covers a PR at its follow-up cap, a stale follow-up and a dispatched issue with no PR. A repo it can't push to shows as a banner, not a Stuck card.
 _Avoid_: Blocked, failed
 
+**Waiting for human**:
+The stage for work only the maintainer can move on: an after-merge step, a green PR to review, an issue that needs the go-ahead, and an open decision, in that order.
+
+**Behind another issue**:
+The stage, at the bottom of the board, for issues blocked by another open issue. Each moves on once its blocker closes, and nothing there needs the maintainer until then.
+_Avoid_: Blocked, on hold
+
 **Parked**:
-An issue the workshop deliberately won't pick up: a `plan`, no tier label, or assigned by hand. Parked items are counted under Waiting, not shown as cards that need you.
+An issue the workshop deliberately won't pick up: a `plan`, no tier label, or assigned by hand. Parked items are counted under Waiting for human, not shown as cards that need you.
 _Avoid_: Skipped, ignored

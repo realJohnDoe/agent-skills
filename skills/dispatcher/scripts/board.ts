@@ -13,7 +13,7 @@ export type Card = {
   check?: "green" | "red" | "pending";
   automerge?: boolean;
   needsReview?: boolean; // green, quiet, no automerge
-  sub?: "decide" | "goAhead" | "blocked";
+  sub?: "decide" | "afterMerge" | "goAhead" | "blocked";
   prs?: number[]; // every PR linked to an issue card
   reason: string; // the dispatcher's one-line why
 };
@@ -27,11 +27,11 @@ export type Board = {
   paused?: { since: string; snapshot: string }; // set only when paused: date, snapshot comment URL
   stages: {
     stuck: Card[];
-    waiting: { cards: Card[]; parked: Parked[] }; // parked: a collapsed fold, not a stage of its own
+    waiting: { cards: Card[]; parked: Parked[] }; // Waiting for human. parked: a collapsed fold, not a stage of its own
     queue: Card[];
     prInProgress: Card[];
-    afterMerge: Card[];
     closed: Card[];
+    behind: Card[]; // Behind another issue: issues blocked by another open issue
   };
 };
 
@@ -57,8 +57,8 @@ const card = (x: Item, reason: string, extra: Partial<Card> = {}): Card => ({
   ...extra,
 });
 
-// Needs review first, then red, then pending, then the rest (automerge).
-const prRank = (c: Card) => (c.needsReview ? 0 : c.check === "red" ? 1 : c.check === "pending" ? 2 : 3);
+// Red first, then pending, then the rest (automerge).
+const prRank = (c: Card) => (c.check === "red" ? 0 : c.check === "pending" ? 1 : 2);
 
 export const buildBoard = (plan: BoardPlan, run: BoardRun): Board => {
   const why = (fallback: string) => (x: Item) => card(x, x.why ?? fallback);
@@ -74,9 +74,10 @@ export const buildBoard = (plan: BoardPlan, run: BoardRun): Board => {
       stuck: plan.unstick.map(why("stuck")),
       waiting: {
         cards: [
-          ...plan.decide.map((x) => card(x, x.why ?? "needs a decision", { sub: "decide" })),
+          ...plan.afterMerge.map((x) => card(x, x.why ?? "after merge", { sub: "afterMerge" })),
+          ...plan.review.map((x) => card(x, x.why ?? "green; waiting for your review", { needsReview: true })),
           ...plan.triage.map((x) => card(x, "waiting for your go-ahead", { sub: "goAhead" })),
-          ...plan.notPicked.filter(blocked).map(why("blocked")),
+          ...plan.decide.map((x) => card(x, x.why ?? "needs a decision", { sub: "decide" })),
         ],
         parked: plan.notPicked
           .filter((x) => !blocked(x))
@@ -84,15 +85,14 @@ export const buildBoard = (plan: BoardPlan, run: BoardRun): Board => {
       },
       queue: plan.queue.map(why("dispatched next")),
       prInProgress: [
-        ...plan.review.map((x) => card(x, x.why ?? "green; waiting for your review", { needsReview: true })),
         ...prs(plan.inProgress).map(why("in progress")),
         ...plan.automerge.map((x) => card(x, "green; merged by the dispatcher")),
       ]
         .map((c, i) => ({ c, i }))
         .sort((a, b) => prRank(a.c) - prRank(b.c) || a.i - b.i)
         .map(({ c }) => c),
-      afterMerge: plan.afterMerge.map(why("after merge")),
       closed: run.closed,
+      behind: plan.notPicked.filter(blocked).map(why("blocked")),
     },
   };
 };

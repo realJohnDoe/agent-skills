@@ -16,7 +16,8 @@ const repoChip = (repo) => {
   for (const c of repo) h = (h * 31 + c.charCodeAt(0)) >>> 0;
   return `<span class="chip repo" style="--repo:${REPO_COLORS[h % REPO_COLORS.length]}">${esc(repo.split("/")[1] ?? repo)}</span>`;
 };
-const SUB = { decide: "Decide", goAhead: "Go ahead?", blocked: "Blocked" };
+// No chip for `blocked`: those cards have a stage of their own, and their reason names the blocker.
+const SUB = { decide: "Decide", afterMerge: "After merge", goAhead: "Go ahead?" };
 const DAY = 864e5;
 
 /** @param {Card} c */
@@ -24,8 +25,9 @@ const card = (c) => {
   const chips = [repoChip(c.repo), `<span class="chip ref">#${c.number}</span>`];
   for (const n of c.prs ?? []) chips.push(link(`https://github.com/${c.repo}/pull/${n}`, `PR #${n}`, "chip prlink"));
   if (c.tier) chips.push(`<span class="chip tier">${c.tier}</span>`);
-  if (c.sub) chips.push(`<span class="chip sub">${SUB[c.sub]}</span>`);
-  if (c.needsReview) chips.push(`<span class="chip review">needs review</span>`);
+  const sub = c.sub && SUB[/** @type {keyof typeof SUB} */ (c.sub)];
+  if (sub) chips.push(`<span class="chip sub">${sub}</span>`);
+  if (c.needsReview) chips.push(`<span class="chip sub">Needs review</span>`); // styled like the other Waiting for human asks
   if (c.automerge) chips.push(`<span class="chip auto">automerge</span>`);
   if (c.check) chips.push(`<span class="check ${c.check}">${c.check}</span>`);
   return `<article class="card">
@@ -75,14 +77,14 @@ export const render = (board, now = new Date()) => {
     notices.push(`<p class="notice stale">This board is ${age} days old: the workshop has not run since. Check its routine.</p>`);
 
   const stuck = [...board.cantPush.map(cantPushCard), ...s.stuck.map(card)];
-  const review = s.prInProgress.filter((c) => c.needsReview).length;
+  const behind = s.behind ?? []; // a board.json from before this stage has none
   const status = [
     `as of <b>${esc(when(board.generated))}</b>`,
     `repos <b>${board.repos.length}</b>`,
     `stuck <b class="bad">${stuck.length}</b>`,
-    `needs review <b class="warn">${review}</b>`,
-    `waiting <b>${s.waiting.cards.length}</b>`,
+    `waiting for human <b>${s.waiting.cards.length}</b>`,
     `queue <b>${s.queue.length}</b>`,
+    `behind another issue <b>${behind.length}</b>`,
     link(board.digest, "digest"),
   ].join('<span class="sep"></span>');
   const parked = s.waiting.parked.length
@@ -94,11 +96,11 @@ export const render = (board, now = new Date()) => {
     `<div class="status">${status}</div>`,
     `<div class="line">`,
     stuck.length ? stageModule("stuck", "Stuck", "needs a hand", stuck, "") : "",
-    stageModule("waiting", "Waiting", "decide, go ahead, blocked", s.waiting.cards.map(card), "Nothing waits on you", parked),
+    stageModule("waiting", "Waiting for human", "after merge, review, go ahead, decide", s.waiting.cards.map(card), "Nothing waits on you", parked),
     stageModule("closed", "Closed", "latest 5", s.closed.map(card), "Nothing closed yet"),
-    stageModule("afterMerge", "After merge", "your step after the PR", s.afterMerge.map(card), "No after-merge steps"),
-    stageModule("pr", "PR in progress", "needs review first", s.prInProgress.map(card), "No open PRs"),
+    stageModule("pr", "PR in progress", "red first", s.prInProgress.map(card), "No open PRs"),
     stageModule("queue", "Queue", "in pickup order", s.queue.map(card), "Queue empty"),
+    stageModule("behind", "Behind another issue", "moves on once its blocker closes", behind.map(card), "Nothing waits on another issue"),
     `</div>`,
   ].join("\n");
 };

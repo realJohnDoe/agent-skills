@@ -218,8 +218,9 @@ describe("dispatch dry run over two repos", () => {
       stages.closed.map((c: Any) => [c.repo, c.number, c.prs]),
       [[T, 2, [7, 8]], [M, 1, undefined]],
     );
-    // Needs review (the Dependabot PR) first, then red, then the automerge PR.
-    assert.deepEqual(stages.prInProgress.map((c: Any) => [c.number, c.check]), [[8, "green"], [9, "red"], [21, "red"], [20, "green"]]);
+    // The Dependabot PR needs review, so it waits for the human; red, then the automerge PR.
+    assert.deepEqual(stages.prInProgress.map((c: Any) => [c.number, c.check]), [[9, "red"], [21, "red"], [20, "green"]]);
+    assert.ok(stages.waiting.cards.some((c: Any) => c.number === 8 && c.needsReview));
   });
 
   test("merges only the automerge PR, naming its repo", () =>
