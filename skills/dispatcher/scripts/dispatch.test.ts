@@ -42,7 +42,7 @@ const pr = (n: number, title: string, extra: Any = {}) => ({
   created_at: "2026-10-01T00:00:00Z",
   ...extra,
 });
-const ALL_LABELS = ["haiku", "sonnet", "opus", "plan", "ready-for-agent", "automerge", "preview"].map(
+const ALL_LABELS = ["haiku", "sonnet", "opus", "plan", "ready-for-agent", "automerge", "preview", "waiting-for-human"].map(
   (name) => ({ name }),
 );
 const green = [{ name: "build", status: "completed", conclusion: "success" }];
@@ -228,7 +228,7 @@ describe("dispatch dry run over two repos", () => {
 
   test("lists the labels each repo is missing", () =>
     assert.deepEqual(res.plan.missingLabels, [
-      { repo: T, missing: ["opus", "plan", "automerge", "preview"] },
+      { repo: T, missing: ["opus", "plan", "automerge", "preview", "waiting-for-human"] },
     ]));
 
   test("one digest naming every item's repo", () => {
@@ -259,7 +259,7 @@ describe("dispatch apply", () => {
 
   test("creates missing labels first, in the repo missing them", () => {
     const created = writes("POST", `repos/${T}/labels`).map((w) => w.body.name);
-    assert.deepEqual(created, ["opus", "plan", "automerge", "preview"]);
+    assert.deepEqual(created, ["opus", "plan", "automerge", "preview", "waiting-for-human"]);
     assert.equal(res.writes[0].path, `repos/${T}/labels`);
     assert.equal(writes("POST", `repos/${M}/labels`).length, 0);
   });
@@ -286,11 +286,12 @@ describe("dispatch apply", () => {
 describe("dispatch --apply --digest-only", () => {
   const res = run("dispatch.ts", ["--digest-only"], world(), { apply: true });
   const isDigestWrite = (w: Any) => w.path.startsWith(`repos/${DIGEST}/issues`);
+  const isWaitingLabel = (w: Any) => /\/issues\/\d+\/labels/.test(w.path) && !w.path.startsWith(`repos/${DIGEST}/`);
 
-  test("makes no write but the digest: no labels, merges, claims or comments", () => {
+  test("makes no write but the digest and the waiting-for-human label: no merges, claims or comments", () => {
     assert.equal(res.status, 0, res.stderr);
     assert.ok(res.writes.length > 0);
-    assert.deepEqual(res.writes.filter((w) => !isDigestWrite(w)), []);
+    assert.deepEqual(res.writes.filter((w) => !isDigestWrite(w) && !isWaitingLabel(w)), []);
   });
 
   test("writes one draft, in the digest repo, and starts no session", () => {
@@ -309,7 +310,7 @@ describe("dispatch --apply --digest-only", () => {
     const due = run("dispatch.ts", ["--digest-only"], world({ digestIssues: [draft], digestComments: { 90: [] } }), { apply: true });
     assert.equal(due.status, 0, due.stderr);
     assert.equal(due.plan.digest.publish, true);
-    assert.deepEqual(due.writes.filter((w) => !isDigestWrite(w)), []);
+    assert.deepEqual(due.writes.filter((w) => !isDigestWrite(w) && !isWaitingLabel(w)), []);
     assert.ok(due.writes.some((w) => w.method === "PATCH" && /^Workshop digest — /.test(w.body?.title ?? "")));
   });
 
@@ -361,9 +362,9 @@ describe("dispatch --apply --digest-only pushes the board", () => {
 describe("dispatch --apply --board-only", () => {
   const res = run("dispatch.ts", ["--board-only"], withBoardRepo(world()), { apply: true, attach: [DIGEST] });
 
-  test("pushes the board and makes no gh write", () => {
+  test("pushes the board and makes no gh write but the waiting-for-human label", () => {
     assert.equal(res.status, 0, res.stderr);
-    assert.deepEqual(res.writes, []);
+    assert.deepEqual(res.writes.filter((w) => w.body?.labels?.[0] !== "waiting-for-human"), []);
     assert.ok(boardPush(res.gitCalls));
     assert.deepEqual(res.plan.sessions, []);
     assert.equal(res.plan.board.state, "normal");
@@ -385,7 +386,62 @@ describe("dispatch --apply --board-only", () => {
     assert.equal(paused.status, 0, paused.stderr);
     assert.equal(paused.plan.board.state, "paused");
     assert.deepEqual(paused.plan.board.paused, { since: "2026-11-13", snapshot: "https://github.com/x/issues/50#c1" });
-    assert.deepEqual(paused.writes, []);
+    assert.deepEqual(paused.writes.filter((w) => w.body?.labels?.[0] !== "waiting-for-human"), []);
+  });
+});
+
+describe("the waiting-for-human label mirrors the Waiting for human stage", () => {
+  // Waiting for human in world(): meridian#13 (decide), meridian#14 (go-ahead), tracemap#8 (review).
+  const labelled = (repo: string, items: Any[]) => ({
+    [`repos/${repo}/issues?labels=waiting-for-human&state=all&per_page=100`]: items,
+  });
+  const fixture = world({
+    extra: {
+      ...labelled(M, [
+        issue(13, "Meridian needs a call", ["sonnet", "waiting-for-human"]),
+        issue(10, "Meridian sonnet task", ["sonnet", "ready-for-agent", "waiting-for-human"]),
+        issue(5, "Closed since", ["waiting-for-human"], { state: "closed" }),
+      ]),
+      ...labelled(T, []),
+    },
+  });
+  const res = run("dispatch.ts", ["--digest-only"], fixture, { apply: true });
+  const labelWrites = (r: Any) =>
+    r.writes.filter((w: Any) => /\/issues\/\d+\/labels/.test(w.path)).map((w: Any) => `${w.method} ${w.path}`);
+
+  test("adds it to each card that lacks it and removes it from everything else, closed included", () => {
+    assert.equal(res.status, 0, res.stderr);
+    assert.deepEqual(labelWrites(res).sort(), [
+      `DELETE repos/${M}/issues/10/labels/waiting-for-human`,
+      `DELETE repos/${M}/issues/5/labels/waiting-for-human`,
+      `POST repos/${M}/issues/14/labels`,
+      `POST repos/${T}/issues/8/labels`,
+    ]);
+    assert.deepEqual(res.plan.waitingLabel, [
+      { repo: M, add: [14], remove: [5, 10] },
+      { repo: T, add: [8], remove: [] },
+    ]);
+  });
+
+  test("a dry run plans the same writes and makes none", () => {
+    const dry = run("dispatch.ts", ["--digest-only"], fixture);
+    assert.equal(dry.status, 0, dry.stderr);
+    assert.deepEqual(dry.writes, []);
+    assert.deepEqual(dry.plan.waitingLabel, res.plan.waitingLabel);
+  });
+
+  test("the main apply step leaves it alone", () => {
+    const main = run("dispatch.ts", ["--max-sessions", "3"], fixture, { apply: true });
+    assert.equal(main.status, 0, main.stderr);
+    assert.deepEqual(labelWrites(main), []);
+    assert.deepEqual(main.plan.waitingLabel, []);
+  });
+
+  test("never in a repo it can't push to", () => {
+    const blocked = run("dispatch.ts", ["--digest-only"], fixture, { apply: true, noPush: [T] });
+    assert.equal(blocked.status, 0, blocked.stderr);
+    assert.ok(labelWrites(blocked).every((w: string) => !w.includes(T)));
+    assert.deepEqual(blocked.plan.waitingLabel.map((s: Any) => s.repo), [M]);
   });
 });
 
