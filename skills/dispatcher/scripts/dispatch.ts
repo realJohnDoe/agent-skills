@@ -11,8 +11,8 @@
 // `waiting-for-human` on exactly the board's Waiting for human cards and starts the
 // board workflow; --board-only does only those two (drain's last step).
 // --board-refresh prints the board for that workflow (.github/workflows/board.yml),
-// which deploys it to Pages: it writes nothing and checks no push access, so it runs
-// on the Actions token.
+// which deploys it to Pages: it covers the repos the digest says the last run covered,
+// needs no clones, writes nothing and checks no push access, so it runs on the Actions token.
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type Blocker, bodyBlockers } from "./bodyBlockers.ts";
@@ -47,6 +47,7 @@ import {
   api,
   arg,
   flag,
+  digestArg,
   loadConfig,
   main,
   names,
@@ -143,14 +144,16 @@ const lookup = ({ repo, number }: Blocker) => {
 };
 
 main(() => {
-  const { digest: DIGEST, repos } = loadConfig();
+  // The digest's state is read first: its window bounds "merged since", and a refresh
+  // covers the repos the last run did, read from it, rather than attached clones.
+  const DIGEST = digestArg();
+  const state = readDigest(DIGEST, TODAY);
+  const repos = REFRESH ? coveredRepos(state.covered) : loadConfig().repos;
   // A repo it can't push to gets no writes and a digest entry, not a stopped run.
   // A refresh writes nothing, and runs on a token that can push to no other repo.
   const unpushableRepos = REFRESH ? [] : unpushable(repos);
   const noPush = new Set(unpushableRepos.map((u) => u.repo));
 
-  // The digest's state is read first: its window bounds "merged since".
-  const state = readDigest(DIGEST, TODAY);
   const { since } = state;
 
   const first = repos.map((r) => {
@@ -376,6 +379,14 @@ main(() => {
     ),
   );
 });
+
+// The repos the last run covered, as the digest names them, without clones: a refresh
+// reads only GitHub, so a repo's path is never used.
+function coveredRepos(covered: string[] | undefined): Repo[] {
+  if (!covered?.length)
+    throw new Error("the digest names no covered repos yet (no digest-repos marker): run the dispatcher once first");
+  return covered.map((repo) => ({ repo, name: repo.split("/")[1], path: "" }));
+}
 
 // Starts the board workflow on main, so the board shows this run's writes now rather
 // than at its next scheduled refresh. A refusal is reported, not fatal: the schedule

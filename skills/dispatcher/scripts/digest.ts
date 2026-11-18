@@ -12,6 +12,9 @@ const RELAYED = "<!-- workshop-relayed -->"; // digest replies up to here are co
 // When a run last wrote the digest; the board's stale notice reads it. It changes the
 // body on every run, so the draft is rewritten every run (an edit notifies nobody).
 const RUN = /<!-- digest-run: (\S+) -->/;
+// The repos the run covered: the ones attached to its routine. The board workflow
+// covers these, so the workshop's repo list lives only in the routine.
+const REPOS = /<!-- digest-repos: ([^>]*?) -->/;
 
 export type DigestState = {
   repo: string;
@@ -19,6 +22,7 @@ export type DigestState = {
   published: GhIssue | undefined;
   since: string;
   lastRun?: string; // when a run last wrote the digest, from its RUN marker
+  covered?: string[]; // the repos that run covered, from its REPOS marker
 };
 
 // The plan's digest-ready lists, plus the run's clock and mode.
@@ -68,8 +72,10 @@ export function readDigest(repo: string, today: Date): DigestState {
   const since =
     (draft ?? published)?.body?.match(marker)?.[1] ??
     new Date(+today - DIGEST_DAYS * 864e5).toISOString().slice(0, 10);
-  const lastRun = (draft ?? published)?.body?.match(RUN)?.[1];
-  return { repo, draft, published, since, ...(lastRun && { lastRun }) };
+  const body = (draft ?? published)?.body;
+  const lastRun = body?.match(RUN)?.[1];
+  const covered = body?.match(REPOS)?.[1].split(/\s+/).filter(Boolean);
+  return { repo, draft, published, since, ...(lastRun && { lastRun }), ...(covered && { covered }) };
 }
 
 // One issue per digest cycle, in the digest repo. Its body is rewritten on
@@ -120,7 +126,7 @@ export function buildDigest({ repo, draft, published, since }: DigestState, plan
       : []),
   ];
   const render = (start: string, mergedLines: string[], prev?: number | null) =>
-    `<!-- digest-since: ${start} -->\n<!-- digest-run: ${plan.now} -->\n\n${NOTE}${
+    `<!-- digest-since: ${start} -->\n<!-- digest-run: ${plan.now} -->\n<!-- digest-repos: ${repos.map((r) => r.repo).join(" ")} -->\n\n${NOTE}${
       [...asks, ...info].join("\n") || "Nothing is waiting on the maintainer.\n"
     }\nRepos covered: ${repos.map((r) => r.repo).join(", ")}.\n${prev ? `\nPrevious digest: #${prev}.\n` : ""}${
       mergedLines.length

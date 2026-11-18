@@ -330,6 +330,17 @@ const withBoardRepo = ({ [`search/issues?q=repo:${M} repo:${T} is:issue is:close
   ...repoFixture(DIGEST, { issues: [], prs: [] }),
   ...w,
 });
+// A draft digest as a run leaves it: the refresh reads its covered repos and run time.
+const ranDraft = (repos: string[], extra: Any = {}) =>
+  world({
+    digestIssues: [
+      issue(50, "Workshop digest (draft) — from 2026-11-10", extra.labels ?? [], {
+        body: `<!-- digest-since: 2026-11-10 -->\n<!-- digest-run: 2026-11-12T20:00:00.000Z -->\n<!-- digest-repos: ${repos.join(" ")} -->`,
+      }),
+    ],
+    digestComments: { 50: extra.comments ?? [] },
+    extra: extra.extra ?? {},
+  });
 const BOARD_RUN = { method: "POST", path: `repos/${DIGEST}/actions/workflows/board.yml/dispatches`, body: { ref: "main" } };
 const boardRuns = (writes: Any[]) => writes.filter((w) => w.path === BOARD_RUN.path);
 
@@ -344,12 +355,10 @@ describe("dispatch --apply --digest-only starts the board workflow", () => {
     assert.deepEqual(res.plan.boardRefresh, { triggered: true });
   });
 
-  test("the digest records the run, and the board reads it back as its last run", () => {
+  test("the digest records the run and the repos it covered; a refresh reads both back", () => {
     assert.match(res.plan.digest.body, /\n<!-- digest-run: 2026-11-13T00:00:00.000Z -->\n/);
-    const draft = issue(50, "Workshop digest (draft) — from 2026-11-10", [], {
-      body: "<!-- digest-since: 2026-11-10 -->\n<!-- digest-run: 2026-11-12T20:00:00.000Z -->",
-    });
-    const next = run("dispatch.ts", ["--board-refresh"], world({ digestIssues: [draft], digestComments: { 50: [] } }));
+    assert.match(res.plan.digest.body, new RegExp(`\n<!-- digest-repos: ${M} ${T} -->\n`));
+    const next = run("dispatch.ts", ["--board-refresh"], ranDraft([M, T]));
     assert.equal(next.status, 0, next.stderr);
     assert.equal(next.plan.board.lastRun, "2026-11-12T20:00:00.000Z");
   });
@@ -375,8 +384,23 @@ describe("dispatch --apply --board-only", () => {
 });
 
 describe("dispatch --board-refresh, the board workflow's build", () => {
-  // As on the Actions token: no repo can be pushed to.
-  const res = run("dispatch.ts", ["--board-refresh"], withBoardRepo(world()), { attach: [DIGEST], noPush: [M, T, DIGEST] });
+  // As in the workflow: only agent-skills is checked out, and nothing can be pushed to.
+  const closedAll = { [`search/issues?q=repo:${DIGEST} repo:${M} repo:${T} is:issue is:closed reason:completed`]: { items: [] } };
+  const res = run("dispatch.ts", ["--board-refresh"], { ...withBoardRepo(ranDraft([DIGEST, M, T])), ...closedAll }, {
+    missing: [M, T],
+    noPush: [DIGEST],
+  });
+
+  test("covers the repos the digest names, not the clones", () => {
+    assert.equal(res.status, 0, res.stderr);
+    assert.deepEqual(res.plan.repos, [DIGEST, M, T]);
+  });
+
+  test("a digest that names no repos yet stops it with why", () => {
+    const fresh = run("dispatch.ts", ["--board-refresh"], world());
+    assert.equal(fresh.status, 1);
+    assert.match(fresh.stderr, /names no covered repos yet/);
+  });
 
   test("prints the board and writes nothing: no label, digest, merge, session or workflow run", () => {
     assert.equal(res.status, 0, res.stderr);
@@ -392,20 +416,19 @@ describe("dispatch --board-refresh, the board workflow's build", () => {
   });
 
   test("even with --apply it writes nothing", () => {
-    const applied = run("dispatch.ts", ["--board-refresh"], withBoardRepo(world()), { apply: true, attach: [DIGEST] });
+    const applied = run("dispatch.ts", ["--board-refresh"], ranDraft([M, T]), { apply: true });
     assert.equal(applied.status, 0, applied.stderr);
     assert.deepEqual(applied.writes, []);
   });
 
   test("while the workshop is paused the board says so, from the snapshot comment", () => {
-    const draft = issue(50, "Workshop digest (draft) — from 2026-11-10", ["workshop-paused"], { body: "<!-- digest-since: 2026-11-10 -->" });
     const snapshot = { body: "<!-- workshop-snapshot -->\nWorkshop paused.", created_at: "2026-11-13T00:00:00Z", html_url: "https://github.com/x/issues/50#c1", user: { login: "b", type: "User" } };
     const paused = run(
       "dispatch.ts",
       ["--board-refresh"],
-      world({
-        digestIssues: [draft],
-        digestComments: { 50: [snapshot] },
+      ranDraft([M, T], {
+        labels: ["workshop-paused"],
+        comments: [snapshot],
         extra: { [`repos/${DIGEST}/issues/50/events`]: [{ event: "labeled", label: { name: "workshop-paused" }, created_at: "2026-11-12T00:00:00Z" }] },
       }),
     );
