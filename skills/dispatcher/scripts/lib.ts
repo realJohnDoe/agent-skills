@@ -94,25 +94,28 @@ export const preflight = (repos: Repo[]) => {
 // snapshot has no "resumed" comment after it.
 export type PauseState = "normal" | "drain" | "paused" | "resume";
 
-/**
- * The workshop's pause state, read from the open digests: the label on either one,
- * the marker comments on the newest (the draft). `digest` is that newest issue and
- * `snap` the latest snapshot comment on it; both are undefined when there is no digest.
- */
-export const readPause = (DIGEST: string) => {
-  const digests = all<GhIssue>(`repos/${DIGEST}/issues?state=open&per_page=100`)
+/** The open digest issues in the digest repo, oldest first; the newest is the digest. */
+export const openDigests = (DIGEST: string) =>
+  all<GhIssue>(`repos/${DIGEST}/issues?state=open&per_page=100`)
     .filter((i) => !i.pull_request && isDigest(i.title))
     .sort((a, b) => a.number - b.number);
-  const digest = digests.at(-1);
+
+/**
+ * The workshop's pause state, read from the digest issue: its label, its label event
+ * and its marker comments. `digest` is that issue and `snap` the latest snapshot
+ * comment on it; both are undefined when there is no digest.
+ */
+export const readPause = (DIGEST: string) => {
+  const digest = openDigests(DIGEST).at(-1);
   if (!digest) return { state: "normal" as PauseState };
-  const labelled = digests.find((d) => names(d).includes(PAUSE_LABEL));
+  const labelled = names(digest).includes(PAUSE_LABEL);
   const comments = all<{ body: string; created_at: string; html_url?: string }>(
     `repos/${DIGEST}/issues/${digest.number}/comments?per_page=100`,
   );
   const snap = comments.findLast((c) => marked(c, SNAPSHOT));
   const labeledAt = labelled
     ? all<{ event: string; label: { name: string }; created_at: string }>(
-        `repos/${DIGEST}/issues/${labelled.number}/events?per_page=100`,
+        `repos/${DIGEST}/issues/${digest.number}/events?per_page=100`,
       ).findLast((e) => e.event === "labeled" && e.label.name === PAUSE_LABEL)?.created_at
     : null;
   const resumed = snap && comments.some((c) => marked(c, RESUMED) && c.created_at > snap.created_at);

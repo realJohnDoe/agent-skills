@@ -11,7 +11,7 @@ The whole system of scheduled runs that dispatches issues to agent sessions, fol
 _Avoid_: Factory, pipeline
 
 **Digest**:
-The one issue in the digest repo where the workshop lists what waits on the maintainer, and the only place the maintainer takes decisions.
+The one long-lived issue in the digest repo where the workshop lists what waits on the maintainer, and the only place the maintainer takes decisions. Publishing it means posting a comment on it.
 _Avoid_: Report, summary
 
 **Workshop board**:

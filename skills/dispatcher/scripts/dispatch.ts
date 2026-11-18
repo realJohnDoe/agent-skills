@@ -261,7 +261,7 @@ main(() => {
     {
       generated: NOW,
       repos: repos.map((r) => r.repo),
-      digest: (state.published ?? state.draft)?.html_url ?? `https://github.com/${DIGEST}/issues`,
+      digest: state.issue?.html_url ?? `https://github.com/${DIGEST}/issues`,
       ...(state.lastRun && { lastRun: state.lastRun }),
       closed: latestClosed(repos),
     },
@@ -309,8 +309,9 @@ main(() => {
 
   const digest = {
     repo: DIGEST,
-    draft: state.draft?.number ?? null,
-    published: state.published?.number ?? null,
+    issue: state.issue?.number ?? null,
+    publishedComment: null as string | null,
+    closes: state.older.map((i) => i.number), // older digest issues closed into the newest
     publish: built.publish,
     replies: built.replies,
     counts: built.counts,
@@ -337,11 +338,9 @@ main(() => {
       }
     }
     if (DIGEST_ONLY) {
-      const w = writeDigest(state, built, NOW);
-      if (built.publish) {
-        digest.draft = w.draft;
-        digest.published = w.published;
-      }
+      const w = writeDigest(state, built);
+      digest.issue = w.issue;
+      digest.publishedComment = w.publishedComment;
     }
     if (FINAL) {
       // Each write on its own: one refused is logged and corrected on the next run.
