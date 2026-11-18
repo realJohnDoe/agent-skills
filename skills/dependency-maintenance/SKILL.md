@@ -9,7 +9,9 @@ Dependabot already proposes every available version and can auto-merge the non-m
 
 **Scope:** the repos the user names. If they name none, use the current repo. Use every repo attached to the session if they asked for "all", or if the working directory isn't a repo but holds several. With several repos, a dependency they share gets one decision, applied in each repo that has it.
 
-**Previous runs:** the tracking issues are the `Dependency maintenance <date>` issues in realJohnDoe/agent-skills. The newest one, open or closed, is the last run. The open sub-issues of every open tracking issue are decisions already made. Don't file them again: re-check their facts and update an issue only when a fact has changed.
+**Previous runs:** each run's parent is a `Dependency maintenance <date>` issue in realJohnDoe/agent-skills, filed per the `conventions` skill's **Filing a batch of findings** (`../conventions/SKILL.md`), which this pass follows for searching, fields, tiers and closing. The newest parent, open or closed, is the last run. The open sub-issues of every open parent are decisions already made: re-check their facts and update an issue only when a fact has changed.
+
+**Start** by closing the finished parents in realJohnDoe/agent-skills, per **Closing** there. They carry the `dependencies` label, or, filed before it, are found by title.
 
 ## 1. Read each repo's own rules first
 
@@ -61,11 +63,11 @@ Two things are not findings: a major you'd hold anyway with no reason having cha
 
 ## 4. File issues where the fix happens
 
-Write one issue per decision, in the repo that changes. A cross-repo decision gets one issue in each affected repo, and each one links the others. Before filing, search the repo's open issues for the dependency name, and update a matching issue instead of opening a duplicate.
+Write one issue per decision, in the repo that changes, with the fields of **Filing a batch of findings** after searching as it says (search the repo's open issues for the dependency name too). A cross-repo decision gets one issue in each affected repo, and each one links the others.
 
 - **Title:** `deps: <verb> <package> <from> → <to>`, for example `deps: replace moment with date-fns` or `deps: lift typescript <7 pin`.
-- **Body:** the verdict, the evidence from step 2 (command plus output excerpt, with the date), the gating risk, and the done-state as the repo's own build and test commands plus the specific check.
-- **Labels:** in a repo the workshop dispatches, the `conventions` skill (`../conventions/SKILL.md`); otherwise the repo's own scheme from step 1. Either way, plus `dependencies` if the repo has that label. If a label doesn't exist, name the tag in the body instead. Don't create labels.
+- **What this pass adds to the fields:** the **Problem** is the verdict from step 3; the **Evidence** is the step 2 command plus its output excerpt, dated; the **Task context** names the gating risk; the **Fix**'s check is the repo's own build and test commands plus the specific check.
+- **Labels:** in a repo the workshop dispatches, per `conventions`; otherwise the repo's own scheme from step 1. Either way, plus `dependencies` if the repo has that label. If a label doesn't exist, name the tag in the body instead. Don't create labels.
 
 ## 5. Publish the report
 
@@ -77,8 +79,6 @@ Publish one Artifact page per run, titled `Dependency maintenance <YYYY-MM-DD>`,
 
 Link the previous run's report at the top.
 
-Then, if the run filed or updated at least one issue, file the run's tracking issue in realJohnDoe/agent-skills, titled like the report. Its body holds the report link, the previous run's tracking issue, the per-repo table and the cross-repo decisions. Add every issue filed or updated as a sub-issue. Give it no tier label: it records the run and isn't work to dispatch. A run with no findings files no tracking issue.
+Then, if the run filed or updated at least one issue, file the run's parent in realJohnDoe/agent-skills, titled like the report and labelled `dependencies`. Its body holds the report link, the previous run's parent, the per-repo table and the cross-repo decisions. Add every issue filed or updated as a sub-issue. A run with no findings files no parent.
 
-Close every open tracking issue whose sub-issues are all closed, as completed. A tracking issue with any open sub-issue stays open.
-
-End your reply with the report link, the tracking issue if there is one, and the issue count per repo.
+End your reply with the report link, the parent if there is one, and the issue count per repo.

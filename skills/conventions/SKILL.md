@@ -5,7 +5,7 @@ description: The labels and body sections the workshop dispatcher reads on issue
 
 # Conventions
 
-The `dispatcher` skill reads these labels and sections to decide what an agent session starts on and what waits for the maintainer. `../dispatcher/scripts/decide.ts` is the authority on how it reads them, and this skill is the authority on what to set. The `surveys` skill adds the survey labels, and a repo's own docs add labels of their own, such as Structra's `wayfinder:*`. Follow those as well.
+The `dispatcher` skill reads these labels and sections to decide what an agent session starts on and what waits for the maintainer. `../dispatcher/scripts/decide.ts` is the authority on how it reads them, and this skill is the authority on what to set. The `surveys` skill adds the survey labels, **Filing a batch of findings** below covers runs that file many issues at once, and a repo's own docs add labels of their own, such as Structra's `wayfinder:*`. Follow those as well.
 
 Whenever you ask the maintainer to do something by hand, in an issue, PR, digest, notification or reply, link the page where they do it, e.g. `https://github.com/<owner>/<repo>/settings/secrets/actions` or `…/labels`, rather than describing how to navigate there. Skip it only where no stable URL exists.
 
@@ -53,6 +53,33 @@ The tier rates the work **as the issue is written**, so write it down a tier whe
 - **Don't fake the downgrade.** Work that needs a judgement call the issue can't settle (a shared mutable singleton with no obvious owner, an abstraction whose shape the code doesn't determine) stays `opus`; say why the context doesn't help. A decision only the maintainer can make is not a reason for `opus`: put it in a `## Decision needed` section and rate the work that follows it.
 - **Split what splits cleanly**: rate the specified half down and leave the rest where it belongs.
 - **Rate the fix, not confirming it.** Re-running a build, a test suite, a measurement or a repro is scripted and suits the cheapest tier.
+
+## Filing a batch of findings
+
+A run that reviews code and files what it finds (a survey, the dependency maintenance pass) files a **parent issue** that records the run and one **sub-issue per finding**. The skill that runs it says where the parent lives, its title and labels, and what its body holds. The parent gets no tier label: it isn't work to dispatch.
+
+**Search first.** A re-run mostly re-derives findings that are already open. Search the open parents of earlier runs and their sub-issues, and the repo's open issues for the thing the finding is about. A match gets a comment with the new evidence, not a second issue. Then read the newest *closed* parent's "deliberately not filed" section, which an open-issue search can't see.
+
+**Where.** File each finding in the repo whose files the fix changes, even when the parent is elsewhere; a sub-issue may be in another repo. A fix to the workshop's shared files (the dispatcher's prompts, these conventions, the survey skills) goes in the workshop's own repo, the digest repo the `dispatcher` skill names.
+
+**Fields.** Every finding has these; the running skill adds its own (a category, an impact scale):
+
+- **Title**: short label.
+- **Breadth**: the number of **files** affected, from a search (grep/glob) you name; write "est." if you estimated. Where the exposure is a *condition* ("every entry, whenever two tabs are open"), say that instead, still naming the search, including one with **zero** hits where absence is the point.
+- **Tier**: per **Choosing a tier**, rated with the Task context present, plus `plan` where the fix spans several PRs.
+- **Evidence**: at least one file path plus a short **verbatim quote** from it, grep-safe: quote a span on one line, or give the line range. For a toolchain or registry finding, a config quote plus the command and its output (dated) is evidence.
+- **Problem**: one sentence: what is wrong and why it matters.
+- **Fix**: one sentence: the concrete change, and the check that shows it's done. Where the run measured something, say how the measurement should read afterwards.
+- **Task context**: what lets the tier work without re-deriving it, each item listed under **Choosing a tier**, verified: exact files and lines plus the call sites to update, the enumerated work with its values, measured numbers and when to re-measure, the trap at a file and line, the precedent (file and commit). For an extraction, state what the moved code depends on *and* what still depends on it, and say you checked both.
+
+**Closing.** A finding closes when a PR saying `Fixes #N` merges. Dropping one is a close as `not planned` with a comment saying why; setting one aside is removing `ready-for-agent` plus a comment. At the start of each run, close every open parent of that kind whose sub-issues are all closed, as completed, with a comment linking its findings (`#n` each). Find them with:
+
+```bash
+gh api --paginate "repos/<owner/repo>/issues?labels=<label>&state=open&per_page=100" \
+  --jq '.[] | select(.pull_request|not) | select(.sub_issues_summary.total>0 and .sub_issues_summary.total==.sub_issues_summary.completed) | .number'
+```
+
+A parent with any open sub-issue stays open.
 
 ## Opening a PR
 
