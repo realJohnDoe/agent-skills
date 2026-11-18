@@ -25,7 +25,7 @@ The survey run, which the `timetable` skill starts, follows these steps. Each ru
 `score = days since that survey last ran on that repo × activity in its scope since then`
 
 - **Last run:** the newest issue in that repo labelled `survey` plus the survey's `label` (or, filed before the `survey` label, one with that `label` and sub-issues). A repo that has none counts from its first commit, so a repo never surveyed ranks high.
-- **Activity:** set by the survey's `scope` frontmatter, which a repo's overlay overrides with a `## <label> scope` heading holding the pathspecs. `sessions` (retro) counts the PRs opened since that name an agent session (`survey-retro/scripts/retro-candidates.ts`). Anything else is git pathspecs, and counts the first-parent commits (merged PRs) touching them.
+- **Activity:** set by the survey's `scope` frontmatter, which a repo's overlay overrides with a `## <label> scope` heading holding the pathspecs. `sessions` (retro) counts the PRs opened since that name an agent session (`_shared/sessions.ts`, which the retro's `retro-candidates.ts` also reads). Anything else is git pathspecs, and counts the first-parent commits (merged PRs) touching them.
 - **Skipped** (`skip` says why), each per repo: the pair while that repo has an open parent for that survey with a finding the workshop can still work on (open, no undecided `## Decision needed`), and every pair of a repo with 3 or more open `survey-finding` issues.
 - **`top`** is the highest-scoring pair not skipped, or `null` when every such score is 0.
 

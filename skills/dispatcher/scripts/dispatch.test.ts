@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { describe, test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { fakeBin } from "./fake-bin.ts";
+import { fakeBin } from "../../_shared/fake-bin.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const DIGEST = "realJohnDoe/agent-skills";
@@ -609,8 +609,10 @@ describe("the repos are the ones attached", () => {
   });
   test("run from inside the skill's folder without --checkouts stops the run", () => {
     // An installed plugin's skill folder isn't a git clone, so copy the scripts out of this one.
-    const skillDir = mkdtempSync(join(tmpdir(), "installed-skill-"));
+    const skills = mkdtempSync(join(tmpdir(), "installed-skills-"));
+    const skillDir = join(skills, "dispatcher");
     cpSync(here, join(skillDir, "scripts"), { recursive: true });
+    cpSync(join(here, "..", "..", "_shared"), join(skills, "_shared"), { recursive: true });
     const res = spawnSync(process.execPath, [join(skillDir, "scripts", "dispatch.ts"), "--digest", DIGEST], {
       cwd: skillDir,
       encoding: "utf8",

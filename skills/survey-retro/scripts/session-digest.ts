@@ -3,7 +3,7 @@
 // turn, so a retro reads ~5% of a transcript's bytes. Step 2 of ../SKILL.md.
 // Usage: node session-digest.ts <saved-list_events-file> [--width N]
 import { readFileSync } from "node:fs";
-import { arg } from "../../dispatcher/scripts/lib.ts";
+import { arg } from "../../_shared/cli.ts";
 
 const W = Number(arg("--width", 160));
 // The saved file wraps one JSON line in an <other-session> envelope; take the JSON.

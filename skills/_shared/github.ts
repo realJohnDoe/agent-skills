@@ -1,5 +1,27 @@
-// The parts of the `gh api` responses the scripts read, as narrow interfaces
-// rather than GitHub's full types.
+// `gh api` calls, and the parts of their responses the scripts read, as narrow
+// interfaces rather than GitHub's full types.
+import { run } from "./cli.ts";
+
+export const api = <T = any>(path: string, ...rest: string[]): T =>
+  JSON.parse(run("gh", ["api", path, ...rest]) || "null");
+// --paginate --slurp yields one array per page.
+export const all = <T = any>(path: string): T[] =>
+  api<T[][]>(path, "--paginate", "--slurp").flat();
+export const post = (path: string, body: unknown, method = "POST") =>
+  run("gh", ["api", "-X", method, path, "--input", "-"], JSON.stringify(body));
+export const names = (x: { labels: (string | { name: string })[] }): string[] =>
+  x.labels.map((l) => (typeof l === "string" ? l : l.name));
+
+// Pages by hand, newest first, stopping at the first page that reaches past `done`.
+export const pages = <T>(path: string, pick: (page: any) => T[], done: (last: T) => boolean) => {
+  const out: T[] = [];
+  for (let page = 1; ; page++) {
+    const batch = pick(api(`${path}&per_page=100&page=${page}`));
+    out.push(...batch);
+    if (batch.length < 100 || done(batch.at(-1)!)) return out;
+  }
+};
+
 type Label = string | { name: string };
 type User = { login: string; type: string };
 

@@ -6,24 +6,12 @@
 // Prints {state, plan}. state is normal | drain | paused | resume. Without --apply
 // nothing is written; with it, drain/resume carry out the plan and post their marker
 // comment last, so a crash is retried and a second firing in the same state does nothing.
-import { FAILED, assertNever, referencedIssues, openQuestion, READY, tierOf, isPlan } from "./decide.ts";
-import type { GhCheckRuns, GhIssue, GhPull } from "./github.ts";
-import {
-  FOOTER,
-  RESUMED,
-  SNAPSHOT,
-  readPause,
-  all,
-  api,
-  arg,
-  flag,
-  loadConfig,
-  main,
-  names,
-  post,
-  preflight,
-} from "./lib.ts";
-import type { PauseState, Repo } from "./lib.ts";
+import type { Repo } from "../../_shared/repos.ts";
+import { all, api, type GhCheckRuns, type GhIssue, type GhPull, names, post } from "../../_shared/github.ts";
+import { arg, flag, main } from "../../_shared/cli.ts";
+import { openQuestion } from "../../_shared/markers.ts";
+import { FOOTER, loadConfig, type PauseState, preflight, readPause, RESUMED, SNAPSHOT } from "./lib.ts";
+import { assertNever, FAILED, isPlan, READY, referencedIssues, tierOf } from "./decide.ts";
 
 const APPLY = flag("--apply");
 const TODAY = arg("--today", new Date().toISOString().slice(0, 10));

@@ -1,8 +1,10 @@
 // The shared digest: read its state, build its body from the run's plan, write it.
 // dispatch.ts calls these. See ../SKILL.md.
-import { AGENT, isDigest, marked, READY } from "./decide.ts";
-import type { GhComment, GhIssue } from "./github.ts";
-import { type Item, type Repo, FOOTER, all, post } from "./lib.ts";
+import type { Repo } from "../../_shared/repos.ts";
+import { all, type GhComment, type GhIssue, post } from "../../_shared/github.ts";
+import { isDigest, marked } from "../../_shared/markers.ts";
+import { AGENT, READY } from "./decide.ts";
+import { FOOTER, type Item } from "./lib.ts";
 
 // The digest is published on the first run of these days.
 const DIGEST_WEEKDAYS = [2, 5]; // Tue, Fri (UTC getDay)
