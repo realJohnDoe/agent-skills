@@ -64,7 +64,7 @@ export type Item = {
   check?: "green" | "red" | "pending";
   automerge?: boolean;
   linkedPrs?: number[]; // the PRs an issue's step waits on
-  sub?: "decide" | "goAhead" | "blocked"; // why an issue waits
+  sub?: "decide" | "afterMerge" | "goAhead" | "blocked"; // why an issue waits
 };
 export type Repo = { repo: string; name: string; path: string };
 

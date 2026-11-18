@@ -16,7 +16,7 @@ const repoChip = (repo) => {
   for (const c of repo) h = (h * 31 + c.charCodeAt(0)) >>> 0;
   return `<span class="chip repo" style="--repo:${REPO_COLORS[h % REPO_COLORS.length]}">${esc(repo.split("/")[1] ?? repo)}</span>`;
 };
-const SUB = { decide: "Decide", goAhead: "Go ahead?", blocked: "Blocked" };
+const SUB = { decide: "Decide", afterMerge: "After merge", goAhead: "Go ahead?", blocked: "Blocked" };
 const DAY = 864e5;
 
 /** @param {Card} c */
@@ -75,14 +75,16 @@ export const render = (board, now = new Date()) => {
     notices.push(`<p class="notice stale">This board is ${age} days old: the workshop has not run since. Check its routine.</p>`);
 
   const stuck = [...board.cantPush.map(cantPushCard), ...s.stuck.map(card)];
-  const review = s.prInProgress.filter((c) => c.needsReview).length;
+  const review = s.waiting.cards.filter((c) => c.needsReview).length;
+  const blocked = s.blocked ?? []; // a board.json from before the Blocked stage has none
   const status = [
     `as of <b>${esc(when(board.generated))}</b>`,
     `repos <b>${board.repos.length}</b>`,
     `stuck <b class="bad">${stuck.length}</b>`,
     `needs review <b class="warn">${review}</b>`,
-    `waiting <b>${s.waiting.cards.length}</b>`,
+    `waiting for human <b>${s.waiting.cards.length}</b>`,
     `queue <b>${s.queue.length}</b>`,
+    `blocked <b>${blocked.length}</b>`,
     link(board.digest, "digest"),
   ].join('<span class="sep"></span>');
   const parked = s.waiting.parked.length
@@ -94,11 +96,11 @@ export const render = (board, now = new Date()) => {
     `<div class="status">${status}</div>`,
     `<div class="line">`,
     stuck.length ? stageModule("stuck", "Stuck", "needs a hand", stuck, "") : "",
-    stageModule("waiting", "Waiting", "decide, go ahead, blocked", s.waiting.cards.map(card), "Nothing waits on you", parked),
+    stageModule("waiting", "Waiting for human", "decide, after merge, review, go ahead", s.waiting.cards.map(card), "Nothing waits on you", parked),
     stageModule("closed", "Closed", "latest 5", s.closed.map(card), "Nothing closed yet"),
-    stageModule("afterMerge", "After merge", "your step after the PR", s.afterMerge.map(card), "No after-merge steps"),
-    stageModule("pr", "PR in progress", "needs review first", s.prInProgress.map(card), "No open PRs"),
+    stageModule("pr", "PR in progress", "red first", s.prInProgress.map(card), "No open PRs"),
     stageModule("queue", "Queue", "in pickup order", s.queue.map(card), "Queue empty"),
+    stageModule("blocked", "Blocked", "waiting on another issue", blocked.map(card), "Nothing blocked"),
     `</div>`,
   ].join("\n");
 };

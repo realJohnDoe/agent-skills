@@ -135,9 +135,9 @@ main { max-width: 1080px; margin: 0 auto; }
 @keyframes blink { 50% { opacity: .25; } }
 .m-waiting { --c: var(--warn); }
 .m-closed { --c: var(--ok); }
-.m-afterMerge { --c: var(--lamp); }
 .m-pr { --c: var(--holo); }
 .m-queue { --c: var(--indigo); }
+.m-blocked { --c: var(--muted); }
 
 /* ---------- readout cards ---------- */
 .card {
@@ -177,7 +177,7 @@ main { max-width: 1080px; margin: 0 auto; }
 .empty { grid-column: 1 / -1; font: 12px var(--f-mono); color: var(--muted); padding: 4px 0; letter-spacing: .04em; text-transform: uppercase; }
 .empty::before { content: "◦ "; color: var(--c); }
 
-/* the parked fold at the foot of Waiting */
+/* the parked fold at the foot of Waiting for human */
 details.parked { margin: 14px 22px 0; padding: 8px 0 0; border-top: 1px dashed var(--seam); color: var(--muted); }
 details.parked summary { cursor: pointer; font: 600 13px var(--f-display); letter-spacing: .06em; text-transform: uppercase; }
 details.parked .stack { padding: 10px 0 0; }
