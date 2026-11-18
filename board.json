@@ -1,5 +1,5 @@
 {
-  "generated": "2026-11-18T12:42:53.794Z",
+  "generated": "2026-11-18T15:38:09.980Z",
   "repos": [
     "realJohnDoe/agent-skills",
     "realJohnDoe/kenpo-notes",
@@ -17,21 +17,12 @@
   "stages": {
     "stuck": [
       {
-        "repo": "realJohnDoe/agent-skills",
-        "kind": "issue",
-        "number": 89,
-        "title": "dispatcher: scripts find no repos when run from inside the installed plugin's skill folder",
-        "url": "https://github.com/realJohnDoe/agent-skills/issues/89",
-        "tier": "sonnet",
-        "reason": "dispatched 2026-11-18, no PR yet; unassign to re-dispatch"
-      },
-      {
         "repo": "realJohnDoe/realJohnDoe.github.io",
         "kind": "issue",
-        "number": 45,
-        "title": "Stale docs and identifiers: create-svelte README, gone nav, kenpo-quartz link, dark-mod theme",
-        "url": "https://github.com/realJohnDoe/realJohnDoe.github.io/issues/45",
-        "tier": "haiku",
+        "number": 44,
+        "title": "Homepage content is hand-copied markup: timeline, cards and page wrapper duplicated",
+        "url": "https://github.com/realJohnDoe/realJohnDoe.github.io/issues/44",
+        "tier": "sonnet",
         "reason": "dispatched 2026-11-18, no PR yet; unassign to re-dispatch"
       }
     ],
@@ -52,12 +43,62 @@
           "sub": "afterMerge"
         },
         {
+          "repo": "realJohnDoe/agent-skills",
+          "kind": "pr",
+          "number": 95,
+          "title": "Record a question left open by a PR on the issue, not only in the PR",
+          "url": "https://github.com/realJohnDoe/agent-skills/pull/95",
+          "check": "green",
+          "reason": "green; waiting for your review",
+          "needsReview": true
+        },
+        {
           "repo": "realJohnDoe/meridian",
           "kind": "issue",
           "number": 1390,
           "title": "Retire the old origin: revoke tokens, delete local data, unregister the PWA",
           "url": "https://github.com/realJohnDoe/meridian/issues/1390",
           "tier": "opus",
+          "sub": "goAhead",
+          "reason": "waiting for your go-ahead"
+        },
+        {
+          "repo": "realJohnDoe/scale-of-economy",
+          "kind": "issue",
+          "number": 27,
+          "title": "Stale dependabot.yml and pnpm-workspace.yaml holds: duplicate ignore key, gone action, met minimatch condition",
+          "url": "https://github.com/realJohnDoe/scale-of-economy/issues/27",
+          "tier": "haiku",
+          "sub": "goAhead",
+          "reason": "waiting for your go-ahead"
+        },
+        {
+          "repo": "realJohnDoe/scale-of-economy",
+          "kind": "issue",
+          "number": 26,
+          "title": "Dead scroll-settle, snap-gating and transform code in ScrollSpace, geometry and CirclesLayer",
+          "url": "https://github.com/realJohnDoe/scale-of-economy/issues/26",
+          "tier": "haiku",
+          "sub": "goAhead",
+          "reason": "waiting for your go-ahead"
+        },
+        {
+          "repo": "realJohnDoe/scale-of-economy",
+          "kind": "issue",
+          "number": 25,
+          "title": "Tailwind v3 config is ignored by v4; text-primary and two other classes emit no CSS",
+          "url": "https://github.com/realJohnDoe/scale-of-economy/issues/25",
+          "tier": "haiku",
+          "sub": "goAhead",
+          "reason": "waiting for your go-ahead"
+        },
+        {
+          "repo": "realJohnDoe/scale-of-economy",
+          "kind": "issue",
+          "number": 24,
+          "title": "Sort-key union is hand-written 13 times across 6 files",
+          "url": "https://github.com/realJohnDoe/scale-of-economy/issues/24",
+          "tier": "haiku",
           "sub": "goAhead",
           "reason": "waiting for your go-ahead"
         }
@@ -67,11 +108,21 @@
     "queue": [],
     "prInProgress": [
       {
-        "repo": "realJohnDoe/realJohnDoe.github.io",
+        "repo": "realJohnDoe/agent-skills",
         "kind": "pr",
-        "number": 53,
-        "title": "fix: make icon links single tab stops and fix list and heading semantics",
-        "url": "https://github.com/realJohnDoe/realJohnDoe.github.io/pull/53",
+        "number": 97,
+        "title": "docs(survey-health): check @latest expiry conditions against the installed version, and grep emitted CSS",
+        "url": "https://github.com/realJohnDoe/agent-skills/pull/97",
+        "check": "pending",
+        "automerge": true,
+        "reason": "CI running"
+      },
+      {
+        "repo": "realJohnDoe/agent-skills",
+        "kind": "pr",
+        "number": 96,
+        "title": "fix: stop dispatcher scripts run from the skill folder instead of finding no repos",
+        "url": "https://github.com/realJohnDoe/agent-skills/pull/96",
         "tier": "sonnet",
         "check": "pending",
         "automerge": true,
@@ -90,6 +141,31 @@
       }
     ],
     "closed": [
+      {
+        "repo": "realJohnDoe/realJohnDoe.github.io",
+        "kind": "issue",
+        "number": 43,
+        "title": "Icon links nest a <button> in an <a>: 144 tab stops on the homepage, plus invalid list and heading outline",
+        "url": "https://github.com/realJohnDoe/realJohnDoe.github.io/issues/43",
+        "tier": "sonnet",
+        "prs": [
+          53
+        ],
+        "reason": "closed 2026-11-18 by realJohnDoe/realJohnDoe.github.io#53"
+      },
+      {
+        "repo": "realJohnDoe/realJohnDoe.github.io",
+        "kind": "issue",
+        "number": 45,
+        "title": "Stale docs and identifiers: create-svelte README, gone nav, kenpo-quartz link, dark-mod theme",
+        "url": "https://github.com/realJohnDoe/realJohnDoe.github.io/issues/45",
+        "tier": "haiku",
+        "prs": [
+          49,
+          54
+        ],
+        "reason": "closed 2026-11-18 by realJohnDoe/realJohnDoe.github.io#49, realJohnDoe/realJohnDoe.github.io#54"
+      },
       {
         "repo": "realJohnDoe/realJohnDoe.github.io",
         "kind": "issue",
@@ -127,31 +203,6 @@
           52
         ],
         "reason": "closed 2026-11-18 by realJohnDoe/realJohnDoe.github.io#50, realJohnDoe/realJohnDoe.github.io#52"
-      },
-      {
-        "repo": "realJohnDoe/realJohnDoe.github.io",
-        "kind": "issue",
-        "number": 46,
-        "title": "Roboto loads through a render-blocking CSS @import chain; Fira Mono never loads",
-        "url": "https://github.com/realJohnDoe/realJohnDoe.github.io/issues/46",
-        "tier": "haiku",
-        "prs": [
-          51
-        ],
-        "reason": "closed 2026-11-18 by realJohnDoe/realJohnDoe.github.io#51"
-      },
-      {
-        "repo": "realJohnDoe/agent-skills",
-        "kind": "issue",
-        "number": 61,
-        "title": "Workshop board: a public page showing every issue and PR by stage",
-        "url": "https://github.com/realJohnDoe/agent-skills/issues/61",
-        "tier": "opus",
-        "prs": [
-          67,
-          70
-        ],
-        "reason": "closed 2026-11-18 by realJohnDoe/agent-skills#67, realJohnDoe/agent-skills#70"
       }
     ],
     "behind": [
@@ -176,14 +227,34 @@
         "reason": "blocked by realJohnDoe/meridian#1390"
       },
       {
-        "repo": "realJohnDoe/realJohnDoe.github.io",
+        "repo": "realJohnDoe/scale-of-economy",
         "kind": "issue",
-        "number": 44,
-        "title": "Homepage content is hand-copied markup: timeline, cards and page wrapper duplicated",
-        "url": "https://github.com/realJohnDoe/realJohnDoe.github.io/issues/44",
+        "number": 30,
+        "title": "CirclesLayer redraws all circles every frame even when idle",
+        "url": "https://github.com/realJohnDoe/scale-of-economy/issues/30",
         "tier": "sonnet",
         "sub": "blocked",
-        "reason": "blocked by realJohnDoe/realJohnDoe.github.io#43"
+        "reason": "blocked by realJohnDoe/scale-of-economy#26"
+      },
+      {
+        "repo": "realJohnDoe/scale-of-economy",
+        "kind": "issue",
+        "number": 29,
+        "title": "Order dropdown is not keyboard- or screen-reader-operable",
+        "url": "https://github.com/realJohnDoe/scale-of-economy/issues/29",
+        "tier": "sonnet",
+        "sub": "blocked",
+        "reason": "blocked by realJohnDoe/scale-of-economy#24"
+      },
+      {
+        "repo": "realJohnDoe/scale-of-economy",
+        "kind": "issue",
+        "number": 28,
+        "title": "No test runner; number formatter renders 999999 as \"$1,000 thousand\"",
+        "url": "https://github.com/realJohnDoe/scale-of-economy/issues/28",
+        "tier": "sonnet",
+        "sub": "blocked",
+        "reason": "blocked by realJohnDoe/scale-of-economy#24"
       }
     ]
   }
