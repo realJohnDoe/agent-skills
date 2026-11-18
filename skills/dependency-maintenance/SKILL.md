@@ -9,7 +9,7 @@ Dependabot already proposes every available version and can auto-merge the non-m
 
 **Scope:** the repos the user names. If they name none, use the current repo. Use every repo attached to the session if they asked for "all", or if the working directory isn't a repo but holds several. With several repos, a dependency they share gets one decision, applied in each repo that has it.
 
-**Previous runs:** each run's parent is a `Dependency maintenance <date>` issue in realJohnDoe/agent-skills, filed per the `workshop-conventions` skill's **Filing a batch of findings** (`../workshop-conventions/SKILL.md`), which this pass follows for searching, fields, tiers and closing. The newest parent, open or closed, is the last run. The open sub-issues of every open parent are decisions already made: re-check their facts and update an issue only when a fact has changed.
+**Previous runs:** each run's parent is a `Dependency maintenance <date>` issue in realJohnDoe/agent-skills, filed per the `conventions` skill's **Filing a batch of findings** (`../conventions/SKILL.md`), which this pass follows for searching, fields, tiers and closing. The newest parent, open or closed, is the last run. The open sub-issues of every open parent are decisions already made: re-check their facts and update an issue only when a fact has changed.
 
 **Start** by closing the finished parents in realJohnDoe/agent-skills, per **Closing** there. They carry the `dependencies` label, or, filed before it, are found by title.
 
@@ -67,7 +67,7 @@ Write one issue per decision, in the repo that changes, with the fields of **Fil
 
 - **Title:** `deps: <verb> <package> <from> → <to>`, for example `deps: replace moment with date-fns` or `deps: lift typescript <7 pin`.
 - **What this pass adds to the fields:** the **Problem** is the verdict from step 3; the **Evidence** is the step 2 command plus its output excerpt, dated; the **Task context** names the gating risk; the **Fix**'s check is the repo's own build and test commands plus the specific check.
-- **Labels:** in a repo the workshop dispatches, per `workshop-conventions`; otherwise the repo's own scheme from step 1. Either way, plus `dependencies` if the repo has that label. If a label doesn't exist, name the tag in the body instead. Don't create labels.
+- **Labels:** in a repo the workshop dispatches, per `conventions`; otherwise the repo's own scheme from step 1. Either way, plus `dependencies` if the repo has that label. If a label doesn't exist, name the tag in the body instead. Don't create labels.
 
 ## 5. Publish the report
 

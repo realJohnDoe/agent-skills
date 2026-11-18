@@ -6,7 +6,7 @@
     {
       "name": "joes-workshop",
       "source": "./skills",
-      "description": "The workshop: scheduled agent runs that dispatch, follow up on and merge work across several repositories",
+      "description": "Recurring maintenance passes that run over several repositories at once",
       "category": "development",
       "homepage": "https://github.com/realJohnDoe/agent-skills"
     }

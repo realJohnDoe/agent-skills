@@ -6,7 +6,7 @@ Issues live in this repo's GitHub Issues (realJohnDoe/agent-skills). See `docs/a
 
 ### Triage labels
 
-Before creating, labelling or ordering an issue, or opening a PR, follow the `workshop-conventions` skill (`skills/workshop-conventions/SKILL.md`).
+Before creating, labelling or ordering an issue, or opening a PR, follow the `conventions` skill (`skills/conventions/SKILL.md`).
 
 ### Domain docs
 

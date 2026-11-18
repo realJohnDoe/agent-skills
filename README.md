@@ -15,7 +15,7 @@ Claude Code skills shared across my repositories, as one plugin (`joes-workshop`
 |---|---|
 | [`timetable`](skills/timetable/SKILL.md) | The workshop's one schedule, as a table in git: the `Timetable` routine fires twice a day and runs only this skill, which starts each task due on that tick (dispatcher, survey run, dependency maintenance) with the model its entry names. |
 | [`dispatcher`](skills/dispatcher/SKILL.md) | Runs over every repo attached to the `Timetable` routine: dispatches tier-labelled issues to subagent sessions, follows up on red or conflicting PRs, merges `automerge` PRs, and keeps one shared digest of what waits on the maintainer, with one label to pause and resume it all. Its `board/` folder is the workshop board's page. |
-| [`workshop-conventions`](skills/workshop-conventions/SKILL.md) | The labels and body sections (such as `## Decision needed`) the dispatcher reads, and what an agent sets when it files an issue or opens a PR in a workshop repo. Each repo's `CLAUDE.md` points here instead of restating them. |
+| [`conventions`](skills/conventions/SKILL.md) | The labels and body sections (such as `## Decision needed`) the dispatcher reads, and what an agent sets when it files an issue or opens a PR in a workshop repo. Each repo's `CLAUDE.md` points here instead of restating them. |
 | [`surveys`](skills/surveys/SKILL.md) | The conventions every survey follows, and the chooser that picks the one (survey, repo) pair to run next across the attached repos, by days since that survey last ran there × activity in its scope since. A repo's own `.claude/skills/survey-*/` are ranked alongside the plugin's. |
 | [`survey-health`](skills/survey-health/SKILL.md) | Surveys one repo's code health (architecture, simplicity, layout, security, testing, tooling and more), runs its quality gates, and files the ranked findings as sub-issues. A repo can narrow its scope or add categories in an overlay. |
 | [`survey-retro`](skills/survey-retro/SKILL.md) | Reviews the agent sessions that worked in one repo since its last retro and files the top changes to their environment (checks, review, steering files, tools) that would have stopped them going wrong. |
@@ -32,4 +32,4 @@ npm ci && npx tsc
 node --test 'skills/**/*.test.ts'
 ```
 
-How to preview the board locally, and what each script decides, is in the dispatcher's [Developing](skills/dispatcher/SKILL.md#developing) section. Issues for this repo follow [`workshop-conventions`](skills/workshop-conventions/SKILL.md); see [`docs/agents/`](docs/agents/).
+How to preview the board locally, and what each script decides, is in the dispatcher's [Developing](skills/dispatcher/SKILL.md#developing) section. Issues for this repo follow [`conventions`](skills/conventions/SKILL.md); see [`docs/agents/`](docs/agents/).

@@ -58,7 +58,7 @@ One line per category, verdicts per `surveys`.
 
 ### 4. Findings
 
-`Title`, `Breadth`, `Tier`, `Evidence`, `Problem`, `Fix` and `Task context` are the shared finding fields (`workshop-conventions`, **Filing a batch of findings**). This survey adds:
+`Title`, `Breadth`, `Tier`, `Evidence`, `Problem`, `Fix` and `Task context` are the shared finding fields (`conventions`, **Filing a batch of findings**). This survey adds:
 
 - **Category**: one or more tags from `architecture` `overengineering` `layout` `dry` `srp` `dead-code` `types` `error-handling` `testing` `styling` `ux` `performance` `security` `dependencies` `naming` `toolchain` `library-fit`. Applying a label the repo lacks fails the whole issue create: list them with `gh api --paginate repos/<owner/repo>/labels --jq '.[].name'` (`gh label list` needs GraphQL, which cloud sessions can't reach) and name a missing tag in the body instead.
 - **Impact**: 1-10 (10 = catastrophic or systemic; 5 = a DRY violation duplicated across ~4 files, or a missing error state on a primary flow; 1 = trivial or cosmetic).
