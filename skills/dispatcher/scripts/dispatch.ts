@@ -3,13 +3,16 @@
 // which PRs need a follow-up session or get merged, and the one shared digest.
 // See ../SKILL.md.
 // Usage: node dispatch.ts --digest owner/repo [--apply] [--followups-only] [--digest-only]
-//   [--max-sessions N] [--max-followups N] [--today YYYY-MM-DD] [--repos o/r,...]
+//   [--board-only] [--max-sessions N] [--max-followups N] [--today YYYY-MM-DD] [--repos o/r,...]
 //   [--checkouts dir]
 // Without --apply it is a dry run: it prints the plan and writes nothing. The
 // digest is written only by --apply --digest-only, the last step of a run, once
-// the sessions have finished; --apply alone does not write it.
+// the sessions have finished; --apply alone does not write it. The same step pushes
+// board.json to the workshop-board branch; --board-only does only that (drain's last step).
+import { readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { type Blocker, bodyBlockers } from "./bodyBlockers.ts";
 import {
   AUTOMERGE,
@@ -30,7 +33,7 @@ import {
   READY,
   tierOf,
 } from "./decide.ts";
-import { type Card, type BoardPlan, buildBoard } from "./board.ts";
+import { type Board, type Card, type BoardPlan, buildBoard } from "./board.ts";
 import { buildDigest, readDigest, writeDigest } from "./digest.ts";
 import type { GhCheckRuns, GhComment, GhIssue, GhPull, GhReview, GhSearch } from "./github.ts";
 import {
@@ -46,12 +49,18 @@ import {
   main,
   names,
   post,
+  readPause,
+  run,
   unpushable,
 } from "./lib.ts";
 
 const APPLY = flag("--apply");
 const FOLLOWUPS_ONLY = flag("--followups-only"); // drain: merge and follow up, start nothing new
 const DIGEST_ONLY = flag("--digest-only"); // end of run: write only the digest
+const BOARD_ONLY = flag("--board-only"); // drain: write only the board, nothing else
+const FINAL = DIGEST_ONLY || BOARD_ONLY; // reads everything, starts nothing, merges nothing
+const BOARD_REPO = "realJohnDoe/agent-skills";
+const BOARD_BRANCH = "workshop-board";
 const MAX_SESSIONS = Number(arg("--max-sessions", 4)); // across all repos
 const MAX_FOLLOWUPS = Number(arg("--max-followups", 2)); // per PR
 const STALE_DAYS = 2; // a claim or follow-up with nothing to show after this is stuck
@@ -160,7 +169,7 @@ main(() => {
   // where something merged is read again, so sessions and the digest see it.
   const mergedIn = new Set<string>();
   const mergedPrs: Merge[] = [];
-  if (APPLY && !DIGEST_ONLY) {
+  if (APPLY && !FINAL) {
     for (const { repo, missing } of missingLabels)
       for (const name of missing)
         post(`repos/${repo}/labels`, { name, color: name === PAUSE_LABEL ? "fbca04" : LABELS[name] });
@@ -196,7 +205,7 @@ main(() => {
   const followups = pick("followups").sort(newestFirst);
   const dispatches = pick("dispatches").sort(newestFirst);
   // --digest-only starts nothing: what is left is not started yet, so it is queued.
-  const cap = DIGEST_ONLY ? 0 : MAX_SESSIONS;
+  const cap = FINAL ? 0 : MAX_SESSIONS;
   const sessions = [...followups, ...dispatches].slice(0, cap);
   const queue = dispatches.slice(Math.max(0, cap - followups.length));
   // What the workshop is working on: this run's sessions, PRs waiting on CI or
@@ -224,7 +233,7 @@ main(() => {
   const merged = pick("merged");
   const unblocksOf = new Map(plans.flatMap((p) => [...p.unblocks]));
 
-  const board = buildBoard(
+  const board: Board = buildBoard(
     {
       cantPush: unpushableRepos,
       review,
@@ -244,6 +253,14 @@ main(() => {
       closed: latestClosed(repos),
     },
   );
+
+  if (BOARD_ONLY) {
+    const { state: pause, snap } = readPause(DIGEST);
+    if (pause === "paused" && snap) {
+      board.state = "paused";
+      board.paused = { since: snap.created_at.slice(0, 10), snapshot: snap.html_url ?? board.digest };
+    }
+  }
 
   const built = buildDigest(state, {
     repos,
@@ -271,6 +288,7 @@ main(() => {
   };
 
   // --- Apply ----------------------------------------------------------------
+  let pushed: { pushed: boolean; why?: string } | undefined;
   if (APPLY) {
     const me = sessions.length ? api<{ login: string }>("user").login : null;
     for (const s of sessions) {
@@ -296,6 +314,7 @@ main(() => {
         digest.published = w.published;
       }
     }
+    if (FINAL) pushed = pushBoard(board, repos);
   }
 
   console.log(
@@ -308,16 +327,48 @@ main(() => {
         sessions: sessions.map(({ created, item, ...s }) => s),
         automerge: automerge.map(({ created, body, item, ...m }) => m),
         notStarted: [...followups, ...dispatches]
-          .slice(DIGEST_ONLY ? Infinity : MAX_SESSIONS)
+          .slice(FINAL ? Infinity : MAX_SESSIONS)
           .map((s) => `${s.repo}: ${s.title}`),
         digest: { ...digest, body: built.body },
-        board,
+        board: { ...board, ...pushed },
       },
       null,
       2,
     ),
   );
 });
+
+// Commits board.json (and the Pages workflow) onto the tip of the workshop-board branch
+// with plumbing, so the clone's working tree and branches stay untouched, and pushes it.
+// Judged by the push's exit code: the proxy prints "push negotiation failed" on success.
+function pushBoard(board: Board, repos: Repo[]): { pushed: boolean; why?: string } {
+  const clone = repos.find((r) => r.repo.toLowerCase() === BOARD_REPO.toLowerCase());
+  if (!clone) return { pushed: false, why: `${BOARD_REPO} isn't attached` };
+  const git = (input: string | undefined, ...args: string[]) =>
+    run("git", ["-C", clone.path, ...args], input).trim();
+  try {
+    git(undefined, "fetch", "origin", BOARD_BRANCH);
+    const tip = git(undefined, "rev-parse", "FETCH_HEAD");
+    const blob = (text: string) => git(text, "hash-object", "-w", "--stdin");
+    const deploy = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../board/deploy.yml"), "utf8");
+    const workflows = git(`100644 blob ${blob(deploy)}\tdeploy.yml\n`, "mktree");
+    const dotGithub = git(`040000 tree ${workflows}\tworkflows\n`, "mktree");
+    const root = git(
+      `100644 blob ${blob(JSON.stringify(board, null, 2) + "\n")}\tboard.json\n040000 tree ${dotGithub}\t.github\n`,
+      "mktree",
+    );
+    const commit = git(
+      undefined,
+      "-c", "user.name=Workshop dispatcher", "-c", "user.email=noreply@anthropic.com",
+      "commit-tree", root, "-p", tip, "-m", `Board ${board.generated}`,
+    );
+    git(undefined, "push", "origin", `${commit}:refs/heads/${BOARD_BRANCH}`);
+    return { pushed: true };
+  } catch (e) {
+    const err = e as { stderr?: Buffer | string; message: string };
+    return { pushed: false, why: (err.stderr || err.message).toString().trim().split("\n").at(-1) };
+  }
+}
 
 // Everything one repo contributes to the plan, every item carrying its repo.
 function planRepo({ repo, name, path }: Repo, since: string): RepoPlan {
