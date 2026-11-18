@@ -59,11 +59,10 @@ One line per category, verdicts per `surveys`.
 
 ### 4. Findings
 
-`Title`, `Breadth`, `Tier`, `Evidence`, `Problem` and `Fix` are the shared finding fields. This survey adds:
+`Title`, `Breadth`, `Tier`, `Evidence`, `Problem`, `Fix` and `Task context` are the shared finding fields (`conventions`, **Filing a batch of findings**). This survey adds:
 
 - **Category**: one or more tags from `architecture` `overengineering` `layout` `dry` `srp` `dead-code` `types` `error-handling` `testing` `styling` `ux` `performance` `security` `dependencies` `naming` `toolchain` `library-fit`. Applying a label the repo lacks fails the whole issue create: list them with `gh api --paginate repos/<owner/repo>/labels --jq '.[].name'` (`gh label list` needs GraphQL, which cloud sessions can't reach) and name a missing tag in the body instead.
 - **Impact**: 1-10 (10 = catastrophic or systemic; 5 = a DRY violation duplicated across ~4 files, or a missing error state on a primary flow; 1 = trivial or cosmetic).
-- **Task context**: the block described in `surveys`, **Tier**.
 
 **Fails silently here** (what sets the tier): a lint rule that passes but no longer catches what it should, a "dead" export actually reached dynamically, a boundary that still resolves but now leaks. A multi-PR architecture change is a `plan`, and a product decision (narrow the type, or restructure the module boundary) is a `## Decision needed`; neither raises the tier. Example hazard note: "`sonnet` if the import boundary to preserve is specified in the task; else `opus`."
 

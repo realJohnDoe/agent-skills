@@ -11,12 +11,7 @@ A survey reviews one repo for one kind of problem and files what it finds as iss
 
 The survey run, which the `timetable` skill starts, follows these steps. Each run surveys one repo, with one survey.
 
-1. **Close finished parents.** In each attached repo, every open issue labelled `survey` whose sub-issues are all closed gets a comment linking its findings (`#n` each), then is closed as completed:
-
-   ```bash
-   gh api --paginate "repos/<owner/repo>/issues?labels=survey&state=open&per_page=100" \
-     --jq '.[] | select(.pull_request|not) | select(.sub_issues_summary.total>0 and .sub_issues_summary.total==.sub_issues_summary.completed) | .number'
-   ```
+1. **Close finished parents.** In each attached repo, close the finished parents labelled `survey`, per the `conventions` skill's **Filing a batch of findings**, **Closing**.
 2. **Choose.** Run `node <this skill's directory>/scripts/survey-next.ts` (see **Choosing the next survey**). If `top` is `null`, stop: post nothing, open nothing.
 3. **Run it.** Run the skill at `top.skill` on `top.repo`, in a worktree of that repo's checkout. The parent issue's body opens with a **Why this survey** line: `top`'s `lastRun`, `since`, `days`, `activity` and `score`, and that it ranked first of the pairs the chooser scored.
 
@@ -56,21 +51,6 @@ Nothing in this plugin names a repo, its paths or its issues: those belong in th
 - **Read the merged-PR history for defect classes, not just for churn.** Commits tell you what changed; PR titles tell you what was *wrong*, which is the question a survey is asking. Sample the last ~200 and tally what was being fixed. A class the repo keeps paying for that no category names is a finding *about the survey*: fix it with a diff on the survey file (see the last section).
 - **Run what you need.** A survey that requires a measurement, a screenshot or the dev server says so, and that pass is the ask, whatever a repo's rule about not driving the dev server unprompted says.
 
-## Tier
-
-Every finding gets a tier label, chosen as the `conventions` skill's **Choosing a tier** says: the cheapest tier that can do the fix well *with* the finding's Task context block present. Each survey names what "fails silently" looks like in its own domain. Whether a finding is a multi-PR `plan` and whether it waits on a `## Decision needed` are separate from the tier (`conventions`, **Filing an issue**): an architecture change spanning several PRs is `plan`, a product decision only the maintainer can make is a decision section, and neither raises the tier.
-
-Give every finding a **Task context** block with what lets that tier work without re-deriving it:
-
-- **Exact locations.** File plus line or line range for every site to change, and the call sites to update. Verify the numbers before writing them down; a confidently wrong line number is worse than none.
-- **The enumerated work.** If the fix is "add the missing N things", list all N with their values. If it is a move, say what moves and what stays.
-- **Measured numbers** the fixer would otherwise re-derive (coverage percentages, a dry-run's error count and distribution, a benchmark baseline), and when to re-measure rather than trust them.
-- **The trap, located.** Not "watch out for the animation" but "`Foo.tsx:57` branches on this prop being `undefined`". A hazard with a file and line is context; without one it is a warning.
-- **The precedent.** If the repo has already solved this shape, name the file and the commit.
-- **The seam, verified in both directions.** For any extraction, state what the moved code depends on *and* what still depends on it, and say you checked.
-
-Re-rank after writing the blocks, since the tier feeds the ranking. Carry rank as its own column in the parent's summary table; a finding's identity is its issue number.
-
 ## Ranking findings
 
 Rank by `(impact × breadth) ÷ effort`, where `effort` is the tier read as an ordinal (`haiku` = 1, `sonnet` = 2, `opus` = 3), plus 2 for a `plan`. A decision section doesn't change effort. Report impact, breadth, tier and `plan` as separate fields. Put a short **summary table** above the findings (finding → tier, `plan`, open decision, plus that survey's other columns).
@@ -83,14 +63,9 @@ gh api repos/<owner/repo>/issues/<parent>/sub_issues --jq '.[] | select(.state==
 
 ## Finding fields
 
-Six fields are the same in every survey. Each survey adds its own (its `Category` tags, its `Impact` scale, and whatever its domain needs).
+`Title`, `Breadth`, `Tier`, `Evidence`, `Problem`, `Fix` and `Task context` are the shared fields (`conventions`, **Filing a batch of findings**). Each survey adds its own: its `Category` tags, its `Impact` scale, and what "fails silently" looks like in its domain, since that sets the tier. An architecture change spanning several PRs is `plan`, a product decision only the maintainer can make is a `## Decision needed`, and neither raises the tier.
 
-- **Title**: short label.
-- **Breadth**: the number of **files** affected, from an actual search (grep/glob) you can name; write "est." if you estimated. Where the exposure is a *condition* ("every entry, whenever two tabs are open"), say that instead, still naming the search, including a grep with **zero** hits where absence is the point.
-- **Tier**: per **Tier**, rated with the Task context block present, plus `plan` where the fix spans several PRs.
-- **Evidence**: at least one file path plus a short **verbatim quote** from it, grep-safe: quote a span on one line, or say so and give the line range. For toolchain findings a config quote plus a dry-run result is evidence.
-- **Problem**: one sentence: what is wrong and why it matters.
-- **Fix**: one sentence: the concrete change. Where the survey measures something, also say how the measurement should read afterwards.
+Re-rank after writing the Task context, since the tier feeds the ranking. Carry rank as its own column in the parent's summary table; a finding's identity is its issue number.
 
 **Prefer systemic and structural findings over isolated, line-level ones.** A pattern across 10 files beats one misused function. Cite real code, no generic observations.
 
@@ -110,12 +85,12 @@ Every survey caps its findings at a stated top-N. Include everything that makes 
 
 ## Reporting
 
-- **One parent issue per run**, in the surveyed repo, titled with the survey, its scope and the date, labelled `survey` plus the survey-type label (on a repo's first run, create these and `survey-finding` with `gh api -X POST repos/<owner/repo>/labels`: the chooser finds runs by them). Its body carries the **Why this survey** line, the coverage statement, the category verdicts and the summary table, with each row linking its finding's sub-issue rather than restating it. It stays open until every finding is resolved.
-- **One sub-issue per finding**, attached to the parent, with the fields above (the repo's `survey-finding` issue template, if it has one, is the skeleton). Label each with the survey's `Category` tag(s), `survey-finding`, the survey-type label, a tier label, and `plan` where it applies, plus a `## Decision needed` section when it hinges on a decision only the maintainer can make, all per the `conventions` skill.
-- **A finding whose fix belongs in the workshop's shared files** (the dispatcher's prompts, `conventions`, these survey skills) is filed in the workshop's own repo, the digest repo the `dispatcher` skill names, and attached to the parent as a sub-issue there too.
-- **Search first.** Search the repo's open parents (and their sub-issues) for the survey-type label: a re-run mostly re-derives findings already open, and those get a comment with the new evidence rather than a second issue. Then read the newest *closed* parent's "deliberately not filed" section, which an open-issue search can't see.
+Search, file and close per the `conventions` skill's **Filing a batch of findings**. What a survey adds:
+
+- **One parent issue per run**, in the surveyed repo, titled with the survey, its scope and the date, labelled `survey` plus the survey-type label (on a repo's first run, create these and `survey-finding` with `gh api -X POST repos/<owner/repo>/labels`: the chooser finds runs by them). Its body carries the **Why this survey** line, the coverage statement, the category verdicts and the summary table, with each row linking its finding's sub-issue rather than restating it.
+- **One sub-issue per finding**, attached to the parent (the repo's `survey-finding` issue template, if it has one, is the skeleton). Label each with the survey's `Category` tag(s), `survey-finding`, the survey-type label, a tier label, and `plan` where it applies, plus a `## Decision needed` section when it hinges on a decision only the maintainer can make, all per the `conventions` skill.
+- **Search first** among the repo's open parents with the survey-type label and their sub-issues.
 - A fix that adds a cache, memo or incremental-update path ships a test that its output deep-equals a full recompute. The fixer re-runs the finding's acceptance check before it closes.
-- A finding closes when a PR saying `Fixes #N` merges. Dropping one is a close as `not planned` with a comment saying why; setting one aside is removing `ready-for-agent` plus a comment. Step 1 of **Starting the next survey** closes the parent once every finding is resolved.
 
 **Suggest improvements to the survey itself, as a diff on its skill file.** A real run is evidence about where a survey is unclear, stale or wrong: an ambiguous instruction, an unmeasurable budget item, a category boundary that didn't hold, a scoring rule that produced a counterintuitive order. After the run, edit the survey's `SKILL.md` (a plugin survey's lives in the workshop's own repo) as its own commit, separate from filing the run and from any product fix, on the branch the session is already working on. Open its PR labelled `automerge` (see `conventions`) and note in the parent issue, in one line, that the survey file was updated and why. Keep it to process learnings; findings are issues.
 
