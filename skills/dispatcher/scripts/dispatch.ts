@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// The daily dispatcher's plan over every attached repo: which issues to start,
+// The dispatcher's plan over every attached repo: which issues to start,
 // which PRs need a follow-up session or get merged, and the one shared digest.
 // See ../SKILL.md.
 // Usage: node dispatch.ts --digest owner/repo [--apply] [--followups-only] [--digest-only]
@@ -313,7 +313,7 @@ main(() => {
         post(`repos/${s.repo}/issues/${s.issue}/assignees`, { assignees: [me] });
         const auto = s.tier !== "opus";
         post(`repos/${s.repo}/issues/${s.issue}/comments`, {
-          body: `${DISPATCH}\nDispatched by the daily workshop run to a ${s.tier} session. Its PR ${auto ? "gets" : "doesn't get"} \`${AUTOMERGE}\`: once green it ${auto ? "is merged by the next daily run" : "waits in the digest for your review"}. Add or remove the label on the PR to change that.${FOOTER}`,
+          body: `${DISPATCH}\nDispatched by the workshop dispatcher to a ${s.tier} session. Its PR ${auto ? "gets" : "doesn't get"} \`${AUTOMERGE}\`: once green it ${auto ? "is merged by the next dispatcher run" : "waits in the digest for your review"}. Add or remove the label on the PR to change that.${FOOTER}`,
         });
       } else {
         post(`repos/${s.repo}/issues/${s.pr}/comments`, {
@@ -570,7 +570,7 @@ function planRepo({ repo, name, path }: Repo, since: string): RepoPlan {
             bot
               ? `This is a Dependabot bump: adapt the code or config to the new versions rather than reverting a bump, and leave the PR description as Dependabot wrote it. If a bump can't be adopted narrowly, say why in a PR comment instead of pushing.`
               : `If the repo has a PR template, the PR description must still meet it.`,
-            `Do not subscribe to PR activity: the daily workshop run checks this PR again tomorrow.`,
+            `Do not subscribe to PR activity: the dispatcher checks this PR again on its next run.`,
             `When you're done, remove the worktree and the scratch folder: \`git -C ${path} worktree remove ${wt}\` and \`rm -rf ${wt}.scratch\`.`,
           ].join("\n"),
         });
@@ -644,8 +644,8 @@ function planRepo({ repo, name, path }: Repo, since: string): RepoPlan {
         `Push the branch \`${branch}\` and open a PR in ${repo} that says ${afterMerge(i.body) ? `\`Refs #${i.number}\`` : `\`Fixes #${i.number}\`, or \`Refs #${i.number}\` when the \`conventions\` skill says so`}. If the repo has a PR template, fill it in. Before pushing, run the checks ${repo}'s CLAUDE.md asks for, and give their result in the PR.`,
         tier === "opus"
           ? `Don't label the PR \`${AUTOMERGE}\`: it waits for the maintainer's review.`
-          : `Label the PR \`${AUTOMERGE}\`: the daily workshop run merges it once green.`,
-        `Do not subscribe to PR activity: the daily workshop run follows up on red CI and review comments.`,
+          : `Label the PR \`${AUTOMERGE}\`: the dispatcher merges it once green.`,
+        `Do not subscribe to PR activity: the dispatcher follows up on red CI and review comments.`,
         `When you're done, remove the worktree and the scratch folder: \`git -C ${path} worktree remove ${wt}\` and \`rm -rf ${wt}.scratch\`.`,
       ].join("\n"),
     });
