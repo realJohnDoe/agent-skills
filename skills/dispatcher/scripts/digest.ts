@@ -9,12 +9,16 @@ const DIGEST_WEEKDAYS = [2, 5]; // Tue, Fri (UTC getDay)
 const DIGEST_DAYS = 2.5; // minimum window, so a second run that day doesn't publish again
 const DIGEST_PREFIX = "Workshop digest";
 const RELAYED = "<!-- workshop-relayed -->"; // digest replies up to here are copied to their issues
+// When a run last wrote the digest; the board's stale notice reads it. It changes the
+// body on every run, so the draft is rewritten every run (an edit notifies nobody).
+const RUN = /<!-- digest-run: (\S+) -->/;
 
 export type DigestState = {
   repo: string;
   draft: GhIssue | undefined;
   published: GhIssue | undefined;
   since: string;
+  lastRun?: string; // when a run last wrote the digest, from its RUN marker
 };
 
 // The plan's digest-ready lists, plus the run's clock and mode.
@@ -64,7 +68,8 @@ export function readDigest(repo: string, today: Date): DigestState {
   const since =
     (draft ?? published)?.body?.match(marker)?.[1] ??
     new Date(+today - DIGEST_DAYS * 864e5).toISOString().slice(0, 10);
-  return { repo, draft, published, since };
+  const lastRun = (draft ?? published)?.body?.match(RUN)?.[1];
+  return { repo, draft, published, since, ...(lastRun && { lastRun }) };
 }
 
 // One issue per digest cycle, in the digest repo. Its body is rewritten on
@@ -115,7 +120,7 @@ export function buildDigest({ repo, draft, published, since }: DigestState, plan
       : []),
   ];
   const render = (start: string, mergedLines: string[], prev?: number | null) =>
-    `<!-- digest-since: ${start} -->\n\n${NOTE}${
+    `<!-- digest-since: ${start} -->\n<!-- digest-run: ${plan.now} -->\n\n${NOTE}${
       [...asks, ...info].join("\n") || "Nothing is waiting on the maintainer.\n"
     }\nRepos covered: ${repos.map((r) => r.repo).join(", ")}.\n${prev ? `\nPrevious digest: #${prev}.\n` : ""}${
       mergedLines.length

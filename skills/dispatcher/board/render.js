@@ -41,13 +41,6 @@ const parkedCard = (p) => `<article class="card compact">
 <div class="title">${link(p.url, p.title)}</div>
 <div class="row">${repoChip(p.repo)}<span class="chip ref">#${p.number}</span><span class="why">${esc(p.reason)}</span></div>
 </article>`;
-/** @param {{ repo: string; reason: string }} r */
-const cantPushCard = (r) => `<article class="card">
-<div class="title">${link(`https://github.com/${r.repo}`, `Can't push to ${r.repo}`)}</div>
-<div class="row">${repoChip(r.repo)}</div>
-<div class="why">${esc(r.reason)}</div>
-</article>`;
-
 /**
  * @param {string} id @param {string} name @param {string} hint @param {string[]} cards
  * @param {string} empty @param {string} [foot]
@@ -63,7 +56,7 @@ const when = (iso) => `${iso.slice(0, 16).replace("T", " ")} UTC`;
 /**
  * The board below the banner: notices, the status strip and the stage modules.
  * @param {Board} board
- * @param {Date} [now] the viewer's clock, for the stale warning
+ * @param {Date} [now] the viewer's clock, for the stale warnings
  */
 export const render = (board, now = new Date()) => {
   const s = board.stages;
@@ -72,14 +65,19 @@ export const render = (board, now = new Date()) => {
     notices.push(
       `<p class="notice paused">${link(board.paused.snapshot, `Paused since ${board.paused.since.slice(0, 10)}. Nothing is dispatched or merged.`)}</p>`,
     );
-  const age = Math.floor((now.getTime() - Date.parse(board.generated)) / DAY);
-  if (board.state !== "paused" && age >= 2)
-    notices.push(`<p class="notice stale">This board is ${age} days old: the workshop has not run since. Check its routine.</p>`);
+  // The board workflow refreshes it every half hour and the dispatcher runs twice a
+  // day, so either one quiet for a day has stopped.
+  const days = (/** @type {string} */ iso) => Math.floor((now.getTime() - Date.parse(iso)) / DAY);
+  if (days(board.generated) >= 1)
+    notices.push(`<p class="notice stale">This board is ${days(board.generated)} day(s) old: its workflow has not run since. Check the Workshop board workflow.</p>`);
+  else if (board.state !== "paused" && board.lastRun && days(board.lastRun) >= 2)
+    notices.push(`<p class="notice stale">The workshop last ran ${days(board.lastRun)} days ago. Check its routine.</p>`);
 
-  const stuck = [...board.cantPush.map(cantPushCard), ...s.stuck.map(card)];
+  const stuck = s.stuck.map(card);
   const behind = s.behind ?? []; // a board.json from before this stage has none
   const status = [
     `as of <b>${esc(when(board.generated))}</b>`,
+    ...(board.lastRun ? [`last run <b>${esc(when(board.lastRun))}</b>`] : []),
     `repos <b>${board.repos.length}</b>`,
     `stuck <b class="bad">${stuck.length}</b>`,
     `waiting for human <b>${s.waiting.cards.length}</b>`,

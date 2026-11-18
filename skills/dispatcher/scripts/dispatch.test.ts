@@ -127,13 +127,7 @@ const run = (
   script: string,
   args: string[],
   fixture: unknown,
-  {
-    apply = false,
-    missing = [],
-    noPush = [],
-    attach = [],
-    pushedBoard,
-  }: { apply?: boolean; missing?: string[]; noPush?: string[]; attach?: string[]; pushedBoard?: unknown } = {},
+  { apply = false, missing = [], noPush = [], attach = [] }: { apply?: boolean; missing?: string[]; noPush?: string[]; attach?: string[] } = {},
 ) => {
   const dir = mkdtempSync(join(tmpdir(), "workshop-test-"));
   const checkouts = join(dir, "checkouts");
@@ -167,7 +161,6 @@ const run = (
         FAKE_GIT_REMOTES: JSON.stringify(remotes),
         FAKE_GIT_NOPUSH: JSON.stringify(noPush.map((r) => join(checkouts, r.split("/")[1]))),
         FAKE_GIT_LOG: gitLog,
-        ...(pushedBoard ? { FAKE_GIT_BOARD: JSON.stringify(pushedBoard) } : {}),
         ...(apply ? { FAKE_GH_LOG: log } : {}),
       },
     },
@@ -294,11 +287,13 @@ describe("dispatch --apply --digest-only", () => {
   const res = run("dispatch.ts", ["--digest-only"], world(), { apply: true });
   const isDigestWrite = (w: Any) => w.path.startsWith(`repos/${DIGEST}/issues`);
   const isWaitingLabel = (w: Any) => /\/issues\/\d+\/labels/.test(w.path) && !w.path.startsWith(`repos/${DIGEST}/`);
+  const isBoardRun = (w: Any) => w.path === `repos/${DIGEST}/actions/workflows/board.yml/dispatches`;
+  const isOther = (w: Any) => !isDigestWrite(w) && !isWaitingLabel(w) && !isBoardRun(w);
 
-  test("makes no write but the digest and the waiting-for-human label: no merges, claims or comments", () => {
+  test("makes no write but the digest, the waiting-for-human label and the board run: no merges, claims or comments", () => {
     assert.equal(res.status, 0, res.stderr);
     assert.ok(res.writes.length > 0);
-    assert.deepEqual(res.writes.filter((w) => !isDigestWrite(w) && !isWaitingLabel(w)), []);
+    assert.deepEqual(res.writes.filter(isOther), []);
   });
 
   test("writes one draft, in the digest repo, and starts no session", () => {
@@ -317,7 +312,7 @@ describe("dispatch --apply --digest-only", () => {
     const due = run("dispatch.ts", ["--digest-only"], world({ digestIssues: [draft], digestComments: { 90: [] } }), { apply: true });
     assert.equal(due.status, 0, due.stderr);
     assert.equal(due.plan.digest.publish, true);
-    assert.deepEqual(due.writes.filter((w) => !isDigestWrite(w) && !isWaitingLabel(w)), []);
+    assert.deepEqual(due.writes.filter(isOther), []);
     assert.ok(due.writes.some((w) => w.method === "PATCH" && /^Workshop digest — /.test(w.body?.title ?? "")));
   });
 
@@ -330,51 +325,76 @@ describe("dispatch --apply --digest-only", () => {
   });
 });
 
-// The board is pushed from the digest repo's own clone, so it is attached here.
-const boardPush = (calls: Any[]) => calls.find((c) => c.args[0] === "push");
 // world()'s closed-issue answer names two repos; drop it so run() answers for all three.
 const withBoardRepo = ({ [`search/issues?q=repo:${M} repo:${T} is:issue is:closed reason:completed`]: _, ...w }: Any) => ({
   ...repoFixture(DIGEST, { issues: [], prs: [] }),
   ...w,
 });
+const BOARD_RUN = { method: "POST", path: `repos/${DIGEST}/actions/workflows/board.yml/dispatches`, body: { ref: "main" } };
+const boardRuns = (writes: Any[]) => writes.filter((w) => w.path === BOARD_RUN.path);
 
-describe("dispatch --apply --digest-only pushes the board", () => {
-  const res = run("dispatch.ts", ["--digest-only"], withBoardRepo(world()), { apply: true, attach: [DIGEST] });
+describe("dispatch --apply --digest-only starts the board workflow", () => {
+  const res = run("dispatch.ts", ["--digest-only"], world(), { apply: true });
 
-  test("commits on the fetched workshop-board tip and pushes it, without force", () => {
+  test("once, on main, after the digest is written, and pushes no branch", () => {
     assert.equal(res.status, 0, res.stderr);
-    const fetched = res.gitCalls.findIndex((c) => c.args.join(" ") === "fetch origin workshop-board");
-    const commit = res.gitCalls.find((c) => c.args.includes("commit-tree"));
-    assert.ok(fetched >= 0);
-    assert.deepEqual(commit.args.slice(commit.args.indexOf("-p"), commit.args.indexOf("-p") + 2), ["-p", "tip0001"]);
-    const push = boardPush(res.gitCalls);
-    assert.deepEqual(push.args, ["push", "origin", "commit0001:refs/heads/workshop-board"]);
-    assert.equal(res.plan.board.pushed, true);
+    assert.deepEqual(boardRuns(res.writes), [BOARD_RUN]);
+    assert.equal(res.writes.at(-1).path, BOARD_RUN.path);
+    assert.equal(res.gitCalls.some((c) => c.args[0] === "push" && !c.args.includes("--dry-run")), false);
+    assert.deepEqual(res.plan.boardRefresh, { triggered: true });
   });
 
-  test("skips the push and says why when agent-skills isn't attached", () => {
-    const none = run("dispatch.ts", ["--digest-only"], world(), { apply: true });
-    assert.equal(boardPush(none.gitCalls), undefined);
-    assert.equal(none.plan.board.pushed, false);
-    assert.match(none.plan.board.why, /isn't attached/);
+  test("the digest records the run, and the board reads it back as its last run", () => {
+    assert.match(res.plan.digest.body, /\n<!-- digest-run: 2026-11-13T00:00:00.000Z -->\n/);
+    const draft = issue(50, "Workshop digest (draft) — from 2026-11-10", [], {
+      body: "<!-- digest-since: 2026-11-10 -->\n<!-- digest-run: 2026-11-12T20:00:00.000Z -->",
+    });
+    const next = run("dispatch.ts", ["--board-refresh"], world({ digestIssues: [draft], digestComments: { 50: [] } }));
+    assert.equal(next.status, 0, next.stderr);
+    assert.equal(next.plan.board.lastRun, "2026-11-12T20:00:00.000Z");
   });
 
-  test("a dry run pushes nothing", () => {
-    const dry = run("dispatch.ts", ["--digest-only"], withBoardRepo(world()), { attach: [DIGEST] });
-    assert.equal(boardPush(dry.gitCalls), undefined);
-    assert.equal(dry.plan.board.pushed, undefined);
+  test("a dry run starts nothing", () => {
+    const dry = run("dispatch.ts", ["--digest-only"], world());
+    assert.equal(dry.status, 0, dry.stderr);
+    assert.equal(dry.plan.boardRefresh, undefined);
   });
 });
 
 describe("dispatch --apply --board-only", () => {
-  const res = run("dispatch.ts", ["--board-only"], withBoardRepo(world()), { apply: true, attach: [DIGEST] });
+  const res = run("dispatch.ts", ["--board-only"], world(), { apply: true });
 
-  test("pushes the board and makes no gh write but the waiting-for-human label", () => {
+  test("starts the board workflow and makes no other gh write but the waiting-for-human label", () => {
     assert.equal(res.status, 0, res.stderr);
-    assert.deepEqual(res.writes.filter((w) => w.body?.labels?.[0] !== "waiting-for-human"), []);
-    assert.ok(boardPush(res.gitCalls));
+    const other = res.writes.filter((w) => w.body?.labels?.[0] !== "waiting-for-human" && w.path !== BOARD_RUN.path);
+    assert.deepEqual(other, []);
+    assert.deepEqual(boardRuns(res.writes), [BOARD_RUN]);
     assert.deepEqual(res.plan.sessions, []);
     assert.equal(res.plan.board.state, "normal");
+  });
+});
+
+describe("dispatch --board-refresh, the board workflow's build", () => {
+  // As on the Actions token: no repo can be pushed to.
+  const res = run("dispatch.ts", ["--board-refresh"], withBoardRepo(world()), { attach: [DIGEST], noPush: [M, T, DIGEST] });
+
+  test("prints the board and writes nothing: no label, digest, merge, session or workflow run", () => {
+    assert.equal(res.status, 0, res.stderr);
+    assert.deepEqual(res.plan.sessions, []);
+    assert.deepEqual(res.plan.waitingLabel, []);
+    assert.equal(res.plan.boardRefresh, undefined);
+    assert.deepEqual(res.plan.board.repos, [DIGEST, M, T]);
+  });
+
+  test("checks no push access, so the Actions token makes nothing Stuck", () => {
+    assert.equal(res.gitCalls.some((c) => c.args.includes("--dry-run")), false);
+    assert.deepEqual(res.plan.unpushable, []);
+  });
+
+  test("even with --apply it writes nothing", () => {
+    const applied = run("dispatch.ts", ["--board-refresh"], withBoardRepo(world()), { apply: true, attach: [DIGEST] });
+    assert.equal(applied.status, 0, applied.stderr);
+    assert.deepEqual(applied.writes, []);
   });
 
   test("while the workshop is paused the board says so, from the snapshot comment", () => {
@@ -382,55 +402,16 @@ describe("dispatch --apply --board-only", () => {
     const snapshot = { body: "<!-- workshop-snapshot -->\nWorkshop paused.", created_at: "2026-11-13T00:00:00Z", html_url: "https://github.com/x/issues/50#c1", user: { login: "b", type: "User" } };
     const paused = run(
       "dispatch.ts",
-      ["--board-only"],
-      withBoardRepo(world({
+      ["--board-refresh"],
+      world({
         digestIssues: [draft],
         digestComments: { 50: [snapshot] },
         extra: { [`repos/${DIGEST}/issues/50/events`]: [{ event: "labeled", label: { name: "workshop-paused" }, created_at: "2026-11-12T00:00:00Z" }] },
-      })),
-      { apply: true, attach: [DIGEST] },
+      }),
     );
     assert.equal(paused.status, 0, paused.stderr);
     assert.equal(paused.plan.board.state, "paused");
     assert.deepEqual(paused.plan.board.paused, { since: "2026-11-13", snapshot: "https://github.com/x/issues/50#c1" });
-    assert.deepEqual(paused.writes.filter((w) => w.body?.labels?.[0] !== "waiting-for-human"), []);
-  });
-});
-
-describe("dispatch --apply --board-refresh", () => {
-  // Every repo but agent-skills is unpushable, as on the Actions token.
-  const opts = { apply: true, attach: [DIGEST], noPush: [M, T] };
-  const res = run("dispatch.ts", ["--board-refresh"], withBoardRepo(world()), opts);
-
-  test("pushes the board and writes nothing else: no label, digest, merge or session", () => {
-    assert.equal(res.status, 0, res.stderr);
-    assert.deepEqual(res.writes, []);
-    assert.deepEqual(res.plan.sessions, []);
-    assert.deepEqual(res.plan.waitingLabel, []);
-    assert.ok(boardPush(res.gitCalls));
-    assert.equal(res.plan.board.pushed, true);
-  });
-
-  test("checks no push access, so the Actions token's limits make no Can't push banner", () => {
-    assert.equal(res.gitCalls.some((c) => c.args.includes("--dry-run")), false);
-    assert.deepEqual(res.plan.board.cantPush, []);
-  });
-
-  test("keeps the pushed board's Can't push banners, and skips the push when nothing else changed", () => {
-    const cantPush = [{ repo: T, reason: "can't push (403)" }];
-    const before = run("dispatch.ts", ["--board-refresh"], withBoardRepo(world()), { ...opts, pushedBoard: { ...res.plan.board, cantPush } });
-    assert.equal(before.status, 0, before.stderr);
-    const { pushed, why, ...pushedBoard } = before.plan.board;
-    assert.deepEqual(pushedBoard.cantPush, cantPush);
-    assert.equal(pushed, true); // its banner differed from res's board
-
-    const same = run("dispatch.ts", ["--board-refresh"], withBoardRepo(world()), {
-      ...opts,
-      pushedBoard: { ...pushedBoard, generated: "2026-11-12T00:00:00Z" },
-    });
-    assert.equal(same.status, 0, same.stderr);
-    assert.equal(boardPush(same.gitCalls), undefined);
-    assert.deepEqual([same.plan.board.pushed, same.plan.board.why], [false, "unchanged"]);
   });
 });
 
