@@ -641,7 +641,7 @@ function planRepo({ repo, name, path }: Repo, since: string): RepoPlan {
           `git -C ${path} fetch origin ${base}`,
           `git -C ${path} worktree add -b ${branch} ${wt} origin/${base}`,
         ]),
-        `Push the branch \`${branch}\` and open a PR in ${repo} that says \`${afterMerge(i.body) ? "Refs" : "Fixes"} #${i.number}\`. If the repo has a PR template, fill it in. Before pushing, run the checks ${repo}'s CLAUDE.md asks for, and give their result in the PR.`,
+        `Push the branch \`${branch}\` and open a PR in ${repo} that says ${afterMerge(i.body) ? `\`Refs #${i.number}\`` : `\`Fixes #${i.number}\`, or \`Refs #${i.number}\` when the \`conventions\` skill says so`}. If the repo has a PR template, fill it in. Before pushing, run the checks ${repo}'s CLAUDE.md asks for, and give their result in the PR.`,
         tier === "opus"
           ? `Don't label the PR \`${AUTOMERGE}\`: it waits for the maintainer's review.`
           : `Label the PR \`${AUTOMERGE}\`: the daily workshop run merges it once green.`,
