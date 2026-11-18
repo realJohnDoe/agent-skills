@@ -1,5 +1,5 @@
 {
-  "generated": "2026-11-18T12:34:14.693Z",
+  "generated": "2026-11-18T12:42:53.794Z",
   "repos": [
     "realJohnDoe/agent-skills",
     "realJohnDoe/kenpo-notes",
@@ -67,21 +67,12 @@
     "queue": [],
     "prInProgress": [
       {
-        "repo": "realJohnDoe/agent-skills",
-        "kind": "pr",
-        "number": 92,
-        "title": "Board: home-screen icon and rename to Joe's Workshop",
-        "url": "https://github.com/realJohnDoe/agent-skills/pull/92",
-        "check": "pending",
-        "reason": "CI running"
-      },
-      {
         "repo": "realJohnDoe/realJohnDoe.github.io",
         "kind": "pr",
-        "number": 52,
-        "title": "chore: remove dead icon toggle, unused imageFit prop and orphaned images",
-        "url": "https://github.com/realJohnDoe/realJohnDoe.github.io/pull/52",
-        "tier": "haiku",
+        "number": 53,
+        "title": "fix: make icon links single tab stops and fix list and heading semantics",
+        "url": "https://github.com/realJohnDoe/realJohnDoe.github.io/pull/53",
+        "tier": "sonnet",
         "check": "pending",
         "automerge": true,
         "reason": "CI running"
@@ -102,6 +93,19 @@
       {
         "repo": "realJohnDoe/realJohnDoe.github.io",
         "kind": "issue",
+        "number": 42,
+        "title": "Delete the never-flipped colored_icons toggle, the unused imageFit prop and ~2.6 MB of orphaned images",
+        "url": "https://github.com/realJohnDoe/realJohnDoe.github.io/issues/42",
+        "tier": "haiku",
+        "prs": [
+          50,
+          52
+        ],
+        "reason": "closed 2026-11-18 by realJohnDoe/realJohnDoe.github.io#50, realJohnDoe/realJohnDoe.github.io#52"
+      },
+      {
+        "repo": "realJohnDoe/realJohnDoe.github.io",
+        "kind": "issue",
         "number": 47,
         "title": "Post frontmatter is unvalidated: a missing title or date publishes a broken page",
         "url": "https://github.com/realJohnDoe/realJohnDoe.github.io/issues/47",
@@ -119,9 +123,10 @@
         "url": "https://github.com/realJohnDoe/realJohnDoe.github.io/issues/41",
         "tier": "haiku",
         "prs": [
-          50
+          50,
+          52
         ],
-        "reason": "closed 2026-11-18 by realJohnDoe/realJohnDoe.github.io#50"
+        "reason": "closed 2026-11-18 by realJohnDoe/realJohnDoe.github.io#50, realJohnDoe/realJohnDoe.github.io#52"
       },
       {
         "repo": "realJohnDoe/realJohnDoe.github.io",
@@ -147,18 +152,6 @@
           70
         ],
         "reason": "closed 2026-11-18 by realJohnDoe/agent-skills#67, realJohnDoe/agent-skills#70"
-      },
-      {
-        "repo": "realJohnDoe/agent-skills",
-        "kind": "issue",
-        "number": 75,
-        "title": "Publish the board: push board.json to workshop-board and deploy it to Pages",
-        "url": "https://github.com/realJohnDoe/agent-skills/issues/75",
-        "tier": "sonnet",
-        "prs": [
-          83
-        ],
-        "reason": "closed 2026-11-18 by realJohnDoe/agent-skills#83"
       }
     ],
     "behind": [
@@ -191,16 +184,6 @@
         "tier": "sonnet",
         "sub": "blocked",
         "reason": "blocked by realJohnDoe/realJohnDoe.github.io#43"
-      },
-      {
-        "repo": "realJohnDoe/realJohnDoe.github.io",
-        "kind": "issue",
-        "number": 43,
-        "title": "Icon links nest a <button> in an <a>: 144 tab stops on the homepage, plus invalid list and heading outline",
-        "url": "https://github.com/realJohnDoe/realJohnDoe.github.io/issues/43",
-        "tier": "sonnet",
-        "sub": "blocked",
-        "reason": "blocked by realJohnDoe/realJohnDoe.github.io#42"
       }
     ]
   }
