@@ -18,7 +18,8 @@ The survey run, which the `timetable` skill starts, follows these steps. Each ru
      --jq '.[] | select(.pull_request|not) | select(.sub_issues_summary.total>0 and .sub_issues_summary.total==.sub_issues_summary.completed) | .number'
    ```
 2. **Choose.** Run `node <this skill's directory>/scripts/survey-next.ts` (see **Choosing the next survey**). If `top` is `null`, stop: post nothing, open nothing.
-3. **Run it.** Run the skill at `top.skill` on `top.repo`, in a worktree of that repo's checkout. The parent issue's body opens with a **Why this survey** line: `top`'s `lastRun`, `since`, `days`, `activity` and `score`, and that it ranked first of the pairs the chooser scored.
+3. **List the top five.** Before starting anything, print the five highest-scoring pairs in `pairs` that have no `skip` (fewer if fewer qualify), as a table in rank order: survey, repo, `days`, `activity`, `score`. The first row is `top`.
+4. **Run it.** Run the skill at `top.skill` on `top.repo`, in a worktree of that repo's checkout. The parent issue's body opens with a **Why this survey** line: `top`'s `lastRun`, `since`, `days`, `activity` and `score`, and that it ranked first of the pairs the chooser scored, followed by the top-five table from step 3.
 
 ## Choosing the next survey
 
