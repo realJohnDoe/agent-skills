@@ -53,8 +53,11 @@ ran that survey. Its parent issue links the survey-file PR, whose body carries
 the session id.
 
 Read the **worst-tagged 5 to 10 sessions** and skip the clean ones. A `not-run`
-that only says "no source changed, so build was skipped" is noise. A `not-run`
-that skips a finding's acceptance check is not noise.
+that skips a gate outside the diff's scope ("nothing outside `animations/`
+changed") is noise. One that skips a finding's acceptance check is a lead:
+re-run that check yourself where it is cheap (headless Chrome is usually at
+`/usr/bin/google-chrome`). A failing re-run is impact 10; a passing one caps the
+finding at what the skip cost.
 
 ### 2. Read each session
 
