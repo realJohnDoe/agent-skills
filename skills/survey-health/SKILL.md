@@ -63,7 +63,7 @@ One line per category, verdicts per `surveys`.
 - **Category**: one or more tags from `architecture` `overengineering` `layout` `dry` `srp` `dead-code` `types` `error-handling` `testing` `styling` `ux` `performance` `security` `dependencies` `naming` `toolchain` `library-fit`. Applying a label the repo lacks fails the whole issue create: list them with `gh api --paginate repos/<owner/repo>/labels --jq '.[].name'` (`gh label list` needs GraphQL, which cloud sessions can't reach) and name a missing tag in the body instead.
 - **Impact**: 1-10 (10 = catastrophic or systemic; 5 = a DRY violation duplicated across ~4 files, or a missing error state on a primary flow; 1 = trivial or cosmetic).
 
-**Fails silently here** (what sets the tier): a lint rule that passes but no longer catches what it should, a "dead" export actually reached dynamically, a boundary that still resolves but now leaks. A multi-PR architecture change is a `plan`, and a product decision (narrow the type, or restructure the module boundary) is a `## Decision needed`; neither raises the tier. Example hazard note: "`sonnet` if the import boundary to preserve is specified in the task; else `opus`."
+**Fails silently here** (what sets the tier): a lint rule that passes but no longer catches what it should, a "dead" export actually reached dynamically, a boundary that still resolves but now leaks. A multi-PR architecture change is a `plan`, and a product decision (narrow the type, or restructure the module boundary) is a `## Decision needed`; neither raises the tier.
 
 "Confirming" a fix means re-running the build, lint or tests, naming the workspace it must run in, since a root command may not cover the package the fix touched.
 
@@ -163,7 +163,7 @@ Examples (not exhaustive):
 
 ### 8. Dependencies & Library Fit
 
-**Scope:** code-level library fit: whether custom code should be a dependency and installed libraries are fully exploited. Version currency, major gaps, held-back pins, successors, abandoned packages and dependencies that don't earn their place belong to the `joes-workshop:dependency-maintenance` skill; don't assess them here.
+**Scope:** code-level library fit: whether custom code should be a dependency and installed libraries are fully exploited. Version currency, major gaps, held-back pins, successors, abandoned packages and dependencies that don't earn their place belong to the `joes-workshop:dependency-maintenance` skill; don't assess them here. A major bump that has already merged is the exception: where the gates don't exercise behaviour, read its changelog against how the code uses the package, since a fix that only made the build pass can leave a silent runtime break.
 
 Say explicitly when the status quo is correct. Examples (not exhaustive):
 
