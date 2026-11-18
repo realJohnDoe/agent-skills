@@ -6,11 +6,13 @@
 // Prints {state, plan}. state is normal | drain | paused | resume. Without --apply
 // nothing is written; with it, drain/resume carry out the plan and post their marker
 // comment last, so a crash is retried and a second firing in the same state does nothing.
-import { FAILED, assertNever, isDigest, marked, referencedIssues, openQuestion, READY, tierOf, isPlan } from "./decide.ts";
+import { FAILED, assertNever, referencedIssues, openQuestion, READY, tierOf, isPlan } from "./decide.ts";
 import type { GhCheckRuns, GhIssue, GhPull } from "./github.ts";
 import {
   FOOTER,
-  PAUSE_LABEL,
+  RESUMED,
+  SNAPSHOT,
+  readPause,
   all,
   api,
   arg,
@@ -21,18 +23,11 @@ import {
   post,
   preflight,
 } from "./lib.ts";
-import type { Repo } from "./lib.ts";
+import type { PauseState, Repo } from "./lib.ts";
 
 const APPLY = flag("--apply");
 const TODAY = arg("--today", new Date().toISOString().slice(0, 10));
-const SNAPSHOT = "<!-- workshop-snapshot -->";
-const RESUMED = "<!-- workshop-resumed -->";
 const tiered = (x: GhIssue | GhPull) => !!tierOf(names(x)) || isPlan(names(x));
-
-// normal: nothing to do. drain: the label is on a digest and the snapshot isn't
-// posted yet. paused: the snapshot is posted. resume: the label is gone and the
-// snapshot has no "resumed" comment after it.
-type PauseState = "normal" | "drain" | "paused" | "resume";
 
 type Drain = {
   repo: string;
@@ -132,31 +127,8 @@ main(() => {
   const { digest: DIGEST, repos } = loadConfig();
   preflight(repos);
 
-  // --- State: the label on either open digest; marker comments on the newest (the draft)
-  const digests = all<GhIssue>(`repos/${DIGEST}/issues?state=open&per_page=100`)
-    .filter((i) => !i.pull_request && isDigest(i.title))
-    .sort((a, b) => a.number - b.number);
-  const digest = digests.at(-1);
+  const { state, digest } = readPause(DIGEST);
   if (!digest) return print("normal", null);
-  const labelled = digests.find((d) => names(d).includes(PAUSE_LABEL));
-  const comments = all<{ body: string; created_at: string }>(
-    `repos/${DIGEST}/issues/${digest.number}/comments?per_page=100`,
-  );
-  const snap = comments.findLast((c) => marked(c, SNAPSHOT));
-  const labeledAt = labelled
-    ? all<{ event: string; label: { name: string }; created_at: string }>(
-        `repos/${DIGEST}/issues/${labelled.number}/events?per_page=100`,
-      ).findLast((e) => e.event === "labeled" && e.label.name === PAUSE_LABEL)?.created_at
-    : null;
-  const resumed =
-    snap && comments.some((c) => marked(c, RESUMED) && c.created_at > snap.created_at);
-  const state: PauseState = labelled
-    ? snap && labeledAt && snap.created_at > labeledAt
-      ? "paused"
-      : "drain"
-    : snap && !resumed
-      ? "resume"
-      : "normal";
 
   let marker: string;
   let plan: object;

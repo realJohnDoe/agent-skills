@@ -18,7 +18,7 @@ The `timetable` skill starts the dispatcher on the ticks its table names (`scrip
 6. Don't subscribe to PR activity, yours or the sessions'. Tomorrow's run is the follow-up. Don't open PRs or issues yourself beyond what the script writes and what the subagents open.
 7. Check each **Unstick** issue that says "no PR yet" and was dispatched before today: look for an open or merged PR on its `claude/issue-<n>` branch. If one exists, its description names the wrong issue. Notify the maintainer with both links, and don't call the run quiet.
 8. If `sessions`, `automerge`, `unpushable` and `digest.replies` are all empty and step 7 found nothing, the run is quiet: post nothing, but still do step 9.
-9. Last, run `node scripts/dispatch.ts --apply --digest-only`. It reads every repo again and makes no write but the digest: no merges, labels, claims or comments, and it starts no sessions. It rewrites the draft, so it shows the PRs the sessions opened and whatever merged during the run, and it publishes the draft when due. Run it on every non-paused run, even a quiet one, and only after step 5 has posted its `<!-- workshop-relayed -->` comment, or the next run relays the same replies again.
+9. Last, run `node scripts/dispatch.ts --apply --digest-only`. It reads every repo again and makes no write but the digest: no merges, labels, claims or comments, and it starts no sessions. It rewrites the draft, so it shows the PRs the sessions opened and whatever merged during the run, and it publishes the draft when due. Last it pushes `board.json` to the `workshop-board` branch, whose `deploy.yml` (the template `board/deploy.yml`) deploys the board to Pages; read `board.pushed` in its output, and report `board.why` when it is false. Run it on every non-paused run, even a quiet one, and only after step 5 has posted its `<!-- workshop-relayed -->` comment, or the next run relays the same replies again.
 
 ### Dry run
 
@@ -120,6 +120,7 @@ Each transition posts its marker comment (`workshop-snapshot`, `workshop-resumed
    - Issues assigned with no PR are unassigned.
 
    Then it posts one snapshot on the digest: per repo, the date, the base commit, what was closed, and open decisions.
+4. `node scripts/dispatch.ts --apply --board-only` pushes the board with `state: paused`, linked to the snapshot. It reads every repo and writes nothing else: no digest, merges, labels, claims, comments or sessions.
 
 **Resume**
 
@@ -129,6 +130,6 @@ Each transition posts its marker comment (`workshop-snapshot`, `workshop-resumed
 
 `node --test 'skills/**/*.test.ts'` runs the decision tests, the `Blocked by:` parser test, and `dispatch.test.ts`. That last file runs both scripts end to end over two repos against a fake `gh` and `git` (`scripts/fake-bin.ts`). CI runs them on every PR. A change to a decision changes what lands on every attached repo's default branch: change its test first.
 
-The workshop board's page is `board/`: `index.html` fetches `board.json` and renders it with `render.js` (tested in `scripts/board.test.ts`). To preview it, write a dry run's board next to it and serve the folder: `node scripts/dispatch.ts --digest realJohnDoe/agent-skills | jq .board > board/board.json`, then `python3 -m http.server -d board` (`board.json` is gitignored).
+The workshop board's page is `board/`: `index.html` fetches `board.json` and renders it with `render.js` (tested in `scripts/board.test.ts`). To preview it, write a dry run's board next to it and serve the folder: `node scripts/dispatch.ts --digest realJohnDoe/agent-skills | jq .board > board/board.json`, then `python3 -m http.server -d board` (`board.json` is gitignored). `board/deploy.yml` is not run from `main`: `dispatch.ts` commits it with `board.json` onto the `workshop-board` branch, so a change to it reaches Pages with the next push.
 
 The scripts are TypeScript that Node runs directly, with no build step, so use only erasable syntax (no `enum`, `namespace` or parameter properties) and `import type` for types. `npm ci && npx tsc` must pass; CI runs it before the tests. A state is a union member (`IssueState`, `PrVerdict`, `ClaimState`, `PauseState`), and every `switch` over one ends in `assertNever`. To add a state, add the union member: `tsc` then flags each `switch` that doesn't handle it.

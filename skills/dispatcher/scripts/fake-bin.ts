@@ -12,7 +12,9 @@
 //   the issues it closes and adds it to the merged-PR search, so the dispatcher's wait settles at once.
 // git: `remote get-url origin` answers from $FAKE_GIT_REMOTES ({path: url});
 //   `push --dry-run` fails for paths listed in $FAKE_GIT_NOPUSH; `rev-parse
-//   --show-toplevel` answers the working directory.
+//   --show-toplevel` answers the working directory. The board push's commands
+//   (fetch, rev-parse FETCH_HEAD, hash-object, mktree, commit-tree, push) answer
+//   made-up ids and are appended to $FAKE_GIT_LOG as `{args, input}` when it is set.
 import { appendFileSync, chmodSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
@@ -100,6 +102,15 @@ const git = (args: string[]) => {
   if (rest[0] === "push" && rest.includes("--dry-run")) {
     if (JSON.parse(process.env.FAKE_GIT_NOPUSH ?? "[]").includes(c))
       fail("remote: Permission denied.\nfatal: unable to access: The requested URL returned error: 403");
+    return;
+  }
+  const board = ["fetch", "rev-parse", "hash-object", "mktree", "commit-tree", "push"];
+  if (board.includes(rest.find((a) => board.includes(a)) ?? "")) {
+    const input = rest.includes("--stdin") || rest.includes("mktree") ? readFileSync(0, "utf8") : undefined;
+    if (process.env.FAKE_GIT_LOG) appendFileSync(process.env.FAKE_GIT_LOG, `${JSON.stringify({ args: rest, input })}\n`);
+    if (rest.includes("commit-tree")) return process.stdout.write("commit0001\n");
+    if (rest.includes("rev-parse")) return process.stdout.write("tip0001\n");
+    if (rest.includes("hash-object") || rest.includes("mktree")) return process.stdout.write("obj0001\n");
     return;
   }
   fail(`fake git: unexpected ${cmd}`);

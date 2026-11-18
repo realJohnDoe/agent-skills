@@ -127,12 +127,12 @@ const run = (
   script: string,
   args: string[],
   fixture: unknown,
-  { apply = false, missing = [], noPush = [] }: { apply?: boolean; missing?: string[]; noPush?: string[] } = {},
+  { apply = false, missing = [], noPush = [], attach = [] }: { apply?: boolean; missing?: string[]; noPush?: string[]; attach?: string[] } = {},
 ) => {
   const dir = mkdtempSync(join(tmpdir(), "workshop-test-"));
   const checkouts = join(dir, "checkouts");
   const remotes: Record<string, string> = {};
-  for (const repo of [M, T]) {
+  for (const repo of [M, T, ...attach]) {
     const name = repo.split("/")[1];
     if (missing.includes(repo)) continue;
     mkdirSync(join(checkouts, name, ".git"), { recursive: true });
@@ -142,11 +142,13 @@ const run = (
   mkdirSync(join(checkouts, "scratch", ".git"), { recursive: true });
   // The board's closed-issue search names every covered repo; answer it empty unless the fixture does.
   const only = args.includes("--repos") ? args[args.indexOf("--repos") + 1].split(",") : null;
-  const covered = [M, T].filter((r) => !missing.includes(r) && (!only || only.includes(r)));
+  const covered = [M, T, ...attach].sort().filter((r) => !missing.includes(r) && (!only || only.includes(r)));
   const closedKey = `search/issues?q=${covered.map((r) => `repo:${r}`).join(" ")} is:issue is:closed reason:completed`;
   writeFileSync(join(dir, "fixture.json"), JSON.stringify({ [closedKey]: { items: [] }, ...(fixture as object) }));
   const log = join(dir, "writes.jsonl");
+  const gitLog = join(dir, "git.jsonl");
   writeFileSync(log, "");
+  writeFileSync(gitLog, "");
   const res = spawnSync(
     process.execPath,
     [join(here, script), ...args, "--today", TODAY, "--digest", DIGEST, "--checkouts", checkouts, ...(apply ? ["--apply"] : [])],
@@ -158,12 +160,14 @@ const run = (
         FAKE_GH_FIXTURE: join(dir, "fixture.json"),
         FAKE_GIT_REMOTES: JSON.stringify(remotes),
         FAKE_GIT_NOPUSH: JSON.stringify(noPush.map((r) => join(checkouts, r.split("/")[1]))),
+        FAKE_GIT_LOG: gitLog,
         ...(apply ? { FAKE_GH_LOG: log } : {}),
       },
     },
   );
   const writes = readFileSync(log, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
-  return { ...res, checkouts, writes, plan: res.status === 0 ? JSON.parse(res.stdout) : null };
+  const gitCalls = readFileSync(gitLog, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
+  return { ...res, checkouts, writes, gitCalls, plan: res.status === 0 ? JSON.parse(res.stdout) : null };
 };
 
 describe("dispatch dry run over two repos", () => {
@@ -314,6 +318,73 @@ describe("dispatch --apply --digest-only", () => {
     assert.deepEqual(dry.writes, []);
     assert.deepEqual(dry.plan.sessions, []);
     assert.match(dry.plan.digest.body, /realJohnDoe\/meridian#13/);
+  });
+});
+
+// The board is pushed from the digest repo's own clone, so it is attached here.
+const boardPush = (calls: Any[]) => calls.find((c) => c.args[0] === "push");
+// world()'s closed-issue answer names two repos; drop it so run() answers for all three.
+const withBoardRepo = ({ [`search/issues?q=repo:${M} repo:${T} is:issue is:closed reason:completed`]: _, ...w }: Any) => ({
+  ...repoFixture(DIGEST, { issues: [], prs: [] }),
+  ...w,
+});
+
+describe("dispatch --apply --digest-only pushes the board", () => {
+  const res = run("dispatch.ts", ["--digest-only"], withBoardRepo(world()), { apply: true, attach: [DIGEST] });
+
+  test("commits on the fetched workshop-board tip and pushes it, without force", () => {
+    assert.equal(res.status, 0, res.stderr);
+    const fetched = res.gitCalls.findIndex((c) => c.args.join(" ") === "fetch origin workshop-board");
+    const commit = res.gitCalls.find((c) => c.args.includes("commit-tree"));
+    assert.ok(fetched >= 0);
+    assert.deepEqual(commit.args.slice(commit.args.indexOf("-p"), commit.args.indexOf("-p") + 2), ["-p", "tip0001"]);
+    const push = boardPush(res.gitCalls);
+    assert.deepEqual(push.args, ["push", "origin", "commit0001:refs/heads/workshop-board"]);
+    assert.equal(res.plan.board.pushed, true);
+  });
+
+  test("skips the push and says why when agent-skills isn't attached", () => {
+    const none = run("dispatch.ts", ["--digest-only"], world(), { apply: true });
+    assert.equal(boardPush(none.gitCalls), undefined);
+    assert.equal(none.plan.board.pushed, false);
+    assert.match(none.plan.board.why, /isn't attached/);
+  });
+
+  test("a dry run pushes nothing", () => {
+    const dry = run("dispatch.ts", ["--digest-only"], withBoardRepo(world()), { attach: [DIGEST] });
+    assert.equal(boardPush(dry.gitCalls), undefined);
+    assert.equal(dry.plan.board.pushed, undefined);
+  });
+});
+
+describe("dispatch --apply --board-only", () => {
+  const res = run("dispatch.ts", ["--board-only"], withBoardRepo(world()), { apply: true, attach: [DIGEST] });
+
+  test("pushes the board and makes no gh write", () => {
+    assert.equal(res.status, 0, res.stderr);
+    assert.deepEqual(res.writes, []);
+    assert.ok(boardPush(res.gitCalls));
+    assert.deepEqual(res.plan.sessions, []);
+    assert.equal(res.plan.board.state, "normal");
+  });
+
+  test("while the workshop is paused the board says so, from the snapshot comment", () => {
+    const draft = issue(50, "Workshop digest (draft) — from 2026-11-10", ["workshop-paused"], { body: "<!-- digest-since: 2026-11-10 -->" });
+    const snapshot = { body: "<!-- workshop-snapshot -->\nWorkshop paused.", created_at: "2026-11-13T00:00:00Z", html_url: "https://github.com/x/issues/50#c1", user: { login: "b", type: "User" } };
+    const paused = run(
+      "dispatch.ts",
+      ["--board-only"],
+      withBoardRepo(world({
+        digestIssues: [draft],
+        digestComments: { 50: [snapshot] },
+        extra: { [`repos/${DIGEST}/issues/50/events`]: [{ event: "labeled", label: { name: "workshop-paused" }, created_at: "2026-11-12T00:00:00Z" }] },
+      })),
+      { apply: true, attach: [DIGEST] },
+    );
+    assert.equal(paused.status, 0, paused.stderr);
+    assert.equal(paused.plan.board.state, "paused");
+    assert.deepEqual(paused.plan.board.paused, { since: "2026-11-13", snapshot: "https://github.com/x/issues/50#c1" });
+    assert.deepEqual(paused.writes, []);
   });
 });
 
