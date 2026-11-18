@@ -5,6 +5,8 @@ description: Run one tick of the workshop's schedule: work out which workshop ta
 
 # Timetable
 
+Run every script from the session's working directory, never after a `cd` into the skill's directory: they look for the attached repos from where they are run.
+
 The `Timetable` routine fires twice a day and runs only this skill. The schedule is one table in git, `TABLE` in `scripts/schedule.ts`: each entry names a skill, its days, its tick (`am` or `pm`) and the `model` its run gets, as a tier (`haiku`, `sonnet` or `opus`), never a model ID. An entry with `everyWeeks: n` runs only every n-th week, counted in whole weeks from `EPOCH`, so its gap is always exactly n weeks; a held or missed run waits for the next one. Schedules stay in this table rather than cron strings: cron has no every-other-week. Changing a schedule means a PR that changes that table. The dispatcher runs on both ticks, every day.
 
 ## The run

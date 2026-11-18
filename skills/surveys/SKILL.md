@@ -5,6 +5,8 @@ description: Shared conventions for every survey skill (`survey-*`, the plugin's
 
 # Surveys
 
+Run every script from the session's working directory, never after a `cd` into the skill's directory: they look for the attached repos from where they are run.
+
 A survey reviews one repo for one kind of problem and files what it finds as issues there. Each `survey-*` skill states only what is specific to it (its categories, its findings cap, its targets) and points here for the rest. The plugin ships `survey-retro`. A repo can add its own in `.claude/skills/survey-*/`; one with the same name as a plugin survey replaces it for that repo. A survey run produces no file: it is a parent issue with its findings as sub-issues (see **Reporting**).
 
 ## Starting the next survey
