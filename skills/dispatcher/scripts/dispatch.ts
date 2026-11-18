@@ -642,6 +642,7 @@ function planRepo({ repo, name, path }: Repo, since: string): RepoPlan {
           `git -C ${path} worktree add -b ${branch} ${wt} origin/${base}`,
         ]),
         `Push the branch \`${branch}\` and open a PR in ${repo} that says \`${afterMerge(i.body) ? "Refs" : "Fixes"} #${i.number}\`. If the repo has a PR template, fill it in. Before pushing, run the checks ${repo}'s CLAUDE.md asks for, and give their result in the PR.`,
+        `If part of the issue needs the maintainer's call before it can be done, do the rest, add a \`## Decision needed\` section to the issue body as the \`conventions\` skill describes, write \`Refs #${i.number}\` in the PR instead, and say in the PR what's left. A question that is only in the PR is never seen again once it merges.`,
         tier === "opus"
           ? `Don't label the PR \`${AUTOMERGE}\`: it waits for the maintainer's review.`
           : `Label the PR \`${AUTOMERGE}\`: the daily workshop run merges it once green.`,
