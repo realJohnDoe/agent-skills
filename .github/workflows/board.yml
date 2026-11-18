@@ -1,0 +1,88 @@
+# Builds the workshop board from GitHub and deploys it to Pages, so the board shows
+# manual changes (merges, labels, closed issues) between dispatcher runs. The build is
+# `dispatch.ts --board-refresh`, which only reads, so the Actions token is enough: every
+# workshop repo is public. It covers the repos the last dispatcher run covered, which the
+# digest names, so the workshop's repo list lives only in the Timetable routine.
+# See skills/dispatcher/SKILL.md, "Developing".
+#
+# Runs every half hour, which picks up changes in every workshop repo; on this repo's
+# issue and PR changes and finished test runs, which show at once; when main changes the
+# page or the scripts; when the dispatcher's last step starts it; and by hand
+# (Actions > Workshop board > Run workflow).
+name: Workshop board
+
+on:
+  schedule:
+    - cron: "7,37 * * * *"
+  issues:
+    types: [opened, edited, closed, reopened, labeled, unlabeled]
+  # _target, so PRs from forks and Dependabot get the same run. It never checks out the
+  # PR: the build is main's.
+  pull_request_target:
+    types: [opened, closed, reopened, labeled, unlabeled, ready_for_review]
+  workflow_run:
+    workflows: [Workshop tests]
+    types: [completed]
+  push:
+    branches: [main]
+    paths:
+      - skills/dispatcher/**
+      - .github/workflows/board.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One build at a time; a newer one supersedes a running one, as it reads fresher state.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      deploy: ${{ steps.board.outputs.deploy }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+      - name: Build the board
+        id: board
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node skills/dispatcher/scripts/dispatch.ts --digest "$GITHUB_REPOSITORY" --board-refresh > plan.json
+          mkdir _site
+          cp -r skills/dispatcher/board/. _site/
+          jq .board plan.json > _site/board.json
+          # Skip the deploy when only the build time changed, unless the page changed or
+          # someone asked for it. A live board that can't be read counts as changed.
+          live=$(curl -fsS "$(gh api "repos/$GITHUB_REPOSITORY/pages" --jq .html_url)board.json" || echo '{}')
+          if [ "$GITHUB_EVENT_NAME" != push ] && [ "$GITHUB_EVENT_NAME" != workflow_dispatch ] &&
+            [ "$(jq -S 'del(.generated)' <<<"$live")" = "$(jq -S 'del(.generated)' _site/board.json)" ]; then
+            echo "Board unchanged; not deploying." >> "$GITHUB_STEP_SUMMARY"
+            echo deploy=false >> "$GITHUB_OUTPUT"
+          else
+            echo deploy=true >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.board.outputs.deploy == 'true'
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    if: needs.build.outputs.deploy == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

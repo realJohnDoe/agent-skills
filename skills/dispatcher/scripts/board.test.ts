@@ -17,7 +17,6 @@ const it = (n: number, extra: Partial<Item> = {}): Item => ({
 const pr = (n: number, extra: Partial<Item> = {}) => it(n, { kind: "pr", issue: undefined, pr: n, ...extra });
 
 const plan: BoardPlan = {
-  cantPush: [{ repo: "o/x", reason: "can't push (403)" }],
   unstick: [pr(1, { why: "CI red after 2 follow-up(s)" })],
   decide: [it(2, { why: "Keep it?", sub: "decide" })],
   triage: [it(3, { why: "sonnet", sub: "goAhead", tier: "sonnet" })],
@@ -37,7 +36,7 @@ const plan: BoardPlan = {
   afterMerge: [it(16, { why: "switch Pages; merged in x", linkedPrs: [40, 41] })],
 };
 const closed = [{ repo: R, kind: "issue" as const, number: 30, title: "Done", url: "u", prs: [31, 32], reason: "closed" }];
-const board = buildBoard(plan, { generated: "2026-11-17T00:00:00Z", repos: [R], digest: "d", closed });
+const board = buildBoard(plan, { generated: "2026-11-17T00:00:00Z", repos: [R], digest: "d", lastRun: "2026-11-16T20:00:00Z", closed });
 const { stages } = board;
 
 describe("buildBoard", () => {
@@ -51,8 +50,7 @@ describe("buildBoard", () => {
       ...stages.behind,
     ];
     const left = 1; // the dispatched issue
-    const { cantPush, ...lists } = plan; // a banner, not a card
-    const total = Object.values(lists).reduce((n, xs) => n + xs.length, 0);
+    const total = Object.values(plan).reduce((n, xs) => n + xs.length, 0);
     assert.equal(all.length, total - left);
     const keys = all.map((c) => `${c.repo}#${"number" in c ? c.number : ""}`);
     assert.equal(new Set(keys).size, keys.length);
@@ -61,7 +59,6 @@ describe("buildBoard", () => {
 
   test("stages", () => {
     assert.deepEqual(stages.stuck.map((c) => [c.kind, c.number]), [["pr", 1]]);
-    assert.deepEqual(board.cantPush, plan.cantPush);
     assert.deepEqual(
       stages.waiting.cards.map((c) => [c.number, c.sub ?? (c.needsReview && "review")]),
       [[16, "afterMerge"], [10, "review"], [3, "goAhead"], [2, "decide"]],
@@ -93,7 +90,6 @@ describe("render", () => {
     assert.deepEqual(ids, ["stuck", "waiting", "closed", "pr", "queue", "behind"]);
     const cards = { stuck: stages.stuck, waiting: stages.waiting.cards, closed: stages.closed, pr: stages.prInProgress, queue: stages.queue, behind: stages.behind };
     for (const [id, cs] of Object.entries(cards)) for (const c of cs) assert.match(section(html, id), new RegExp(`>${c.title}</a>`), `${id}: ${c.title}`);
-    assert.match(section(html, "stuck"), /Can&#39;t push to o\/x/);
     assert.match(section(html, "waiting"), /<summary>1 parked<\/summary>[\s\S]*>T5<\/a>/);
     assert.match(section(html, "waiting"), /<h2>Waiting for human<\/h2>/);
     assert.match(section(html, "waiting"), /href="https:\/\/github.com\/o\/r\/pull\/40"[^>]*>PR #40</);
@@ -104,7 +100,7 @@ describe("render", () => {
 
   test("Stuck hides when empty; the other modules show an empty message", () => {
     const empty = buildBoard(
-      { cantPush: [], review: [], unstick: [], decide: [], afterMerge: [], triage: [], inProgress: [], queue: [], notPicked: [], automerge: [] },
+      { review: [], unstick: [], decide: [], afterMerge: [], triage: [], inProgress: [], queue: [], notPicked: [], automerge: [] },
       { generated: board.generated, repos: [R], digest: "d", closed: [] },
     );
     const h = render(empty, now);
@@ -113,15 +109,24 @@ describe("render", () => {
   });
 
   test("a paused board shows the paused banner and no stale warning", () => {
-    const paused = { ...board, state: "paused" as const, paused: { since: "2026-11-01", snapshot: "https://snap" } };
+    const paused = { ...board, generated: "2026-11-29T23:00:00Z", state: "paused" as const, paused: { since: "2026-11-01", snapshot: "https://snap" } };
     const h = render(paused, new Date("2026-11-30T00:00:00Z"));
     assert.match(h, /href="https:\/\/snap"[^>]*>Paused since 2026-11-01\. Nothing is dispatched or merged\./);
     assert.doesNotMatch(h, /stale/);
   });
 
-  test("a board more than 2 days old is stale", () => {
-    assert.doesNotMatch(render(board, new Date("2026-11-18T23:00:00Z")), /stale/);
-    assert.match(render(board, new Date("2026-11-19T01:00:00Z")), /class="notice stale">This board is 2 days old/);
+  test("a board a day old is stale: its workflow stopped", () => {
+    assert.doesNotMatch(render(board, new Date("2026-11-17T23:00:00Z")), /stale/);
+    assert.match(render(board, new Date("2026-11-18T01:00:00Z")), /class="notice stale">This board is 1 day\(s\) old/);
+  });
+
+  test("a fresh board says when the dispatcher last ran, and warns after 2 days", () => {
+    const fresh = { ...board, generated: "2026-11-19T00:00:00Z" };
+    const at = new Date("2026-11-19T00:10:00Z");
+    assert.match(render(fresh, at), /last run <b>2026-11-16 20:00 UTC<\/b>/);
+    assert.match(render(fresh, at), /class="notice stale">The workshop last ran 2 days ago/);
+    assert.doesNotMatch(render({ ...fresh, lastRun: "2026-11-18T08:00:00Z" }, at), /stale/);
+    assert.doesNotMatch(render({ ...fresh, state: "paused" as const }, at), /last ran/);
   });
 
   test("escapes what it shows", () => {

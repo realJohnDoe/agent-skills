@@ -69,11 +69,17 @@ export type Item = {
 };
 export type Repo = { repo: string; name: string; path: string };
 
-export const loadConfig = (): { digest: string; checkouts: string; repos: Repo[] } => {
+export const loadConfig = (): { digest: string; checkouts: string; repos: Repo[] } => ({
+  digest: digestArg(),
+  ...attachedRepos(),
+});
+
+// The `--digest owner/repo` argument, checked.
+export const digestArg = (): string => {
   const digest = arg("--digest");
   if (!digest || !/^[^/\s]+\/[^/\s]+$/.test(digest))
     throw new Error("pass --digest owner/repo: the dispatcher's SKILL.md names the digest repo");
-  return { digest, ...attachedRepos() };
+  return digest;
 };
 
 // The checkouts folder and the repos under it, as loadConfig describes; the survey
