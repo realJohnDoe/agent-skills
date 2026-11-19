@@ -32,7 +32,7 @@
 html { background: var(--deck); }
 body {
   margin: 0; color: var(--fg);
-  background: linear-gradient(var(--seam) 1px, transparent 1px) 0 0 / 100% 120px, var(--deck);
+  background: var(--deck);
   font: 15px/1.45 var(--f-body);
   padding: 0 max(16px, env(safe-area-inset-right, 0px)) 64px var(--gutter);
 }
