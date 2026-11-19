@@ -6,9 +6,9 @@
 // Usage: node retro-candidates.ts --repo owner/repo --since YYYY-MM-DD
 import { arg, main } from "../../_shared/cli.ts";
 import { pages } from "../../_shared/github.ts";
+import { NOT_RUN } from "../../_shared/markers.ts";
 import { sessionPrs } from "../../_shared/sessions.ts";
 
-const NOT_RUN = /\b(did not|didn't|not) (run|re-?run|re-?measured?|verified|tested)\b|\bunverified\b/i;
 const fixes = (body: string) =>
   [...body.matchAll(/(?:fix|fixes|close|closes|resolves)\s+#(\d+)/gi)].map((m) => m[1]);
 

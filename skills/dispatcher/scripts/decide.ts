@@ -4,7 +4,7 @@
 
 import type { Blocker } from "./bodyBlockers.ts";
 import type { GhCheckRun, GhComment, GhReview } from "../../_shared/github.ts";
-import { isDigest, marked, sectionParagraph } from "../../_shared/markers.ts";
+import { isDigest, marked, notRunSentence, sectionParagraph } from "../../_shared/markers.ts";
 
 export const TIERS = ["haiku", "sonnet", "opus"];
 // A plan spanning several PRs, never dispatched. Orthogonal to the tier, which
@@ -187,6 +187,9 @@ export const prVerdict = (pr: PrFacts): PrVerdict => {
     const n = /^claude\/issue-(\d+)$/.exec(pr.branch ?? "")?.[1];
     if (n && !referencedIssues(pr.body).includes(Number(n)))
       return out({ kind: "review", why: `branch is for #${n} but the description doesn't reference it` });
+    // Dependabot bodies are release notes, which can say "not tested".
+    const skipped = pr.dependabot ? undefined : notRunSentence(pr.body);
+    if (skipped) return out({ kind: "review", why: `description says a check was not run: ${skipped}` });
     return out({ kind: "merge" });
   }
   const marks = pr.comments.filter((c) => marked(c, FOLLOWUP));

@@ -33,3 +33,14 @@ export const sectionParagraph = (
  */
 export const openQuestion = (body: string | null | undefined) =>
   sectionParagraph(body, DECISION, /^\s*(\*\*)?Decided:/im);
+
+// A PR description that says a check was not run.
+export const NOT_RUN = /\b(did not|didn't|not) (run|re-?run|re-?measured?|verified|tested)\b|\bunverified\b/i;
+
+/** The sentence in `body` that says a check was not run, cut to 200 characters; undefined when none. */
+export const notRunSentence = (body: string | null | undefined): string | undefined => {
+  const s = (body ?? "").split(/(?<=[.!?])\s+|\n+/).find((x) => NOT_RUN.test(x));
+  if (!s) return;
+  const t = s.trim().replace(/\s+/g, " ");
+  return t.length > 200 ? `${t.slice(0, 199)}…` : t;
+};

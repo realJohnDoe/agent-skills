@@ -239,6 +239,14 @@ describe("prVerdict", () => {
       assert.equal(v.kind, "review");
       assert.match(v.kind === "review" ? (v.why ?? "") : "", /branch is for #5 but the description doesn't reference it/);
     });
+    test("automerge PR whose description says a check was not run goes to review with the sentence", () => {
+      const m = (body: string, dependabot = false) => prVerdict(pr({ labels: ["automerge"], body, dependabot }));
+      const v = m("Fixes #5.\n\nThe accessibility tree check was not run in headless Chromium. Rest is fine.");
+      assert.equal(v.kind, "review");
+      assert.equal(whyOf(v), "description says a check was not run: The accessibility tree check was not run in headless Chromium.");
+      assert.equal(m("Fixes #5. Ran the check in headless Chromium; it passes.").kind, "merge");
+      assert.equal(m("Bumps foo. This release was not tested on Windows.", true).kind, "merge");
+    });
     test("automerge-labelled PR is merged", () =>
       assert.equal(prVerdict(pr({ labels: ["automerge"] })).kind, "merge"));
     test("automerge-labelled PR already on native auto-merge waits", () =>
