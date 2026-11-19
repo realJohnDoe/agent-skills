@@ -19,10 +19,10 @@ const pr = (n: number, extra: Partial<Item> = {}) => it(n, { kind: "pr", issue: 
 const plan: BoardPlan = {
   unstick: [pr(1, { why: "CI red after 2 follow-up(s)" })],
   decide: [it(2, { why: "Keep it?", sub: "decide" })],
-  triage: [it(3, { why: "sonnet", sub: "goAhead", tier: "sonnet" })],
+  triage: [it(3, { why: "sonnet", sub: "goAhead", tier: "sonnet", unready: true })],
   notPicked: [
     it(4, { why: "blocked by o/r#2", waiting: true, sub: "blocked" }),
-    it(5, { why: "`plan`; start a plan session by hand" }),
+    it(5, { why: "`plan`; start a plan session by hand", unready: true }),
   ],
   queue: [it(6, { tier: "haiku" }), it(7, { tier: "opus" })],
   review: [pr(10, { check: "green" })],
@@ -67,6 +67,9 @@ describe("buildBoard", () => {
     assert.deepEqual(stages.waiting.parked.map((p) => p.number), [5]);
     assert.deepEqual(stages.queue.map((c) => c.number), [6, 7]);
     assert.deepEqual(stages.behind.map((c) => [c.number, c.sub]), [[4, "blocked"]]);
+    assert.equal(stages.waiting.cards.find((c) => c.number === 3)?.unready, true);
+    assert.equal(stages.waiting.parked[0].unready, true);
+    assert.equal(stages.waiting.cards.find((c) => c.number === 2)?.unready, undefined);
   });
 
   test("PRs in progress: red, pending, then automerge", () => {
@@ -96,6 +99,14 @@ describe("render", () => {
     assert.match(section(html, "waiting"), />Needs review</);
     assert.doesNotMatch(section(html, "pr"), />Needs review</);
     assert.match(html, /as of <b>2026-11-17 00:00 UTC<\/b>/);
+  });
+
+  test("a Claude chip on every Stuck and Waiting for human card and each other issue without the label", () => {
+    const links = [...html.matchAll(/<a class="chip claude" href="([^"]+)"/g)].map((m) => new URL(m[1].replaceAll("&amp;", "&")));
+    assert.deepEqual(
+      links.map((u) => [u.origin + u.pathname, u.searchParams.get("repo"), u.searchParams.get("q")]),
+      [1, 16, 10, 3, 2, 5].map((n) => ["https://claude.ai/code/new", R, `Regarding ${R}#${n}: `]),
+    );
   });
 
   test("Stuck hides when empty; the other modules show an empty message", () => {

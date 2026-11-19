@@ -257,6 +257,12 @@ describe("the board and digest of a run", () => {
     assert.ok(stages.waiting.cards.some((c) => c.number === 8 && c.needsReview));
   });
 
+  test("the board flags every open issue without ready-for-agent, and nothing else", () => {
+    const { stages } = buildBoard(run.board, { generated: NOW, repos: [M, T], digest: "u", closed: [] });
+    const all = [...stages.stuck, ...stages.waiting.cards, ...stages.waiting.parked, ...stages.queue, ...stages.prInProgress, ...stages.behind];
+    assert.deepEqual(all.filter((c) => c.unready).map((c) => c.number).sort((a, b) => a - b), [12, 13, 14]);
+  });
+
   test("one digest naming every item's repo", () => {
     const { body, counts } = digestOf(ps, run);
     assert.match(body, /\nRepos covered: realJohnDoe\/meridian, realJohnDoe\/tracemap\.\n/);

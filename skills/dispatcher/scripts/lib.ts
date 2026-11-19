@@ -29,6 +29,7 @@ export type Item = {
   automerge?: boolean;
   linkedPrs?: number[]; // the PRs an issue's step waits on
   sub?: "decide" | "afterMerge" | "goAhead" | "blocked"; // why an issue waits
+  unready?: boolean; // an issue without `ready-for-agent`: the board links it to a Claude Code session
 };
 /**
  * The workshop config: `{digest, checkouts, repos: [{repo, name, path}]}`. `--digest

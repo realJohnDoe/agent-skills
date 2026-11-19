@@ -15,9 +15,10 @@ export type Card = {
   needsReview?: boolean; // green, quiet, no automerge
   sub?: "decide" | "afterMerge" | "goAhead" | "blocked";
   prs?: number[]; // every PR linked to an issue card
+  unready?: boolean; // an open issue without `ready-for-agent`: the page links it to a new Claude Code session
   reason: string; // the dispatcher's one-line why
 };
-export type Parked = { repo: string; number: number; title: string; url: string; reason: string };
+export type Parked = { repo: string; number: number; title: string; url: string; reason: string; unready?: boolean };
 export type Board = {
   generated: string; // ISO time it was built: a dispatcher run or the board workflow
   lastRun?: string; // ISO time of the last dispatcher run, from the digest's marker
@@ -53,6 +54,7 @@ const card = (x: Item, reason: string, extra: Partial<Card> = {}): Card => ({
   ...(x.automerge && { automerge: true }),
   ...(x.sub && { sub: x.sub }),
   ...(x.linkedPrs?.length && { prs: x.linkedPrs }),
+  ...(x.unready && { unready: true }),
   reason,
   ...extra,
 });
@@ -81,7 +83,7 @@ export const buildBoard = (plan: BoardPlan, run: BoardRun): Board => {
         ],
         parked: plan.notPicked
           .filter((x) => !blocked(x))
-          .map((x) => ({ repo: x.repo, number: x.issue!, title: x.title, url: x.url, reason: x.why ?? "" })),
+          .map((x) => ({ repo: x.repo, number: x.issue!, title: x.title, url: x.url, reason: x.why ?? "", ...(x.unready && { unready: true }) })),
       },
       queue: plan.queue.map(why("dispatched next")),
       prInProgress: [

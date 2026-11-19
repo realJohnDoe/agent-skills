@@ -112,6 +112,7 @@ export function planRepo(s: RepoSnapshot, opts: PlanOptions): RepoPlan {
     title: x.title,
     kind: "head" in x ? "pr" : "issue",
     tier: tierOf(names(x)) as Item["tier"],
+    ...(!("head" in x) && !names(x).includes(READY) && { unready: true }),
     ...extra,
   });
   const worktree = (kind: string, n: number) => join(tmpdir(), "workshop", `${name}-${kind}-${n}`);
