@@ -1,4 +1,4 @@
-// The shared digest: read its state, build its body from the run's plan, write it.
+// The shared digest: read its state (replies included), build its body from the run's plan, write it.
 // dispatch.ts calls these. See ../SKILL.md.
 import type { Repo } from "../../_shared/repos.ts";
 import { all, type GhComment, type GhIssue, names, post } from "../../_shared/github.ts";
@@ -27,7 +27,9 @@ export type DigestState = {
   since: string;
   lastRun?: string; // when a run last wrote the digest, from its RUN marker
   covered?: string[]; // the repos that run covered, from its REPOS marker
+  replies: Reply[]; // maintainer replies on the digest not yet copied onto their issues
 };
+export type Reply = { digest: number; url: string; author: string; body: string };
 
 // The plan's digest-ready lists, plus the run's clock and mode.
 export type DigestPlan = {
@@ -50,7 +52,6 @@ export type DigestPlan = {
 export type BuiltDigest = {
   body: string;
   publish: boolean;
-  replies: { digest: number; url: string; author: string; body: string }[];
   counts: Record<
     "decide" | "afterMerge" | "review" | "unstick" | "triage" | "inProgress" | "queue" | "notPicked" | "merged",
     number
@@ -65,25 +66,35 @@ const NOTE = `_The digest is rewritten by every dispatcher run and published as 
 
 // The shared digest's state, read first: its window bounds "merged since".
 export function readDigest(repo: string, today: Date): DigestState {
-  const [issue, ...older] = openDigests(repo).reverse();
-  const publishedAt = issue
-    ? all<GhComment>(`repos/${repo}/issues/${issue.number}/comments?per_page=100`).findLast((c) =>
-        marked(c, PUBLISHED),
-      )?.created_at
-    : undefined;
+  const digests = openDigests(repo);
+  const issue = digests.at(-1);
+  const comments = issue ? all<GhComment>(`repos/${repo}/issues/${issue.number}/comments?per_page=100`) : [];
+  return digestState(repo, digests, comments, today);
+}
+
+// The state from the open digest issues, oldest first, and the newest one's comments.
+export function digestState(repo: string, digests: GhIssue[], comments: GhComment[], today: Date): DigestState {
+  const [issue, ...older] = [...digests].reverse();
+  const publishedAt = comments.findLast((c) => marked(c, PUBLISHED))?.created_at;
   const since =
     publishedAt ??
     issue?.body?.match(/<!-- digest-(?:date|since): (\S+) -->/)?.[1] ??
     new Date(+today - DIGEST_DAYS * 864e5).toISOString().slice(0, 10);
   const lastRun = issue?.body?.match(RUN)?.[1];
   const covered = issue?.body?.match(REPOS)?.[1].split(/\s+/).filter(Boolean);
-  return { repo, issue, older, since, ...(lastRun && { lastRun }), ...(covered && { covered }) };
+  // Maintainer replies on the digest not yet copied onto their issues.
+  const relayedAt = comments.findLast((c) => marked(c, RELAYED))?.created_at ?? "";
+  const replies = comments
+    .filter((c) => c.created_at > relayedAt && c.user.type !== "Bot" && !AGENT.test(c.body))
+    .map((c) => ({ digest: issue!.number, url: c.html_url, author: c.user.login, body: c.body }));
+  return { repo, issue, older, since, ...(lastRun && { lastRun }), ...(covered && { covered }), replies };
 }
 
 // One long-lived issue in the digest repo. Its body is rewritten on every run
 // (an edit notifies nobody); a comment that publishes it is the ping. Every item
-// names its repo with a full reference, so links resolve from here.
-export function buildDigest({ repo, issue, since }: DigestState, plan: DigestPlan): BuiltDigest {
+// names its repo with a full reference, so links resolve from here. Pure: the
+// replies are read with the state.
+export function buildDigest({ issue, since }: DigestState, plan: DigestPlan): BuiltDigest {
   const { repos, review, unstick, decide, afterMerge, triage, inProgress, queue, notPicked, merged, unblocksOf } =
     plan;
   const line = (x: Item, ask?: string) => {
@@ -143,16 +154,9 @@ export function buildDigest({ repo, issue, since }: DigestState, plan: DigestPla
     (+plan.today - +new Date(since)) / 864e5 >= DIGEST_DAYS &&
     DIGEST_WEEKDAYS.includes(new Date(plan.now).getUTCDay()) &&
     (merged.length > 0 || asks.length > 0);
-  // Maintainer replies on the digest not yet copied onto their issues.
-  const cs = issue ? all<GhComment>(`repos/${repo}/issues/${issue.number}/comments?per_page=100`) : [];
-  const relayedAt = cs.findLast((c) => marked(c, RELAYED))?.created_at ?? "";
-  const replies = cs
-    .filter((c) => c.created_at > relayedAt && c.user.type !== "Bot" && !AGENT.test(c.body))
-    .map((c) => ({ digest: issue!.number, url: c.html_url, author: c.user.login, body: c.body }));
   return {
     body,
     publish,
-    replies,
     counts: {
       decide: decide.length,
       afterMerge: afterMerge.length,
@@ -169,7 +173,7 @@ export function buildDigest({ repo, issue, since }: DigestState, plan: DigestPla
   };
 }
 
-// Under --apply: create the issue if missing, close any older digest issues into it,
+// On `finish`: create the issue if missing, close any older digest issues into it,
 // rewrite its body and, when due, post the published comment. Returns the issue
 // number and the comment's url (null when none was posted).
 export function writeDigest(
