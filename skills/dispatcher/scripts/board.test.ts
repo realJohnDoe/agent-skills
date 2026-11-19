@@ -101,11 +101,11 @@ describe("render", () => {
     assert.match(html, /as of <b>2026-11-17 00:00 UTC<\/b>/);
   });
 
-  test("a Claude chip on every Waiting for human card and each other issue without the label", () => {
+  test("a Claude chip on every Stuck and Waiting for human card and each other issue without the label", () => {
     const links = [...html.matchAll(/<a class="chip claude" href="([^"]+)"/g)].map((m) => new URL(m[1].replaceAll("&amp;", "&")));
     assert.deepEqual(
       links.map((u) => [u.origin + u.pathname, u.searchParams.get("repo"), u.searchParams.get("q")]),
-      [16, 10, 3, 2, 5].map((n) => ["https://claude.ai/code/new", R, `Work on https://github.com/${R}/issues/${n}`]),
+      [1, 16, 10, 3, 2, 5].map((n) => ["https://claude.ai/code/new", R, `Regarding ${R}#${n}: `]),
     );
   });
 

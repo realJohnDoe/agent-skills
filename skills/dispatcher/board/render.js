@@ -18,13 +18,14 @@ const repoChip = (repo) => {
 };
 // No chip for `blocked`: those cards have a stage of their own, and their reason names the blocker.
 const SUB = { decide: "Decide", afterMerge: "After merge", goAhead: "Go ahead?" };
-// On every Waiting for human card, and on any other issue without `ready-for-agent` (which
-// the dispatcher won't pick up): a link that opens a new Claude Code session on its repo
-// with the issue or PR as the prompt (you press send).
-/** @param {{ repo: string, url: string, unready?: boolean }} c @param {boolean} [always] */
+// On every Stuck and Waiting for human card, and on any other issue without `ready-for-agent`
+// (which the dispatcher won't pick up): a link that opens a new Claude Code session on its
+// repo with "Regarding owner/name#n: " prefilled, for you to finish and send. Not on cards the
+// dispatcher is working on (Queue, PR in progress), where a second session would collide.
+/** @param {{ repo: string, number: number, unready?: boolean }} c @param {boolean} [always] */
 const claudeChip = (c, always = false) =>
   always || c.unready
-    ? `<a class="chip claude" href="${esc(`https://claude.ai/code/new?repo=${encodeURIComponent(c.repo)}&q=${encodeURIComponent(`Work on ${c.url}`)}`)}" target="_blank" rel="noopener" title="Work on this with Claude" aria-label="Work on this with Claude">✳</a>`
+    ? `<a class="chip claude" href="${esc(`https://claude.ai/code/new?repo=${encodeURIComponent(c.repo)}&q=${encodeURIComponent(`Regarding ${c.repo}#${c.number}: `)}`)}" target="_blank" rel="noopener" title="Work on this with Claude" aria-label="Work on this with Claude">✳</a>`
     : "";
 const DAY = 864e5;
 
@@ -47,8 +48,8 @@ const cardWith = (c, claude) => {
 };
 /** @param {Card} c */
 const card = (c) => cardWith(c, false);
-/** @param {Card} c on Waiting for human: always with the Claude chip */
-const waitingCard = (c) => cardWith(c, true);
+/** @param {Card} c on Stuck and Waiting for human: always with the Claude chip */
+const askCard = (c) => cardWith(c, true);
 /** @param {Parked} p */
 const parkedCard = (p) => `<article class="card compact">
 <div class="title">${link(p.url, p.title)}</div>
@@ -86,7 +87,7 @@ export const render = (board, now = new Date()) => {
   else if (board.state !== "paused" && board.lastRun && days(board.lastRun) >= 2)
     notices.push(`<p class="notice stale">The workshop last ran ${days(board.lastRun)} days ago. Check its routine.</p>`);
 
-  const stuck = s.stuck.map(card);
+  const stuck = s.stuck.map(askCard);
   const behind = s.behind ?? []; // a board.json from before this stage has none
   const status = [
     `as of <b>${esc(when(board.generated))}</b>`,
@@ -107,7 +108,7 @@ export const render = (board, now = new Date()) => {
     `<div class="status">${status}</div>`,
     `<div class="line">`,
     stuck.length ? stageModule("stuck", "Stuck", "needs a hand", stuck, "") : "",
-    stageModule("waiting", "Waiting for human", "after merge, review, go ahead, decide", s.waiting.cards.map(waitingCard), "Nothing waits on you", parked),
+    stageModule("waiting", "Waiting for human", "after merge, review, go ahead, decide", s.waiting.cards.map(askCard), "Nothing waits on you", parked),
     stageModule("closed", "Closed", "latest 5", s.closed.map(card), "Nothing closed yet"),
     stageModule("pr", "PR in progress", "red first", s.prInProgress.map(card), "No open PRs"),
     stageModule("queue", "Queue", "in pickup order", s.queue.map(card), "Queue empty"),
