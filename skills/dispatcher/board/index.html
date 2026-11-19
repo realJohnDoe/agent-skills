@@ -12,7 +12,8 @@
 <meta name="apple-mobile-web-app-title" content="Joe's Workshop">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
-<link rel="stylesheet" href="board.css">
+<!-- ?v=dev becomes the commit on deploy (board.yml), so a new deploy is never served from a browser cache -->
+<link rel="stylesheet" href="board.css?v=dev">
 </head>
 <body>
 <header class="banner"><img src="banner.jpg" alt=""></header>
@@ -20,7 +21,7 @@
 <p class="banner-sub">Every open issue and PR of the workshop, by stage. Read-only: decide on the digest.</p>
 <main id="board"></main>
 <script type="module">
-import { render } from "./render.js";
+import { render } from "./render.js?v=dev";
 const main = document.getElementById("board");
 try {
   const res = await fetch("board.json", { cache: "no-store" });
