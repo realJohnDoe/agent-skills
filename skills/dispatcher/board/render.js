@@ -18,17 +18,18 @@ const repoChip = (repo) => {
 };
 // No chip for `blocked`: those cards have a stage of their own, and their reason names the blocker.
 const SUB = { decide: "Decide", afterMerge: "After merge", goAhead: "Go ahead?" };
-// On an issue without `ready-for-agent`, which the dispatcher won't pick up: a link that
-// opens a new Claude Code session on its repo with the issue as the prompt (you press send).
-/** @param {{ repo: string, url: string, unready?: boolean }} c */
-const claudeChip = (c) =>
-  c.unready
+// On every Waiting for human card, and on any other issue without `ready-for-agent` (which
+// the dispatcher won't pick up): a link that opens a new Claude Code session on its repo
+// with the issue or PR as the prompt (you press send).
+/** @param {{ repo: string, url: string, unready?: boolean }} c @param {boolean} [always] */
+const claudeChip = (c, always = false) =>
+  always || c.unready
     ? `<a class="chip claude" href="${esc(`https://claude.ai/code/new?repo=${encodeURIComponent(c.repo)}&q=${encodeURIComponent(`Work on ${c.url}`)}`)}" target="_blank" rel="noopener" title="Work on this with Claude" aria-label="Work on this with Claude">✳</a>`
     : "";
 const DAY = 864e5;
 
-/** @param {Card} c */
-const card = (c) => {
+/** @param {Card} c @param {boolean} claude show the Claude chip whether or not it is unready */
+const cardWith = (c, claude) => {
   const chips = [repoChip(c.repo), `<span class="chip ref">#${c.number}</span>`];
   for (const n of c.prs ?? []) chips.push(link(`https://github.com/${c.repo}/pull/${n}`, `PR #${n}`, "chip prlink"));
   if (c.tier) chips.push(`<span class="chip tier">${c.tier}</span>`);
@@ -37,13 +38,17 @@ const card = (c) => {
   if (c.needsReview) chips.push(`<span class="chip sub">Needs review</span>`); // styled like the other Waiting for human asks
   if (c.automerge) chips.push(`<span class="chip auto">automerge</span>`);
   if (c.check) chips.push(`<span class="check ${c.check}">${c.check}</span>`);
-  chips.push(claudeChip(c));
+  chips.push(claudeChip(c, claude));
   return `<article class="card">
 <div class="title">${link(c.url, c.title)}</div>
 <div class="row">${chips.join("")}</div>
 <div class="why">${esc(c.reason)}</div>
 </article>`;
 };
+/** @param {Card} c */
+const card = (c) => cardWith(c, false);
+/** @param {Card} c on Waiting for human: always with the Claude chip */
+const waitingCard = (c) => cardWith(c, true);
 /** @param {Parked} p */
 const parkedCard = (p) => `<article class="card compact">
 <div class="title">${link(p.url, p.title)}</div>
@@ -102,7 +107,7 @@ export const render = (board, now = new Date()) => {
     `<div class="status">${status}</div>`,
     `<div class="line">`,
     stuck.length ? stageModule("stuck", "Stuck", "needs a hand", stuck, "") : "",
-    stageModule("waiting", "Waiting for human", "after merge, review, go ahead, decide", s.waiting.cards.map(card), "Nothing waits on you", parked),
+    stageModule("waiting", "Waiting for human", "after merge, review, go ahead, decide", s.waiting.cards.map(waitingCard), "Nothing waits on you", parked),
     stageModule("closed", "Closed", "latest 5", s.closed.map(card), "Nothing closed yet"),
     stageModule("pr", "PR in progress", "red first", s.prInProgress.map(card), "No open PRs"),
     stageModule("queue", "Queue", "in pickup order", s.queue.map(card), "Queue empty"),
