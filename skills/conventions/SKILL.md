@@ -40,7 +40,7 @@ Whenever you ask the maintainer to do something by hand, in an issue, PR, digest
    ```
 
    `<blocker-db-id>` is the blocker's numeric database id (the `id` that MCP `issue_write` returns, or `gh api repos/<owner>/<repo>/issues/<n> --jq .id`), not its `#number`. The blocker may be in another repo. This is a REST call, so it works where GraphQL is blocked and `gh issue`/`gh pr` commands fail. The GitHub MCP tools have no dependency tool, so use `gh api` for it. Check the edge took with `gh api repos/<owner>/<repo>/issues/<blocked>/dependencies/blocked_by --jq '.[].html_url'`. Only where `gh api` can't reach GitHub at all, use a `Blocked by: #n` line at the top of the body instead; it may name an issue in another repo as `owner/repo#n`. To make an issue part of a larger one, make it a sub-issue: MCP `issue_write` with `parent_issue_number` (it may be in another repo), or `sub_issue_write` afterwards.
-6. **Approval.** Leave approval to the maintainer. `ready-for-agent` is their go-ahead and nothing is dispatched without it, so the issue waits under the digest's **Waiting on you** until they add it. Agents never add it themselves. The one exception is the dispatcher relaying the maintainer's own `ready` reply.
+6. **Approval.** Leave approval to the maintainer. `ready-for-agent` is their go-ahead and nothing is dispatched without it, so the issue waits under the digest's **Waiting on you** until they add it. Agents never add it, however clear the issue or however sure they are it is ready, unless the maintainer explicitly asks them to in that conversation. The one standing exception is the dispatcher relaying the maintainer's own `ready` reply.
 
 Done when the issue has one tier label (or a decision section instead), `plan` if it is a multi-PR plan, a decision section if anything waits on the maintainer, and its blockers as edges.
 
@@ -93,7 +93,7 @@ Close the issue from the body with `Fixes #n`. For an issue with an `## After me
 |---|---|---|---|
 | `haiku` / `sonnet` / `opus` | issue | whoever files it | The model a session runs on, once the issue is approved and unblocked |
 | `plan` | issue | whoever files it | A plan spanning several PRs, alongside a tier label; never dispatched |
-| `ready-for-agent` | issue | the maintainer | The go-ahead; with a tier label, the issue is dispatched once unblocked; removing it parks the issue under Go ahead? |
+| `ready-for-agent` | issue | the maintainer; an agent only when explicitly asked to | The go-ahead; with a tier label, the issue is dispatched once unblocked; removing it parks the issue under Go ahead? |
 | `automerge` | PR | whoever opens it; a repo's Dependabot workflow for non-major bumps | Merged by the dispatcher once green and quiet |
 | `preview` | PR | whoever opens a PR that changes what a page looks like; the maintainer on any PR | Deploys a live preview of the PR, in a repo with PR previews |
 | `waiting-for-human` | issue, PR | the dispatcher only, at the end of each run | It is in the board's Waiting for human stage: a filter for GitHub, as fresh as the last run. Never set or remove it by hand, and never read it to decide anything: the dispatcher rewrites it from the stage each run |
@@ -108,5 +108,5 @@ Skills written for mattpocock/skills name five triage roles. In a workshop repo 
 |---|---|
 | `needs-triage` | no `ready-for-agent` yet |
 | `needs-info`, `ready-for-human` | an open `## Decision needed` section |
-| `ready-for-agent` | a tier label; the maintainer adds `ready-for-agent` itself |
+| `ready-for-agent` | a tier label; the maintainer adds `ready-for-agent` itself (an agent only when explicitly asked) |
 | `wontfix` | close as `not planned` |
