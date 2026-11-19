@@ -18,11 +18,12 @@ const repoChip = (repo) => {
 };
 // No chip for `blocked`: those cards have a stage of their own, and their reason names the blocker.
 const SUB = { decide: "Decide", afterMerge: "After merge", goAhead: "Go ahead?" };
-// On an issue without `ready-for-agent`: index.html adds the label when it's pressed.
-/** @param {{ repo: string, number: number, unready?: boolean }} c */
-const readyButton = (c) =>
+// On an issue without `ready-for-agent`, which the dispatcher won't pick up: a link that
+// opens a new Claude Code session on its repo with the issue as the prompt (you press send).
+/** @param {{ repo: string, url: string, unready?: boolean }} c */
+const claudeChip = (c) =>
   c.unready
-    ? `<button type="button" class="ready" data-repo="${esc(c.repo)}" data-number="${c.number}">Mark ready for agent</button>`
+    ? `<a class="chip claude" href="${esc(`https://claude.ai/code/new?repo=${encodeURIComponent(c.repo)}&q=${encodeURIComponent(`Work on ${c.url}`)}`)}" target="_blank" rel="noopener" title="Work on this with Claude" aria-label="Work on this with Claude">✳</a>`
     : "";
 const DAY = 864e5;
 
@@ -36,16 +37,17 @@ const card = (c) => {
   if (c.needsReview) chips.push(`<span class="chip sub">Needs review</span>`); // styled like the other Waiting for human asks
   if (c.automerge) chips.push(`<span class="chip auto">automerge</span>`);
   if (c.check) chips.push(`<span class="check ${c.check}">${c.check}</span>`);
+  chips.push(claudeChip(c));
   return `<article class="card">
 <div class="title">${link(c.url, c.title)}</div>
 <div class="row">${chips.join("")}</div>
-<div class="why">${esc(c.reason)}</div>${readyButton(c)}
+<div class="why">${esc(c.reason)}</div>
 </article>`;
 };
 /** @param {Parked} p */
 const parkedCard = (p) => `<article class="card compact">
 <div class="title">${link(p.url, p.title)}</div>
-<div class="row">${repoChip(p.repo)}<span class="chip ref">#${p.number}</span><span class="why">${esc(p.reason)}</span></div>${readyButton(p)}
+<div class="row">${repoChip(p.repo)}<span class="chip ref">#${p.number}</span>${claudeChip(p)}<span class="why">${esc(p.reason)}</span></div>
 </article>`;
 /**
  * @param {string} id @param {string} name @param {string} hint @param {string[]} cards

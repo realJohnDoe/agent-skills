@@ -165,17 +165,9 @@ main { max-width: 1080px; margin: 0 auto; }
 .chip.sub { background: var(--metal-hi); color: var(--fg); }
 .chip.prlink { color: var(--holo); border-color: var(--holo); text-decoration: none; }
 .chip.prlink:hover { background: var(--holo-dim); }
+.chip.claude { color: #f0a283; border-color: currentColor; text-decoration: none; padding: 1px 5px; font: 700 15px/1 var(--f-body); } /* Claude's coral */
+.chip.claude:hover { background: rgba(240, 162, 131, .14); }
 .chip.auto { background: var(--ok); color: #062312; }
-button.ready {
-  justify-self: start; cursor: pointer;
-  font: 600 12px/1 var(--f-display); letter-spacing: .06em; text-transform: uppercase;
-  padding: 7px 10px; border-radius: var(--r);
-  color: var(--ok); background: transparent; border: 1px solid var(--ok);
-}
-button.ready:hover:not(:disabled) { background: color-mix(in srgb, var(--ok) 14%, transparent); }
-button.ready:disabled { cursor: default; opacity: .7; }
-button.ready.failed { color: var(--bad); border-color: var(--bad); }
-button.ready.done { opacity: 1; background: var(--ok); color: #062312; }
 .check { display: inline-flex; align-items: center; gap: 5px; font: 11px var(--f-mono); color: var(--muted); }
 .check::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--l); box-shadow: 0 0 6px var(--l); }
 .check.green { --l: var(--ok); }

@@ -17,7 +17,7 @@
 <body>
 <header class="banner"><img src="banner.jpg" alt=""></header>
 <div class="banner-title"><h1>Joe's Workshop</h1></div>
-<p class="banner-sub">Every open issue and PR of the workshop, by stage. Decide on the digest; the one thing you can do here is mark an issue ready for agent.</p>
+<p class="banner-sub">Every open issue and PR of the workshop, by stage. Read-only: decide on the digest.</p>
 <main id="board"></main>
 <script type="module">
 import { render } from "./render.js";
@@ -30,45 +30,6 @@ try {
   main.innerHTML = `<p class="notice error">Couldn't load board.json (${String(e.message ?? e).replace(/[&<>]/g, "")}).</p>`;
 }
 
-// "Mark ready for agent": adds `ready-for-agent` to the issue with the maintainer's own
-// GitHub token, a fine-grained one with Issues: read and write on the workshop repos. It is
-// asked for once and kept in this browser only. The label change starts the board workflow,
-// which moves the card on its next build.
-const TOKEN = "workshop-github-token";
-const store = {
-  get: () => { try { return localStorage.getItem(TOKEN); } catch { return null; } },
-  set: (t) => { try { t ? localStorage.setItem(TOKEN, t) : localStorage.removeItem(TOKEN); } catch {} },
-};
-const askToken = () =>
-  prompt(
-    "A GitHub fine-grained token with Issues: read and write on the workshop repos " +
-      "(github.com/settings/personal-access-tokens/new). It stays in this browser.",
-  )?.trim() || null;
-main.addEventListener("click", async (ev) => {
-  const btn = ev.target instanceof Element && ev.target.closest("button.ready");
-  if (!btn || btn.disabled) return;
-  const token = store.get() ?? askToken();
-  if (!token) return;
-  btn.disabled = true;
-  btn.classList.remove("failed");
-  btn.textContent = "Marking…";
-  try {
-    const res = await fetch(`https://api.github.com/repos/${btn.dataset.repo}/issues/${btn.dataset.number}/labels`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" },
-      body: JSON.stringify({ labels: ["ready-for-agent"] }),
-    });
-    if (res.status === 401) store.set(null); // a bad or expired token: ask again next time
-    if (!res.ok) throw new Error(res.status === 401 ? "token rejected" : res.status === 403 || res.status === 404 ? "token can't write to this repo" : `HTTP ${res.status}`);
-    store.set(token);
-    btn.textContent = "Ready for agent ✓";
-    btn.classList.add("done");
-  } catch (e) {
-    btn.disabled = false;
-    btn.classList.add("failed");
-    btn.textContent = `Failed: ${e.message ?? e}. Retry`;
-  }
-});
 </script>
 </body>
 </html>

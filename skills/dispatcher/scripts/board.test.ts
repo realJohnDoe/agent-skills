@@ -101,9 +101,12 @@ describe("render", () => {
     assert.match(html, /as of <b>2026-11-17 00:00 UTC<\/b>/);
   });
 
-  test("a Mark ready for agent button on each issue without the label, naming it", () => {
-    const buttons = [...html.matchAll(/<button type="button" class="ready" data-repo="([^"]+)" data-number="(\d+)">Mark ready for agent<\/button>/g)];
-    assert.deepEqual(buttons.map((m) => [m[1], Number(m[2])]), [[R, 3], [R, 5]]);
+  test("a Claude chip on each issue without the label, opening a session on it", () => {
+    const links = [...html.matchAll(/<a class="chip claude" href="([^"]+)"/g)].map((m) => new URL(m[1].replaceAll("&amp;", "&")));
+    assert.deepEqual(
+      links.map((u) => [u.origin + u.pathname, u.searchParams.get("repo"), u.searchParams.get("q")]),
+      [3, 5].map((n) => ["https://claude.ai/code/new", R, `Work on https://github.com/${R}/issues/${n}`]),
+    );
   });
 
   test("Stuck hides when empty; the other modules show an empty message", () => {

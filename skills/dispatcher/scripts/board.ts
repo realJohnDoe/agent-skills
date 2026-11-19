@@ -15,7 +15,7 @@ export type Card = {
   needsReview?: boolean; // green, quiet, no automerge
   sub?: "decide" | "afterMerge" | "goAhead" | "blocked";
   prs?: number[]; // every PR linked to an issue card
-  unready?: boolean; // an open issue without `ready-for-agent`: the page shows a button that adds it
+  unready?: boolean; // an open issue without `ready-for-agent`: the page links it to a new Claude Code session
   reason: string; // the dispatcher's one-line why
 };
 export type Parked = { repo: string; number: number; title: string; url: string; reason: string; unready?: boolean };
