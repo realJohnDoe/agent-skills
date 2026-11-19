@@ -13,7 +13,7 @@ A survey reviews one repo for one kind of problem and files what it finds as iss
 
 The survey run, which the `timetable` skill starts, follows these steps. Each run surveys one repo, with one survey.
 
-1. **Close finished parents.** In each attached repo, close the finished parents labelled `survey`, per the `conventions` skill's **Filing a batch of findings**, **Closing**.
+1. **Close finished parents.** In each attached repo, close the finished parents labelled `survey`, per `../conventions/batch-findings.md`, **Closing**.
 2. **Choose.** Run `node <this skill's directory>/scripts/survey-next.ts` (see **Choosing the next survey**). If `top` is `null`, stop: post nothing, open nothing.
 3. **List the top five.** Before starting anything, print the five highest-scoring pairs in `pairs` that have no `skip` (fewer if fewer qualify), as a table in rank order: survey, repo, `days`, `activity`, `score`. The first row is `top`.
 4. **Run it.** Run the skill at `top.skill` on `top.repo`, in a worktree of that repo's checkout. The parent issue's body opens with a **Why this survey** line: `top`'s `lastRun`, `since`, `days`, `activity` and `score`, and that it ranked first of the pairs the chooser scored, followed by the top-five table from step 3.
@@ -66,7 +66,7 @@ gh api repos/<owner/repo>/issues/<parent>/sub_issues --jq '.[] | select(.state==
 
 ## Finding fields
 
-`Title`, `Breadth`, `Tier`, `Evidence`, `Problem`, `Fix` and `Task context` are the shared fields (`conventions`, **Filing a batch of findings**). Each survey adds its own: its `Category` tags, its `Impact` scale, and what "fails silently" looks like in its domain, since that sets the tier. An architecture change spanning several PRs is `plan`, a product decision only the maintainer can make is a `## Decision needed`, and neither raises the tier.
+`Title`, `Breadth`, `Tier`, `Evidence`, `Problem`, `Fix` and `Task context` are the shared fields (`../conventions/batch-findings.md`). Each survey adds its own: its `Category` tags, its `Impact` scale, and what "fails silently" looks like in its domain, since that sets the tier. An architecture change spanning several PRs is `plan`, a product decision only the maintainer can make is a `## Decision needed`, and neither raises the tier.
 
 Re-rank after writing the Task context, since the tier feeds the ranking. Carry rank as its own column in the parent's summary table; a finding's identity is its issue number.
 
@@ -88,7 +88,7 @@ Every survey caps its findings at a stated top-N. Include everything that makes 
 
 ## Reporting
 
-Search, file and close per the `conventions` skill's **Filing a batch of findings**. What a survey adds:
+Search, file and close per `../conventions/batch-findings.md`. What a survey adds:
 
 - **One parent issue per run**, in the surveyed repo, titled with the survey, its scope and the date, labelled `survey` plus the survey-type label (on a repo's first run, create these and `survey-finding` with `gh api -X POST repos/<owner/repo>/labels`: the chooser finds runs by them). Its body carries the **Why this survey** line, the coverage statement, the category verdicts and the summary table, with each row linking its finding's sub-issue rather than restating it.
 - **One sub-issue per finding**, attached to the parent (the repo's `survey-finding` issue template, if it has one, is the skeleton). Label each with the survey's `Category` tag(s), `survey-finding`, the survey-type label, a tier label, and `plan` where it applies, plus a `## Decision needed` section when it hinges on a decision only the maintainer can make, all per the `conventions` skill.
