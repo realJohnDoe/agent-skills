@@ -6,7 +6,6 @@ import { join } from "node:path";
 import { describe, test } from "node:test";
 import { buildBoard } from "./board.ts";
 import { buildDigest, digestState } from "./digest.ts";
-import { FOOTER } from "./lib.ts";
 import { assemble, LABELS, type PlanOptions, planRepo, type RepoPlan } from "./plan.ts";
 import type { RepoSnapshot } from "./snapshot.ts";
 
@@ -66,7 +65,6 @@ const snap = (repo: string, s: Any = {}): RepoSnapshot => {
     blockers: new Map(Object.entries(s.blockers ?? {}).map(([n, b]) => [Number(n), b as Any])),
     closed: s.closed ?? [],
     dispatchedAt: new Map(Object.entries(s.dispatchedAt ?? {}).map(([n, at]) => [Number(n), at as string | null])),
-    merged: s.merged ?? [],
     labels: s.labels ?? Object.keys(LABELS),
   };
 };
@@ -101,16 +99,9 @@ const tracemap = () =>
   });
 const plans = (opts = OPTS) => [planRepo(meridian(), opts), planRepo(tracemap(), opts)];
 const automergeOf = (ps: RepoPlan[]) => ps.flatMap((p) => p.automerge.map((m) => m.item));
-const runOf = (ps: RepoPlan[], maxSessions?: number, unpushable: Any[] = []) =>
-  assemble(ps, { ...(maxSessions !== undefined && { maxSessions }), unpushable, automerge: automergeOf(ps) });
-const digestOf = (ps: RepoPlan[], run: ReturnType<typeof runOf>, state = digestState("o/d", [], [], TODAY)) =>
-  buildDigest(state, {
-    ...run.digest,
-    repos: ps.map((p) => ({ repo: p.repo, name: "", path: "" })),
-    today: TODAY,
-    now: NOW,
-    followupsOnly: false,
-  });
+const runOf = (ps: RepoPlan[], maxSessions?: number) =>
+  assemble(ps, { ...(maxSessions !== undefined && { maxSessions }), automerge: automergeOf(ps) });
+const boardOf = (run: ReturnType<typeof runOf>) => buildBoard(run.board, { generated: NOW, repos: [M, T], digest: "u", closed: [] }).stages;
 
 describe("planRepo", () => {
   test("merges only the green automerge PR, pinned to its head", () =>
@@ -155,9 +146,11 @@ describe("planRepo", () => {
     assert.deepEqual(p.dispatches, []);
   });
 
-  test("what merged, with the issues it closed and their labels", () => {
-    const p = planRepo(snap(M, { merged: [{ pr: pr(50, "Fix it", { body: "Fixes #51" }), closes: [{ number: 51, labels: ["sonnet", "ready-for-agent"] }] }] }), OPTS);
-    assert.deepEqual(p.merged, [`- [${M}#50](https://github.com/x/pull/50) Fix it (closes ${M}#51 · sonnet, ready-for-agent)`]);
+  test("the workshop's can't-push issue is Stuck, never dispatched or parked", () => {
+    const body = `<!-- workshop-cant-push: ${T} -->\nThe workshop can't push to it.`;
+    const p = planRepo(snap(M, { issues: [issue(70, `Workshop can't push to ${T}`, ["sonnet", "ready-for-agent"], { body })] }), OPTS);
+    assert.deepEqual(p.unstick.map((i) => [i.ref, i.why]), [[`${M}#70`, `can't push to ${T}; give the routine push access, or detach it`]]);
+    assert.deepEqual([p.dispatches, p.notPicked, p.triage, p.decide], [[], [], [], []]);
   });
 });
 
@@ -174,33 +167,28 @@ describe("an issue with an After merge step", () => {
       closed,
       dispatchedAt: { 30: "2026-10-01T00:00:00Z" },
     });
-  const digest = (prs: Any[], closed: Any[]) => {
-    const ps = [planRepo(repo(prs, closed), OPTS)];
-    return digestOf(ps, runOf(ps, 4));
-  };
+  const board = (prs: Any[], closed: Any[]) => boardOf(runOf([planRepo(repo(prs, closed), OPTS)], 4));
+  const numbers = (cs: { number: number }[]) => cs.map((c) => c.number);
 
   test("while its Refs PR is open it is in progress under the PR", () => {
-    const { body } = digest([pr(40, "Do the thing", { body: "Refs #30", runs: green, mergeable: true })], []);
-    assert.match(body, /\*\*Review:\*\* \[realJohnDoe\/meridian#40\]/);
-    assert.doesNotMatch(body, /meridian#30\]/);
-    assert.doesNotMatch(body, /Unstick/);
-    assert.match(body, /meridian#31\]\(\S+\) Waits on 30 \(blocked by realJohnDoe\/meridian#30\)/);
+    const b = board([pr(40, "Do the thing", { body: "Refs #30", runs: green, mergeable: true })], []);
+    assert.deepEqual(b.waiting.cards.map((c) => [c.number, c.needsReview]), [[40, true]]);
+    assert.deepEqual(b.stuck, []);
+    assert.deepEqual(b.behind.map((c) => [c.number, c.reason]), [[31, "blocked by realJohnDoe/meridian#30"]]);
   });
 
-  test("once merged it waits on the maintainer with the step, never Unstick, past STALE_DAYS", () => {
-    const d = digest([], [pr(41, "Unrelated", { merged_at: "2026-11-12T00:00:00Z" }), pr(40, "Do the thing", { body: "Refs #30", merged_at: "2026-11-12T00:00:00Z" })]);
-    assert.match(
-      d.body,
-      new RegExp(`## Waiting on you[^]*\\*\\*After merge:\\*\\* \\[realJohnDoe/meridian#30\\]\\(\\S+\\) Needs a manual step \\(Switch the Pages source[^;]*; merged in \\[realJohnDoe/meridian#40\\]\\(\\S+\\); unblocks realJohnDoe/meridian#31\\)`),
-    );
-    assert.doesNotMatch(d.body, /Unstick/);
-    assert.equal(d.counts.afterMerge, 1);
+  test("once merged it waits on the maintainer with the step, never Stuck, past STALE_DAYS", () => {
+    const b = board([], [pr(41, "Unrelated", { merged_at: "2026-11-12T00:00:00Z" }), pr(40, "Do the thing", { body: "Refs #30", merged_at: "2026-11-12T00:00:00Z" })]);
+    const [c] = b.waiting.cards;
+    assert.deepEqual([c.number, c.sub, c.prs], [30, "afterMerge", [40]]);
+    assert.match(c.reason, /^Switch the Pages source[^;]*; merged in \[realJohnDoe\/meridian#40\]/);
+    assert.deepEqual(b.stuck, []);
   });
 
-  test("with no merged PR for it, a dispatched one is Unstick", () => {
-    const d = digest([], []);
-    assert.equal(d.counts.afterMerge, 0);
-    assert.match(d.body, /## Unstick[^]*meridian#30\]/);
+  test("with no merged PR for it, a dispatched one is Stuck", () => {
+    const b = board([], []);
+    assert.deepEqual(numbers(b.stuck), [30]);
+    assert.deepEqual(b.waiting.cards, []);
   });
 });
 
@@ -239,12 +227,6 @@ describe("assemble", () => {
       [`${T}#9`, `${M}#21`],
     );
   });
-
-  test("a repo it can't push to heads the digest's Unstick, not the board's", () => {
-    const run = runOf(plans(), 3, [{ repo: M, reason: "can't push (403)" }]);
-    assert.deepEqual(run.digest.unstick.map((i) => [i.ref, i.ask]), [[M, "Can't push:"]]);
-    assert.deepEqual(run.board.unstick, []);
-  });
 });
 
 describe("the board and digest of a run", () => {
@@ -263,79 +245,32 @@ describe("the board and digest of a run", () => {
     assert.deepEqual(all.filter((c) => c.unready).map((c) => c.number).sort((a, b) => a - b), [12, 13, 14]);
   });
 
-  test("one digest naming every item's repo", () => {
-    const { body, counts } = digestOf(ps, run);
-    assert.match(body, /\nRepos covered: realJohnDoe\/meridian, realJohnDoe\/tracemap\.\n/);
-    assert.match(body, /\*\*Review:\*\* \[realJohnDoe\/tracemap#8\]/);
-    assert.match(
-      body,
-      /## Waiting on you[^]*\*\*Decide:\*\* \[realJohnDoe\/meridian#13\]\(\S+\) Meridian needs a call \(Keep the old endpoint\?\)[^]*\*\*Go ahead\?\*\* \[realJohnDoe\/meridian#14\]/,
-    );
-    assert.match(
-      body,
-      /## In progress\n\n- \[realJohnDoe\/tracemap#9\]\(\S+\) Tracemap red \(follow-up\)\n- \[realJohnDoe\/meridian#21\]\(\S+\) Meridian red \(follow-up\)\n- \[realJohnDoe\/tracemap#4\]\(\S+\) .* \(dispatched\)\n/,
-    );
-    assert.equal(counts.inProgress, 3);
-    assert.match(body, /## Queue[^]*\[realJohnDoe\/meridian#10\][^]*\[realJohnDoe\/tracemap#3\]/);
-    assert.match(body, /\[realJohnDoe\/meridian#12\]\(\S+\) Meridian untriaged \(no tier label/);
-    assert.match(body, /\[realJohnDoe\/meridian#11\]\(\S+\) Meridian waits on 10 \(blocked by realJohnDoe\/meridian#10\)/);
-    assert.match(body, /\n<!-- digest-run: 2026-11-13T00:00:00.000Z -->\n/);
+  test("the digest holds only the markers the board reads, and points to the board", () => {
+    const body = buildDigest({ repos: ps.map((p) => ({ repo: p.repo, name: "", path: "" })), now: NOW });
+    assert.match(body, /^<!-- digest-run: 2026-11-13T00:00:00.000Z -->\n/);
     assert.match(body, new RegExp(`\n<!-- digest-repos: ${M} ${T} -->\n`));
+    assert.match(body, /\nRepos covered: realJohnDoe\/meridian, realJohnDoe\/tracemap\./);
+    assert.match(body, /\[workshop board\]\(https:\/\/realjohndoe\.github\.io\/agent-skills\/\)/);
+    assert.doesNotMatch(body, /meridian#/);
   });
 
   test("at the end of a run nothing shows as dispatched", () =>
-    assert.doesNotMatch(digestOf(ps, runOf(ps)).body, /\(dispatched\)/));
+    assert.ok(boardOf(runOf(ps)).prInProgress.every((c) => c.reason !== "dispatched")));
 });
 
-describe("the digest's state and when it is published", () => {
-  const ps = plans();
-  const run = runOf(ps);
-  const digestIssue = (n: number, title = "Workshop digest", body = "<!-- digest-since: 2026-11-10 -->") => issue(n, title, [], { body }) as Any;
-  const comment = (body: string, at: string, type = "User") => ({ body, created_at: at, html_url: `c-${at}`, user: { login: "x", type } });
-  const published = (at: string) => comment("<!-- workshop-published -->\nPublished: 0 to review", at);
-  const publish = (state: ReturnType<typeof digestState>) => digestOf(ps, run, state).publish;
-
-  test("due on a Tuesday or Friday 2.5 days into its window, with something to show", () => {
-    assert.equal(publish(digestState("o/d", [digestIssue(90)], [], TODAY)), true);
-    assert.equal(publish(digestState("o/d", [], [], TODAY)), false); // no issue yet: it is created first
-  });
-
-  test("the window runs from the newest published comment, and a recent one means not due", () => {
-    const fresh = digestState("o/d", [digestIssue(90)], [published("2026-11-10T00:00:00Z"), published("2026-11-12T00:00:00Z")], TODAY);
-    assert.equal(fresh.since, "2026-11-12T00:00:00Z");
-    assert.equal(publish(fresh), false);
-    assert.equal(publish(digestState("o/d", [digestIssue(90)], [published("2026-11-10T00:00:00Z")], TODAY)), true);
-  });
-
-  test("drain never publishes", () =>
-    assert.equal(buildDigest(digestState("o/d", [digestIssue(90)], [], TODAY), { ...run.digest, repos: [], today: TODAY, now: NOW, followupsOnly: true }).publish, false));
-
-  test("replies: the maintainer's since the last relay, never a bot's, an agent's or a published comment", () => {
-    const { replies } = digestState(
-      "o/d",
-      [digestIssue(90)],
-      [
-        comment("old", "2026-11-10T00:00:00Z"),
-        comment("<!-- workshop-relayed -->", "2026-11-11T00:00:00Z"),
-        comment("ready meridian#14", "2026-11-12T00:00:00Z"),
-        comment("beep", "2026-11-12T01:00:00Z", "Bot"),
-        comment(`<!-- workshop-published -->\nhi${FOOTER}`, "2026-11-12T02:00:00Z"),
-      ],
-      TODAY,
-    );
-    assert.deepEqual(replies, [{ digest: 90, url: "c-2026-11-12T00:00:00Z", author: "x", body: "ready meridian#14" }]);
-  });
+describe("the digest's state", () => {
+  const digestIssue = (n: number, title = "Workshop digest", body = "") => issue(n, title, [], { body }) as Any;
 
   test("the newest open digest is the digest; older ones are closed into it; its markers are read back", () => {
-    const s = digestState(
-      "o/d",
-      [digestIssue(90, "Workshop digest — 2026-11-06"), digestIssue(91, "Workshop digest", `<!-- digest-since: 2026-11-10 -->\n<!-- digest-run: 2026-11-12T20:00:00.000Z -->\n<!-- digest-repos: ${M} ${T} -->`)],
-      [],
-      TODAY,
-    );
+    const s = digestState("o/d", [
+      digestIssue(90, "Workshop digest — 2026-11-06"),
+      digestIssue(91, "Workshop digest", `<!-- digest-since: 2026-11-10 -->\n<!-- digest-run: 2026-11-12T20:00:00.000Z -->\n<!-- digest-repos: ${M} ${T} -->`),
+    ]);
     assert.equal(s.issue?.number, 91);
     assert.deepEqual(s.older.map((i) => i.number), [90]);
     assert.equal(s.lastRun, "2026-11-12T20:00:00.000Z");
     assert.deepEqual(s.covered, [M, T]);
   });
+
+  test("no digest issue yet: no markers", () => assert.deepEqual(digestState("o/d", []), { repo: "o/d", issue: undefined, older: [] }));
 });

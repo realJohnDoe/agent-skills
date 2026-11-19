@@ -1,5 +1,6 @@
 // How every skill reads the workshop's shared conventions on issues and comments: the
-// digest issue, the pause label, marker comments, and an issue body's open question.
+// digest issue, the pause label, marker comments, an issue body's open question, and the
+// issue that says the workshop can't push to a repo.
 // The `conventions` skill says what to set; this file and the dispatcher's decide.ts
 // say how it is read.
 
@@ -8,6 +9,12 @@ export const PAUSE_LABEL = "workshop-paused";
 export const DECISION = "Decision needed";
 
 export const isDigest = (title: string) => /^(Workshop|Farm) digest/.test(title);
+
+// Heads the body of the issue the dispatcher files in the digest repo when it can't push
+// to a repo; the board shows that issue as Stuck.
+export const cantPushMarker = (repo: string) => `<!-- workshop-cant-push: ${repo} -->`;
+/** The repo a can't-push issue's body names; undefined for any other body. */
+export const cantPushRepo = (body: string | null | undefined) => (body ?? "").match(/<!-- workshop-cant-push: (\S+) -->/)?.[1];
 
 // Comments written before the farm → workshop rename still carry `farm-` markers.
 export const marked = (c: { body: string }, m: string) =>

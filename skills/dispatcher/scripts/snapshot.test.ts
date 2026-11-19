@@ -51,7 +51,7 @@ const fetch = (issues: Any[], pulls: Any[] = [], extra: Any = {}) => {
     }),
   );
   process.env.FAKE_GH_FIXTURE = file;
-  return fetchRepo({ repo: M, name: "meridian", path: "" }, "2026-11-10", { merged: false });
+  return fetchRepo({ repo: M, name: "meridian", path: "" });
 };
 
 // Each test names a different blocker: a run looks each one up only once.

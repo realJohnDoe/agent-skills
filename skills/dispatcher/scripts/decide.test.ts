@@ -404,7 +404,7 @@ describe("claimState", () => {
     assert.deepEqual(claimState({ tiered: true, dispatchedAt: null }), { kind: "notPicked" }));
   test("assigned by hand without a tier: nothing to say", () =>
     assert.deepEqual(claimState({ tiered: false, dispatchedAt: null }), { kind: "none" }));
-  test("dispatched, no PR by the time the digest reads it (even dispatched today): unstick", () => {
+  test("dispatched, no PR by the time `finish` reads it (even dispatched today): unstick", () => {
     assert.deepEqual(claimState({ tiered: true, dispatchedAt: "2026-11-13T00:00:00Z" }), { kind: "unstick" });
     assert.deepEqual(claimState({ tiered: true, dispatchedAt: "2026-11-10T00:00:00Z" }), { kind: "unstick" });
   });

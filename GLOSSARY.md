@@ -11,11 +11,11 @@ The whole system of scheduled runs that dispatches issues to agent sessions, fol
 _Avoid_: Factory, pipeline
 
 **Digest**:
-The one long-lived issue in the digest repo where the workshop lists what waits on the maintainer, and the only place the maintainer takes decisions. Publishing it means posting a comment on it.
+The one long-lived issue in the digest repo that holds the workshop's state: the markers the board reads (when the dispatcher last ran, which repos it covered) and the pause label. It lists no items; what waits on the maintainer is on the board, and they decide on each issue itself.
 _Avoid_: Report, summary
 
 **Workshop board**:
-A read-only public page that shows every open issue and PR of the workshop by stage. You can look at it, but you can't decide anything on it.
+A read-only public page that shows every open issue and PR of the workshop by stage: where the maintainer sees what waits on them. You can't decide anything on it, but its ✳ chips open a Claude Code session on a card's issue.
 _Avoid_: Dashboard, kanban
 
 ### On the board
@@ -25,7 +25,7 @@ Where an issue or PR stands in the workshop's flow: Stuck, Waiting for human, Cl
 _Avoid_: Column, status
 
 **Stuck**:
-The stage for work the workshop can't move without the maintainer stepping in. That covers a PR at its follow-up cap, a stale follow-up and a dispatched issue with no PR. A repo it can't push to isn't on the board: the digest lists it under Unstick.
+The stage for work the workshop can't move without the maintainer stepping in. That covers a PR at its follow-up cap, a stale follow-up, a dispatched issue with no PR, and the issue the dispatcher files in the digest repo for a repo it can't push to.
 _Avoid_: Blocked, failed
 
 **Waiting for human**:

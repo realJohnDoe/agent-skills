@@ -17,8 +17,7 @@ export const assertNever = (x: never): never => {
   throw new Error(`unhandled state: ${JSON.stringify(x)}`);
 };
 export const AUTOMERGE = "automerge";
-// The maintainer's go-ahead. Agents pick the tier; only the maintainer, or a
-// relay of their digest reply, adds this.
+// The maintainer's go-ahead. Agents pick the tier; only the maintainer adds this.
 export const READY = "ready-for-agent";
 /**
  * The manual step in an issue body's `## After merge` section: its first
@@ -48,16 +47,18 @@ const days = (today: Date, iso: string) => (+today - +new Date(iso)) / 864e5;
 /**
  * What the workshop does with an open issue, the first matching rule winning:
  * - `dispatchable`: start a session on it
- * - `elsewhere`: shown by its PR, Unstick or the digest itself, not as an issue
- * - `decision`: Waiting on you, with its open question
- * - `afterMerge`: Waiting on you, with its manual step: its PR has merged
- * - `awaitingTriage`: Waiting on you for the go-ahead
- * - `blocked`: Not picked up, but only counted in the digest
- * - `notPicked`: Not picked up, with the `reason` listed there
+ * - `elsewhere`: shown by its PR or Stuck, or is the digest itself, not as an issue
+ * - `cantPush`: the workshop's own issue saying it can't push to `repo`: Stuck
+ * - `decision`: Waiting for human, with its open question
+ * - `afterMerge`: Waiting for human, with its manual step: its PR has merged
+ * - `awaitingTriage`: Waiting for human, for the go-ahead
+ * - `blocked`: Behind another issue
+ * - `notPicked`: parked, with its `reason`
  */
 export type IssueState =
   | { kind: "dispatchable" }
   | { kind: "elsewhere" }
+  | { kind: "cantPush"; repo: string }
   | { kind: "decision"; question: string }
   | { kind: "afterMerge"; step: string; pr: string }
   | { kind: "awaitingTriage" }
@@ -80,11 +81,14 @@ export type IssueFacts = {
   question?: string;
   /** Its `## After merge` step and the merged PR it waits on, once one has merged. */
   afterMerge?: { step: string; pr: string };
+  /** The repo its can't-push marker names (`cantPushRepo`). */
+  cantPush?: string;
 };
 
 export const issueState = (issue: IssueFacts): IssueState => {
   const l = issue.labels;
   if (isDigest(issue.title) || issue.subIssues > 0) return { kind: "elsewhere" };
+  if (issue.cantPush) return { kind: "cantPush", repo: issue.cantPush };
   if (issue.linked) return { kind: "elsewhere" };
   // Assigned by the dispatch that made its PR, but the work is done: never again.
   if (issue.afterMerge) return { kind: "afterMerge", ...issue.afterMerge };
@@ -215,7 +219,7 @@ export const prVerdict = (pr: PrFacts): PrVerdict => {
 /**
  * An assigned issue with no open PR: `notPicked` when assigned by hand (no
  * dispatch marker) and tier-labelled, `unstick` when dispatched (every session
- * of the run has finished by the time the digest reads it, so no PR means the
+ * of the run has finished by the time `finish` reads it, so no PR means the
  * session ended without one), `none` otherwise.
  */
 export type ClaimState = { kind: "notPicked" } | { kind: "unstick" } | { kind: "none" };
