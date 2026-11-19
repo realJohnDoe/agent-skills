@@ -53,7 +53,8 @@ const days = (today: Date, iso: string) => (+today - +new Date(iso)) / 864e5;
  * - `afterMerge`: Waiting for human, with its manual step: its PR has merged
  * - `awaitingTriage`: Waiting for human, for the go-ahead
  * - `blocked`: Behind another issue
- * - `notPicked`: parked, with its `reason`
+ * - `plan`: Waiting for human, for a plan session
+ * - `untiered`: Waiting for human, for a tier label
  */
 export type IssueState =
   | { kind: "dispatchable" }
@@ -63,7 +64,8 @@ export type IssueState =
   | { kind: "afterMerge"; step: string; pr: string }
   | { kind: "awaitingTriage" }
   | { kind: "blocked"; blockers: ResolvedBlocker[] }
-  | { kind: "notPicked"; reason: string };
+  | { kind: "plan" }
+  | { kind: "untiered" };
 
 /** An open blocker, or one that couldn't be looked up and so blocks until it can be. */
 export type ResolvedBlocker = Blocker & { unreadable?: boolean };
@@ -97,9 +99,8 @@ export const issueState = (issue: IssueFacts): IssueState => {
   // A decision can wait until its blocker is done; the go-ahead settles it.
   if (issue.question && !l.includes(READY))
     return issue.blockers.length ? blocked() : { kind: "decision", question: issue.question };
-  if (isPlan(l)) return { kind: "notPicked", reason: "`plan`; start a plan session by hand" };
-  if (!tierOf(l))
-    return { kind: "notPicked", reason: "no tier label; add `haiku`, `sonnet` or `opus` to queue it" };
+  if (isPlan(l)) return { kind: "plan" };
+  if (!tierOf(l)) return { kind: "untiered" };
   if (issue.blockers.length) return blocked();
   if (!l.includes(READY)) return { kind: "awaitingTriage" };
   return { kind: "dispatchable" };
@@ -217,14 +218,15 @@ export const prVerdict = (pr: PrFacts): PrVerdict => {
 };
 
 /**
- * An assigned issue with no open PR: `notPicked` when assigned by hand (no
- * dispatch marker) and tier-labelled, `unstick` when dispatched (every session
+ * An assigned issue with no open PR: `unstick` when dispatched (every session
  * of the run has finished by the time `finish` reads it, so no PR means the
- * session ended without one), `none` otherwise.
+ * session ended without one). Assigned by hand (no dispatch marker): `assigned`
+ * (Waiting for human) when it also has `ready-for-agent`, which contradicts the
+ * claim; `none` otherwise, as it is the assignee's own work.
  */
-export type ClaimState = { kind: "notPicked" } | { kind: "unstick" } | { kind: "none" };
+export type ClaimState = { kind: "assigned" } | { kind: "unstick" } | { kind: "none" };
 
-export const claimState = ({ tiered, dispatchedAt }: { tiered: boolean; dispatchedAt: string | null }): ClaimState => {
-  if (!dispatchedAt) return { kind: tiered ? "notPicked" : "none" };
+export const claimState = ({ ready, dispatchedAt }: { ready: boolean; dispatchedAt: string | null }): ClaimState => {
+  if (!dispatchedAt) return { kind: ready ? "assigned" : "none" };
   return { kind: "unstick" };
 };

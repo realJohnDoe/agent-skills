@@ -55,8 +55,8 @@ test("the workshop's own issues: pause issues, and the retired digest until it i
 });
 
 const ELSEWHERE = { kind: "elsewhere" };
-const NO_TIER = { kind: "notPicked", reason: "no tier label; add `haiku`, `sonnet` or `opus` to queue it" };
-const PLAN_STATE = { kind: "notPicked", reason: "`plan`; start a plan session by hand" };
+const NO_TIER = { kind: "untiered" };
+const PLAN_STATE = { kind: "plan" };
 
 describe("issueState", () => {
   const issue = (over = {}) => ({
@@ -107,7 +107,7 @@ describe("issueState", () => {
       assert.deepEqual(issueState(issue({ labels: [], assignees: 1, question: "Which API?" })), ELSEWHERE));
   });
 
-  describe("not picked up, with the reason", () => {
+  describe("waits for a human: a plan session or a tier label", () => {
     test("no tier label", () =>
       assert.deepEqual(
         issueState(issue({ labels: ["bug"] })),
@@ -409,13 +409,13 @@ describe("prVerdict", () => {
 });
 
 describe("claimState", () => {
-  test("assigned by hand (no dispatch marker) with a tier: not picked up", () =>
-    assert.deepEqual(claimState({ tiered: true, dispatchedAt: null }), { kind: "notPicked" }));
-  test("assigned by hand without a tier: nothing to say", () =>
-    assert.deepEqual(claimState({ tiered: false, dispatchedAt: null }), { kind: "none" }));
+  test("assigned by hand (no dispatch marker) but ready for an agent: asks which", () =>
+    assert.deepEqual(claimState({ ready: true, dispatchedAt: null }), { kind: "assigned" }));
+  test("assigned by hand without ready-for-agent: the assignee's own work", () =>
+    assert.deepEqual(claimState({ ready: false, dispatchedAt: null }), { kind: "none" }));
   test("dispatched, no PR by the time `finish` reads it (even dispatched today): unstick", () => {
-    assert.deepEqual(claimState({ tiered: true, dispatchedAt: "2026-11-13T00:00:00Z" }), { kind: "unstick" });
-    assert.deepEqual(claimState({ tiered: true, dispatchedAt: "2026-11-10T00:00:00Z" }), { kind: "unstick" });
+    assert.deepEqual(claimState({ ready: true, dispatchedAt: "2026-11-13T00:00:00Z" }), { kind: "unstick" });
+    assert.deepEqual(claimState({ ready: false, dispatchedAt: "2026-11-10T00:00:00Z" }), { kind: "unstick" });
   });
 });
 

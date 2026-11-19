@@ -20,9 +20,12 @@ const plan: BoardPlan = {
   unstick: [pr(1, { why: "CI red after 2 follow-up(s)" })],
   decide: [it(2, { why: "Keep it?", sub: "decide" })],
   triage: [it(3, { why: "sonnet", sub: "goAhead", tier: "sonnet", unready: true })],
-  notPicked: [
-    it(4, { why: "blocked by o/r#2", sub: "blocked" }),
-    it(5, { why: "`plan`; start a plan session by hand", unready: true }),
+  behind: [it(4, { why: "blocked by o/r#2", sub: "blocked" })],
+  // out of order: the board puts plan, then tier, then assigned
+  asks: [
+    it(9, { why: "assigned to @x but ready for an agent; unassign it or remove ready-for-agent", sub: "assigned", tier: "sonnet" }),
+    it(8, { why: "no tier label; add `haiku`, `sonnet` or `opus`", sub: "tier", unready: true }),
+    it(5, { why: "`plan`; start a plan session", sub: "plan", unready: true }),
   ],
   queue: [it(6, { tier: "haiku" }), it(7, { tier: "opus" })],
   review: [pr(10, { check: "green" })],
@@ -43,8 +46,7 @@ describe("buildBoard", () => {
   test("every plan item lands in exactly one stage", () => {
     const all = [
       ...stages.stuck,
-      ...stages.waiting.cards,
-      ...stages.waiting.parked,
+      ...stages.waiting,
       ...stages.queue,
       ...stages.prInProgress,
       ...stages.behind,
@@ -52,7 +54,7 @@ describe("buildBoard", () => {
     const left = 1; // the dispatched issue
     const total = Object.values(plan).reduce((n, xs) => n + xs.length, 0);
     assert.equal(all.length, total - left);
-    const keys = all.map((c) => `${c.repo}#${"number" in c ? c.number : ""}`);
+    const keys = all.map((c) => `${c.repo}#${c.number}`);
     assert.equal(new Set(keys).size, keys.length);
     assert.deepEqual(stages.closed, closed);
   });
@@ -60,16 +62,15 @@ describe("buildBoard", () => {
   test("stages", () => {
     assert.deepEqual(stages.stuck.map((c) => [c.kind, c.number]), [["pr", 1]]);
     assert.deepEqual(
-      stages.waiting.cards.map((c) => [c.number, c.sub ?? (c.needsReview && "review")]),
-      [[16, "afterMerge"], [10, "review"], [3, "goAhead"], [2, "decide"]],
+      stages.waiting.map((c) => [c.number, c.sub ?? (c.needsReview && "review")]),
+      [[16, "afterMerge"], [10, "review"], [3, "goAhead"], [2, "decide"], [5, "plan"], [8, "tier"], [9, "assigned"]],
     );
-    assert.deepEqual(stages.waiting.cards.find((c) => c.number === 16)?.prs, [40, 41]);
-    assert.deepEqual(stages.waiting.parked.map((p) => p.number), [5]);
+    assert.deepEqual(stages.waiting.find((c) => c.number === 16)?.prs, [40, 41]);
     assert.deepEqual(stages.queue.map((c) => c.number), [6, 7]);
     assert.deepEqual(stages.behind.map((c) => [c.number, c.sub]), [[4, "blocked"]]);
-    assert.equal(stages.waiting.cards.find((c) => c.number === 3)?.unready, true);
-    assert.equal(stages.waiting.parked[0].unready, true);
-    assert.equal(stages.waiting.cards.find((c) => c.number === 2)?.unready, undefined);
+    assert.equal(stages.waiting.find((c) => c.number === 3)?.unready, true);
+    assert.equal(stages.waiting.find((c) => c.number === 5)?.unready, true);
+    assert.equal(stages.waiting.find((c) => c.number === 2)?.unready, undefined);
   });
 
   test("PRs in progress: red, pending, then automerge", () => {
@@ -91,9 +92,10 @@ describe("render", () => {
   test("one module per stage, each holding its cards", () => {
     const ids = [...html.matchAll(/class="module m-(\w+)"/g)].map((m) => m[1]);
     assert.deepEqual(ids, ["stuck", "waiting", "closed", "pr", "queue", "behind"]);
-    const cards = { stuck: stages.stuck, waiting: stages.waiting.cards, closed: stages.closed, pr: stages.prInProgress, queue: stages.queue, behind: stages.behind };
+    const cards = { stuck: stages.stuck, waiting: stages.waiting, closed: stages.closed, pr: stages.prInProgress, queue: stages.queue, behind: stages.behind };
     for (const [id, cs] of Object.entries(cards)) for (const c of cs) assert.match(section(html, id), new RegExp(`>${c.title}</a>`), `${id}: ${c.title}`);
-    assert.match(section(html, "waiting"), /<summary>1 parked<\/summary>[\s\S]*>T5<\/a>/);
+    assert.match(section(html, "waiting"), />Plan<[\s\S]*>Tier\?<[\s\S]*>Assigned</);
+    assert.doesNotMatch(html, /parked/);
     assert.match(section(html, "waiting"), /<h2>Waiting for human<\/h2>/);
     assert.match(section(html, "waiting"), /href="https:\/\/github.com\/o\/r\/pull\/40"[^>]*>PR #40</);
     assert.match(section(html, "waiting"), />Needs review</);
@@ -105,13 +107,13 @@ describe("render", () => {
     const links = [...html.matchAll(/<a class="chip claude" href="([^"]+)"/g)].map((m) => new URL(m[1].replaceAll("&amp;", "&")));
     assert.deepEqual(
       links.map((u) => [u.origin + u.pathname, u.searchParams.get("repo"), u.searchParams.get("q")]),
-      [1, 16, 10, 3, 2, 5].map((n) => ["https://claude.ai/code/new", R, `Regarding ${R}#${n}: `]),
+      [1, 16, 10, 3, 2, 5, 8, 9].map((n) => ["https://claude.ai/code/new", R, `Regarding ${R}#${n}: `]),
     );
   });
 
   test("Stuck hides when empty; the other modules show an empty message", () => {
     const empty = buildBoard(
-      { review: [], unstick: [], decide: [], afterMerge: [], triage: [], inProgress: [], queue: [], notPicked: [], automerge: [] },
+      { review: [], unstick: [], decide: [], afterMerge: [], triage: [], asks: [], inProgress: [], queue: [], behind: [], automerge: [] },
       { generated: board.generated, repos: [R], closed: [] },
     );
     const h = render(empty, now);
@@ -147,18 +149,18 @@ describe("render", () => {
 });
 
 describe("labelSync", () => {
-  // Waiting for human here: #16 (after merge), #10 (review), #3 (go-ahead), #2 (decide); #5 is parked.
-  test("adds to every Waiting for human card, never to a parked one or another stage", () =>
-    assert.deepEqual(labelSync(board, []), [{ repo: R, add: [2, 3, 10, 16], remove: [] }]));
+  // Waiting for human here: #16 (after merge), #10 (review), #3 (go-ahead), #2 (decide), #5 (plan), #8 (tier), #9 (assigned).
+  test("adds to every Waiting for human card, never to another stage", () =>
+    assert.deepEqual(labelSync(board, []), [{ repo: R, add: [2, 3, 5, 8, 9, 10, 16], remove: [] }]));
 
   test("removes it from whatever else has it, and leaves cards that have it alone", () =>
     assert.deepEqual(
-      labelSync(board, [{ repo: R, number: 2 }, { repo: R, number: 5 }, { repo: R, number: 1 }, { repo: "O/R", number: 10 }]),
-      [{ repo: R, add: [3, 16], remove: [1, 5] }],
+      labelSync(board, [{ repo: R, number: 2 }, { repo: R, number: 4 }, { repo: R, number: 1 }, { repo: "O/R", number: 10 }]),
+      [{ repo: R, add: [3, 5, 8, 9, 16], remove: [1, 4] }],
     ));
 
   test("nothing to do, nothing listed; a repo the board doesn't cover is never touched", () => {
-    const all = [2, 3, 10, 16].map((number) => ({ repo: R, number }));
+    const all = [2, 3, 5, 8, 9, 10, 16].map((number) => ({ repo: R, number }));
     assert.deepEqual(labelSync(board, [...all, { repo: "o/other", number: 1 }]), []);
   });
 });

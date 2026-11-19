@@ -33,12 +33,9 @@ The stage for work the workshop can't move without the maintainer stepping in. T
 _Avoid_: Blocked, failed
 
 **Waiting for human**:
-The stage for work only the maintainer can move on: an after-merge step, a green PR to review, an issue that needs the go-ahead, and an open decision, in that order. Each run's last step mirrors it onto GitHub as the `waiting-for-human` label, which nothing reads back.
+The stage for work only the maintainer can move on: an after-merge step, a green PR to review, an issue that needs the go-ahead, an open decision, a `plan` issue that needs a plan session, an issue with no tier label, and an issue assigned by hand that also has `ready-for-agent`, in that order. An issue assigned by hand without `ready-for-agent` is the assignee's own work and is not on the board. Each run's last step mirrors it onto GitHub as the `waiting-for-human` label, which nothing reads back.
 
 **Behind another issue**:
 The stage, at the bottom of the board, for issues blocked by another open issue. Each moves on once its blocker closes, and nothing there needs the maintainer until then.
 _Avoid_: Blocked, on hold
 
-**Parked**:
-An issue the workshop deliberately won't pick up: a `plan`, no tier label, or assigned by hand. Parked items are counted under Waiting for human, not shown as cards that need you.
-_Avoid_: Skipped, ignored

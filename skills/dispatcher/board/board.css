@@ -154,8 +154,6 @@ main { max-width: 1080px; margin: 0 auto; }
 .card .title a:hover { text-decoration: underline; text-decoration-color: var(--holo); }
 .card .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .card .why { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
-.card.compact { gap: 5px; padding-block: 8px; }
-.card.compact .title { font-weight: 400; font-size: 14px; }
 
 /* every chip is the same rectangle; only its fill or outline changes */
 .chip { font: 600 11px/1 var(--f-mono); padding: 4px 7px; border-radius: var(--r); letter-spacing: .03em; border: 1px solid transparent; }
@@ -177,14 +175,8 @@ main { max-width: 1080px; margin: 0 auto; }
 .empty { grid-column: 1 / -1; font: 12px var(--f-mono); color: var(--muted); padding: 4px 0; letter-spacing: .04em; text-transform: uppercase; }
 .empty::before { content: "◦ "; color: var(--c); }
 
-/* the parked fold at the foot of Waiting for human */
-details.parked { margin: 14px 22px 0; padding: 8px 0 0; border-top: 1px dashed var(--seam); color: var(--muted); }
-details.parked summary { cursor: pointer; font: 600 13px var(--f-display); letter-spacing: .06em; text-transform: uppercase; }
-details.parked .stack { padding: 10px 0 0; }
-
 @media (max-width: 560px) {
   .module-head, .stack { padding-inline: 12px; }
-  details.parked { margin-inline: 12px; }
   .stack { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce) { .m-stuck .led { animation: none; } }

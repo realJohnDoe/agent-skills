@@ -68,7 +68,7 @@ The two decisions that change what lands on a default branch are in `scripts/dec
   - has no sub-issues;
   - has no open PR that closes it.
 
-  Every other open issue is somewhere else on the board (under its PR, Stuck, Waiting for human, Behind another issue), or parked under Waiting for human with its reason, so nothing is skipped silently. The reasons are `plan`, no tier label, and assigned by hand.
+  Every other open issue is somewhere else on the board (under its PR, Stuck, Waiting for human, Behind another issue), so nothing is skipped silently. A `plan` issue waits for human for a plan session, and one with no tier label for a tier. An issue assigned by hand (no dispatch marker) is the assignee's own work and is not on the board, unless it also has `ready-for-agent`: then it waits for human, to be unassigned or have the label removed.
 
   A PR for an issue with an `## After merge` section says `Refs #n`, which keeps the issue open after merge. An open PR that `Refs` an issue counts as linked to it, as one that closes it does. Once that PR has merged and no open one remains, the issue is Waiting for human, never dispatched again nor Stuck, until the maintainer closes it. Finding the merged PR reads the newest page of closed PRs, and only for issues that have the section.
 
