@@ -1,9 +1,9 @@
-// What the dispatch and pause scripts share: the digest repo, the pause state, and the
+// What the dispatch and pause scripts share: the home repo, the pause state, and the
 // check that each attached repo can be pushed to. The generic parts (arguments, `gh api`,
 // the attached repos) are in ../../_shared/.
 import { arg, run } from "../../_shared/cli.ts";
-import { all, type GhIssue, names } from "../../_shared/github.ts";
-import { PAUSE_LABEL, isDigest, marked } from "../../_shared/markers.ts";
+import { all, api, type GhIssue } from "../../_shared/github.ts";
+import { isPause, marked } from "../../_shared/markers.ts";
 import { type Repo, attachedRepos } from "../../_shared/repos.ts";
 
 export const FOOTER =
@@ -31,21 +31,24 @@ export type Item = {
   unready?: boolean; // an issue without `ready-for-agent`: the board links it to a Claude Code session
 };
 /**
- * The workshop config: `{digest, checkouts, repos: [{repo, name, path}]}`. `--digest
- * owner/repo` names the repo holding the digest issue; SKILL.md says which. The repos
- * are the ones attached to the session (../../_shared/repos.ts).
+ * The workshop config: `{home, checkouts, repos: [{repo, name, path}]}`. `--home
+ * owner/repo` names the home repo, which holds the pause issue, the can't-push issues and
+ * the board; SKILL.md says which. The repos are the ones attached to the session
+ * (../../_shared/repos.ts).
  */
-export const loadConfig = (): { digest: string; checkouts: string; repos: Repo[] } => ({
-  digest: digestArg(),
+export const loadConfig = (): { home: string; checkouts: string; repos: Repo[] } => ({
+  home: homeArg(),
   ...attachedRepos(),
 });
 
-// The `--digest owner/repo` argument, checked.
-export const digestArg = (): string => {
-  const digest = arg("--digest");
-  if (!digest || !/^[^/\s]+\/[^/\s]+$/.test(digest))
-    throw new Error("pass --digest owner/repo: the dispatcher's SKILL.md names the digest repo");
-  return digest;
+export const REPO_NAME = /^[^/\s]+\/[^/\s]+$/;
+
+// The `--home owner/repo` argument, checked.
+export const homeArg = (): string => {
+  if (arg("--digest")) throw new Error("--digest is retired: pass --home owner/repo");
+  const home = arg("--home");
+  if (!home || !REPO_NAME.test(home)) throw new Error("pass --home owner/repo: the dispatcher's SKILL.md names the home repo");
+  return home;
 };
 
 /**
@@ -89,42 +92,56 @@ export const preflight = (repos: Repo[]) => {
 };
 
 
-// normal: nothing to do. drain: the label is on a digest and the snapshot isn't
-// posted yet. paused: the snapshot is posted. resume: the label is gone and the
-// snapshot has no "resumed" comment after it.
+// normal: nothing to do. drain: a pause issue is open and no snapshot is posted since
+// the last resume. paused: it is. resume: no pause issue is open, and the one closed last
+// has a snapshot with no "resumed" comment after it.
 export type PauseState = "normal" | "drain" | "paused" | "resume";
 
-/** The open digest issues in the digest repo, oldest first; the newest is the digest. */
-export const openDigests = (DIGEST: string) =>
-  all<GhIssue>(`repos/${DIGEST}/issues?state=open&per_page=100`)
-    .filter((i) => !i.pull_request && isDigest(i.title))
-    .sort((a, b) => a.number - b.number);
+type Comment = { body: string; created_at: string; html_url?: string };
+export type PauseIssue = GhIssue & { closed_at?: string | null };
+export type Pause = {
+  state: PauseState;
+  issue?: PauseIssue; // where the next marker goes: the oldest open pause issue, or the one closed last
+  snap?: Comment; // the snapshot that pauses it, while paused or until resumed
+};
+
+// The latest snapshot in `comments` that no "resumed" comment follows.
+const unresumed = (comments: Comment[]) => {
+  const snap = comments.findLast((c) => marked(c, SNAPSHOT));
+  return snap && !comments.some((c) => marked(c, RESUMED) && c.created_at > snap.created_at) ? snap : undefined;
+};
 
 /**
- * The workshop's pause state, read from the digest issue: its label, its label event
- * and its marker comments. `digest` is that issue and `snap` the latest snapshot
- * comment on it; both are undefined when there is no digest.
+ * The pause state from the pause issues in the home repo, each with its comments in
+ * order. Pure; `readPause` does the reads. Every open pause issue counts as one pause, so
+ * a second one opened by mistake neither drains again nor resumes, and a pause issue
+ * reopened after a resume drains again.
  */
-export const readPause = (DIGEST: string) => {
-  const digest = openDigests(DIGEST).at(-1);
-  if (!digest) return { state: "normal" as PauseState };
-  const labelled = names(digest).includes(PAUSE_LABEL);
-  const comments = all<{ body: string; created_at: string; html_url?: string }>(
-    `repos/${DIGEST}/issues/${digest.number}/comments?per_page=100`,
+export const pauseState = (pauses: { issue: PauseIssue; comments: Comment[] }[]): Pause => {
+  const open = pauses.filter((p) => p.issue.state !== "closed").sort((a, b) => a.issue.number - b.issue.number);
+  if (open.length) {
+    const snap = unresumed(open.flatMap((p) => p.comments).sort((a, b) => a.created_at.localeCompare(b.created_at)));
+    return snap ? { state: "paused", issue: open[0].issue, snap } : { state: "drain", issue: open[0].issue };
+  }
+  const last = pauses.toSorted((a, b) => (a.issue.closed_at ?? "").localeCompare(b.issue.closed_at ?? "")).at(-1);
+  const snap = last && unresumed(last.comments);
+  return snap ? { state: "resume", issue: last.issue, snap } : { state: "normal" };
+};
+
+/**
+ * The workshop's pause state, read from the pause issues in the home repo: the open ones,
+ * or else the one closed last (from the newest page of closed issues), and their marker
+ * comments.
+ */
+export const readPause = (HOME: string): Pause => {
+  const pauseIssue = (i: GhIssue) => !i.pull_request && isPause(i.title);
+  let pauses: PauseIssue[] = all<GhIssue>(`repos/${HOME}/issues?state=open&per_page=100`).filter(pauseIssue);
+  if (!pauses.length)
+    pauses = api<PauseIssue[]>(`repos/${HOME}/issues?state=closed&sort=updated&direction=desc&per_page=100`)
+      .filter(pauseIssue)
+      .toSorted((a, b) => (a.closed_at ?? "").localeCompare(b.closed_at ?? ""))
+      .slice(-1);
+  return pauseState(
+    pauses.map((issue) => ({ issue, comments: all<Comment>(`repos/${HOME}/issues/${issue.number}/comments?per_page=100`) })),
   );
-  const snap = comments.findLast((c) => marked(c, SNAPSHOT));
-  const labeledAt = labelled
-    ? all<{ event: string; label: { name: string }; created_at: string }>(
-        `repos/${DIGEST}/issues/${digest.number}/events?per_page=100`,
-      ).findLast((e) => e.event === "labeled" && e.label.name === PAUSE_LABEL)?.created_at
-    : null;
-  const resumed = snap && comments.some((c) => marked(c, RESUMED) && c.created_at > snap.created_at);
-  const state: PauseState = labelled
-    ? snap && labeledAt && snap.created_at > labeledAt
-      ? "paused"
-      : "drain"
-    : snap && !resumed
-      ? "resume"
-      : "normal";
-  return { state, digest, snap };
 };

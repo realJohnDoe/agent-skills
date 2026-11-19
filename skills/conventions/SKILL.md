@@ -5,7 +5,7 @@ description: The labels and body sections the workshop dispatcher reads on issue
 
 # Conventions
 
-The `dispatcher` skill reads these labels and sections to decide what a session starts on and what waits for the maintainer. `../dispatcher/scripts/decide.ts` is the authority on how it reads them, with `../_shared/markers.ts` for what every skill reads (the digest, the pause label, marker comments, `Decision needed`, the can't-push issue); this skill is the authority on what to set. The `surveys` skill adds the survey labels, and a repo's own docs add labels of their own, such as Structra's `wayfinder:*`. A run that files many issues at once also follows `batch-findings.md` in this folder.
+The `dispatcher` skill reads these labels and sections to decide what a session starts on and what waits for the maintainer. `../dispatcher/scripts/decide.ts` is the authority on how it reads them, with `../_shared/markers.ts` for what every skill reads (the pause issue, marker comments, `Decision needed`, the can't-push issue); this skill is the authority on what to set. The `surveys` skill adds the survey labels, and a repo's own docs add labels of their own, such as Structra's `wayfinder:*`. A run that files many issues at once also follows `batch-findings.md` in this folder.
 
 When you ask the maintainer to do something by hand, in an issue, PR, notification or reply, link the page where they do it, e.g. `https://github.com/<owner>/<repo>/settings/secrets/actions`. Skip the link only where no stable URL exists.
 

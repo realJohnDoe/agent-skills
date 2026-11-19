@@ -16,7 +16,7 @@ import {
   type GhSearch,
   names,
 } from "../../_shared/github.ts";
-import { isDigest, marked } from "../../_shared/markers.ts";
+import { isWorkshopIssue, marked } from "../../_shared/markers.ts";
 import { type Blocker, bodyBlockers } from "./bodyBlockers.ts";
 import { afterMerge, ciRunning, DISPATCH, referencedIssues, type ResolvedBlocker, tierOf } from "./decide.ts";
 import type { Card } from "./board.ts";
@@ -128,7 +128,7 @@ export function fetchRepo(r: Repo): RepoSnapshot {
 
   const dispatchedAt = new Map(
     issues
-      .filter((i) => i.assignees.length && !linked.has(i.number) && !isDigest(i.title) && !(i.sub_issues_summary?.total ?? 0))
+      .filter((i) => i.assignees.length && !linked.has(i.number) && !isWorkshopIssue(i.title) && !(i.sub_issues_summary?.total ?? 0))
       .map((i) => [
         i.number,
         i.comments

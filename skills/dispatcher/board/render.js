@@ -97,7 +97,6 @@ export const render = (board, now = new Date()) => {
     `waiting for human <b>${s.waiting.cards.length}</b>`,
     `queue <b>${s.queue.length}</b>`,
     `behind another issue <b>${behind.length}</b>`,
-    link(board.digest, "digest"),
   ].join('<span class="sep"></span>');
   const parked = s.waiting.parked.length
     ? `<details class="parked"><summary>${s.waiting.parked.length} parked</summary><div class="stack">${s.waiting.parked.map(parkedCard).join("")}</div></details>`

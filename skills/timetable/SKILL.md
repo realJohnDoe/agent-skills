@@ -11,7 +11,7 @@ The `Timetable` routine fires twice a day and runs only this skill. The schedule
 
 ## The run
 
-1. `node <this skill's directory>/scripts/timetable.ts --digest realJohnDoe/agent-skills` prints the tick it computed from the UTC hour, whether the workshop is `paused`, the entries to `run` and the ones `held` by the pause. The tick is `am` before 12:00 UTC and `pm` from then on, so a manual run at any time counts as the tick it falls in. Don't work out the schedule yourself.
+1. `node <this skill's directory>/scripts/timetable.ts --home realJohnDoe/agent-skills` prints the tick it computed from the UTC hour, whether the workshop is `paused`, the entries to `run` and the ones `held` by the pause. The tick is `am` before 12:00 UTC and `pm` from then on, so a manual run at any time counts as the tick it falls in. Don't work out the schedule yourself.
 2. For each entry in `run` except `dispatcher`, start one background subagent with the `Agent` tool. Give it the entry's `prompt`, take `description` from its `skill`, and set `model` to its `model`.
 3. If `dispatcher` is in `run`, run the `dispatcher` skill in this session. It can't be a subagent: it starts its sessions as subagents, and a subagent can't start one. So its `model` is the one the routine runs on.
 4. Wait for every subagent to finish. A failing task doesn't stop the others. End with one line per task: its skill and how it ended.
@@ -22,7 +22,7 @@ The `Timetable` routine fires twice a day and runs only this skill. The schedule
 
 ## Pausing
 
-The `workshop-paused` label on an open digest (the `dispatcher` skill's **Pausing**) pauses every task. The timetable checks it once per tick. While it's on, only the dispatcher still runs, because it carries out the drain and the resume itself. The other due tasks are `held` and aren't made up later.
+An open `Pause workshop` issue in the home repo (the `dispatcher` skill's **Pausing**) pauses every task. The timetable checks for one once per tick. While one is open, only the dispatcher still runs, because it carries out the drain and the resume itself. The other due tasks are `held` and aren't made up later.
 
 ## Configuring
 

@@ -5,7 +5,7 @@
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type GhIssue, type GhPull, names } from "../../_shared/github.ts";
-import { cantPushRepo, isDigest, openQuestion } from "../../_shared/markers.ts";
+import { cantPushRepo, isWorkshopIssue, openQuestion } from "../../_shared/markers.ts";
 import {
   afterMerge,
   assertNever,
@@ -268,7 +268,7 @@ export function planRepo(s: RepoSnapshot, opts: PlanOptions): RepoPlan {
 
   // Claimed by a dispatch, still no PR: stuck.
   for (const i of issues.filter((i) => i.assignees.length && !linked.has(i.number))) {
-    if (isDigest(i.title) || cantPushRepo(i.body) || (i.sub_issues_summary?.total ?? 0) > 0 || doneStep(i)) continue;
+    if (isWorkshopIssue(i.title) || cantPushRepo(i.body) || (i.sub_issues_summary?.total ?? 0) > 0 || doneStep(i)) continue;
     const at = s.dispatchedAt.get(i.number) ?? null;
     const state = claimState({ tiered: !!tierOf(names(i)), dispatchedAt: at });
     switch (state.kind) {
