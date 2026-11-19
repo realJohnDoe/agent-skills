@@ -9,6 +9,7 @@ import { dirname, join } from "node:path";
 import { describe, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { fakeBin } from "../../_shared/fake-bin.ts";
+import { FOOTER } from "./lib.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const DIGEST = "realJohnDoe/agent-skills";
@@ -296,24 +297,60 @@ describe("dispatch --apply --digest-only", () => {
     assert.deepEqual(res.writes.filter(isOther), []);
   });
 
-  test("writes one draft, in the digest repo, and starts no session", () => {
+  test("creates the one digest issue, in the digest repo, and starts no session", () => {
     const digests = res.writes.filter((w) => w.method === "POST" && /^repos\/[^/]+\/[^/]+\/issues$/.test(w.path));
     assert.equal(digests.length, 1);
     assert.equal(digests[0].path, `repos/${DIGEST}/issues`);
-    assert.match(digests[0].body.title, /^Workshop digest \(draft\) — from /);
+    assert.equal(digests[0].body.title, "Workshop digest");
     assert.match(digests[0].body.body, /realJohnDoe\/meridian#13/);
     assert.deepEqual(res.plan.sessions, []);
     assert.deepEqual(res.plan.notStarted, []);
     assert.doesNotMatch(res.plan.digest.body, /\(dispatched\)/);
   });
 
-  test("publishes on a due day", () => {
-    const draft = issue(90, "Workshop digest (draft) — from 2026-11-10", [], { body: "<!-- digest-since: 2026-11-10 -->" });
-    const due = run("dispatch.ts", ["--digest-only"], world({ digestIssues: [draft], digestComments: { 90: [] } }), { apply: true });
+  const digestIssue = (n: number, title = "Workshop digest") => issue(n, title, [], { body: "<!-- digest-since: 2026-11-10 -->" });
+  const mergedSince = (at: string) => Object.fromEntries([M, T].map((r) => [`search/issues?q=repo:${r} is:pr is:merged merged:>=${at}`, { items: [] }]));
+  const published = (at: string) => ({ body: "<!-- workshop-published -->\nPublished: 0 to review", created_at: at, user: { login: "x", type: "User" } });
+
+  test("publishes on a due day with one comment: no new issue, retitle or close", () => {
+    const due = run("dispatch.ts", ["--digest-only"], world({ digestIssues: [digestIssue(90)], digestComments: { 90: [] } }), { apply: true });
     assert.equal(due.status, 0, due.stderr);
     assert.equal(due.plan.digest.publish, true);
     assert.deepEqual(due.writes.filter(isOther), []);
-    assert.ok(due.writes.some((w) => w.method === "PATCH" && /^Workshop digest — /.test(w.body?.title ?? "")));
+    assert.deepEqual(due.writes.filter((w) => w.path === `repos/${DIGEST}/issues`), []);
+    assert.equal(due.writes.filter((w) => w.body?.title || w.body?.state).length, 0);
+    const comments = due.writes.filter((w) => w.path === `repos/${DIGEST}/issues/90/comments`);
+    assert.equal(comments.length, 1);
+    assert.match(comments[0].body.body, /^<!-- workshop-published -->\nPublished: /);
+    assert.match(comments[0].body.body, /realJohnDoe\/meridian#13/);
+    assert.equal(due.plan.digest.issue, 90);
+  });
+
+  test("the window runs from the newest published comment, and a recent one means not due", () => {
+    const fresh = world({ digestIssues: [digestIssue(90)], digestComments: { 90: [published("2026-11-12T00:00:00Z")] }, extra: mergedSince("2026-11-12T00:00:00Z") });
+    const r = run("dispatch.ts", ["--digest-only"], fresh, { apply: true });
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(r.plan.digest.publish, false);
+    assert.deepEqual(r.writes.filter((w) => w.path.endsWith("/90/comments")), []);
+    const old = world({ digestIssues: [digestIssue(90)], digestComments: { 90: [published("2026-11-10T00:00:00Z")] }, extra: mergedSince("2026-11-10T00:00:00Z") });
+    assert.equal(run("dispatch.ts", ["--digest-only"], old).plan.digest.publish, true);
+  });
+
+  test("published comments are not relayed as replies", () => {
+    const r = run("dispatch.ts", ["--digest-only"], world({ digestIssues: [digestIssue(90)], digestComments: { 90: [{ ...published("2026-11-12T00:00:00Z"), body: `<!-- workshop-published -->\nhi${FOOTER}` }] }, extra: mergedSince("2026-11-12T00:00:00Z") }));
+    assert.deepEqual(r.plan.digest.replies, []);
+  });
+
+  test("two open digest issues: a dry run reports the migration and writes nothing; apply keeps the newest", () => {
+    const two = world({ digestIssues: [digestIssue(90, "Workshop digest — 2026-11-06"), digestIssue(91, "Workshop digest (draft) — from 2026-11-06")], digestComments: { 90: [], 91: [] } });
+    const dry = run("dispatch.ts", ["--digest-only"], two);
+    assert.deepEqual(dry.writes, []);
+    assert.equal(dry.plan.digest.issue, 91);
+    assert.deepEqual(dry.plan.digest.closes, [90]);
+    const applied = run("dispatch.ts", ["--digest-only"], two, { apply: true });
+    assert.ok(applied.writes.some((w) => w.method === "PATCH" && w.path === `repos/${DIGEST}/issues/91` && w.body.title === "Workshop digest"));
+    assert.ok(applied.writes.some((w) => w.method === "PATCH" && w.path === `repos/${DIGEST}/issues/90` && w.body.state === "closed" && w.body.state_reason === "completed"));
+    assert.match(applied.writes.find((w) => w.path === `repos/${DIGEST}/issues/90/comments`)!.body.body, /#91/);
   });
 
   test("without --apply it only prints", () => {
@@ -334,7 +371,7 @@ const withBoardRepo = ({ [`search/issues?q=repo:${M} repo:${T} is:issue is:close
 const ranDraft = (repos: string[], extra: Any = {}) =>
   world({
     digestIssues: [
-      issue(50, "Workshop digest (draft) — from 2026-11-10", extra.labels ?? [], {
+      issue(50, "Workshop digest", extra.labels ?? [], {
         body: `<!-- digest-since: 2026-11-10 -->\n<!-- digest-run: 2026-11-12T20:00:00.000Z -->\n<!-- digest-repos: ${repos.join(" ")} -->`,
       }),
     ],
