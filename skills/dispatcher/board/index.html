@@ -12,16 +12,15 @@
 <meta name="apple-mobile-web-app-title" content="Joe's Workshop">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
-<!-- board.yml swaps "dev" in these URLs for the commit, so a new deploy is never served from a browser cache -->
-<link rel="stylesheet" href="board.css?v=dev">
+<link rel="stylesheet" href="board.css">
 </head>
 <body>
 <header class="banner"><img src="banner.jpg" alt=""></header>
 <div class="banner-title"><h1>Joe's Workshop</h1></div>
-<p class="banner-sub">Every open issue and PR of the workshop, by stage. Read-only: decide on the digest.</p>
+<p class="banner-sub">Every open issue and PR of the workshop, by stage. Decide on the digest; ✳ opens a Claude session.</p>
 <main id="board"></main>
 <script type="module">
-import { render } from "./render.js?v=dev";
+import { render } from "./render.js";
 const main = document.getElementById("board");
 try {
   const res = await fetch("board.json", { cache: "no-store" });
