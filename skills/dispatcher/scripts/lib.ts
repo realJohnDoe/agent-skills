@@ -27,7 +27,7 @@ export type Item = {
   check?: "green" | "red" | "pending";
   automerge?: boolean;
   linkedPrs?: number[]; // the PRs an issue's step waits on
-  sub?: "decide" | "afterMerge" | "goAhead" | "blocked"; // why an issue waits
+  sub?: "decide" | "afterMerge" | "goAhead" | "plan" | "tier" | "assigned" | "blocked"; // why an issue waits
   unready?: boolean; // an issue without `ready-for-agent`: the board links it to a Claude Code session
 };
 /**

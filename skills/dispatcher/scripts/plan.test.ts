@@ -125,7 +125,7 @@ describe("planRepo", () => {
     assert.equal(p.decide.length, 1);
   });
 
-  test("a dispatched issue with no PR is Unstick; one with a PR is under its PR, never a new dispatch", () => {
+  test("a dispatched issue with no PR is Unstick; one with a PR is under its PR; one assigned by hand asks only while ready", () => {
     const assigned = { assignees: [{ login: "workshop-bot" }], comments: 1 };
     const p = planRepo(
       snap(M, {
@@ -133,23 +133,27 @@ describe("planRepo", () => {
           issue(60, "Dispatched with a PR", ["sonnet", "ready-for-agent"], assigned),
           issue(61, "Dispatched, still no PR", ["sonnet", "ready-for-agent"], assigned),
           issue(62, "Assigned by hand", ["sonnet", "ready-for-agent"], { assignees: [{ login: "someone" }] }),
+          issue(63, "Someone's own work", ["sonnet"], { assignees: [{ login: "someone" }] }),
+          issue(64, "Someone's own plan", ["plan"], { assignees: [{ login: "someone" }] }),
         ],
         prs: [pr(70, "Do 60", { body: "Fixes #60", runs: [], mergeable: true })],
-        dispatchedAt: { 61: "2026-11-13T10:00:00Z", 62: null },
+        dispatchedAt: { 61: "2026-11-13T10:00:00Z", 62: null, 63: null, 64: null },
       }),
       OPTS,
     );
     assert.deepEqual(p.unstick.map((i) => [i.ref, i.why]), [[`${M}#61`, "dispatched 2026-11-13, no PR yet; unassign to re-dispatch"]]);
     assert.deepEqual(p.inProgress.map((i) => i.ref), [`${M}#70`]);
-    assert.deepEqual(p.notPicked.map((i) => [i.ref, i.why]), [[`${M}#62`, "assigned to @someone; unassign to queue it"]]);
-    assert.deepEqual(p.dispatches, []);
+    assert.deepEqual(p.asks.map((i) => [i.ref, i.sub, i.why]), [
+      [`${M}#62`, "assigned", "assigned to @someone but ready for an agent; unassign it or remove ready-for-agent"],
+    ]);
+    assert.deepEqual([p.dispatches, p.behind, p.triage, p.decide], [[], [], [], []]);
   });
 
-  test("the workshop's can't-push issue is Stuck, never dispatched or parked", () => {
+  test("the workshop's can't-push issue is Stuck, never dispatched or waiting", () => {
     const body = `<!-- workshop-cant-push: ${T} -->\nThe workshop can't push to it.`;
     const p = planRepo(snap(M, { issues: [issue(70, `Workshop can't push to ${T}`, ["sonnet", "ready-for-agent"], { body })] }), OPTS);
     assert.deepEqual(p.unstick.map((i) => [i.ref, i.why]), [[`${M}#70`, `can't push to ${T}; give the routine push access, or detach it`]]);
-    assert.deepEqual([p.dispatches, p.notPicked, p.triage, p.decide], [[], [], [], []]);
+    assert.deepEqual([p.dispatches, p.behind, p.triage, p.decide, p.asks], [[], [], [], [], []]);
   });
 });
 
@@ -171,14 +175,14 @@ describe("an issue with an After merge step", () => {
 
   test("while its Refs PR is open it is in progress under the PR", () => {
     const b = board([pr(40, "Do the thing", { body: "Refs #30", runs: green, mergeable: true })], []);
-    assert.deepEqual(b.waiting.cards.map((c) => [c.number, c.needsReview]), [[40, true]]);
+    assert.deepEqual(b.waiting.map((c) => [c.number, c.needsReview]), [[40, true]]);
     assert.deepEqual(b.stuck, []);
     assert.deepEqual(b.behind.map((c) => [c.number, c.reason]), [[31, "blocked by realJohnDoe/meridian#30"]]);
   });
 
   test("once merged it waits on the maintainer with the step, never Stuck, past STALE_DAYS", () => {
     const b = board([], [pr(41, "Unrelated", { merged_at: "2026-11-12T00:00:00Z" }), pr(40, "Do the thing", { body: "Refs #30", merged_at: "2026-11-12T00:00:00Z" })]);
-    const [c] = b.waiting.cards;
+    const [c] = b.waiting;
     assert.deepEqual([c.number, c.sub, c.prs], [30, "afterMerge", [40]]);
     assert.match(c.reason, /^Switch the Pages source[^;]*; merged in \[realJohnDoe\/meridian#40\]/);
     assert.deepEqual(b.stuck, []);
@@ -187,7 +191,7 @@ describe("an issue with an After merge step", () => {
   test("with no merged PR for it, a dispatched one is Stuck", () => {
     const b = board([], []);
     assert.deepEqual(numbers(b.stuck), [30]);
-    assert.deepEqual(b.waiting.cards, []);
+    assert.deepEqual(b.waiting, []);
   });
 });
 
@@ -235,13 +239,20 @@ describe("the board of a run", () => {
   test("the board: red PRs first, the Dependabot PR waits for review", () => {
     const { stages } = buildBoard(run.board, { generated: NOW, repos: [M, T], closed: [] });
     assert.deepEqual(stages.prInProgress.map((c) => [c.number, c.check]), [[9, "red"], [21, "red"], [20, "green"]]);
-    assert.ok(stages.waiting.cards.some((c) => c.number === 8 && c.needsReview));
+    assert.ok(stages.waiting.some((c) => c.number === 8 && c.needsReview));
   });
 
   test("the board flags every open issue without ready-for-agent, and nothing else", () => {
     const { stages } = buildBoard(run.board, { generated: NOW, repos: [M, T], closed: [] });
-    const all = [...stages.stuck, ...stages.waiting.cards, ...stages.waiting.parked, ...stages.queue, ...stages.prInProgress, ...stages.behind];
+    const all = [...stages.stuck, ...stages.waiting, ...stages.queue, ...stages.prInProgress, ...stages.behind];
     assert.deepEqual(all.filter((c) => c.unready).map((c) => c.number).sort((a, b) => a - b), [12, 13, 14]);
+  });
+
+  test("every open non-draft PR shows on the board, once", () => {
+    const { stages } = buildBoard(run.board, { generated: NOW, repos: [M, T], closed: [] });
+    const all = [...stages.stuck, ...stages.waiting, ...stages.queue, ...stages.prInProgress, ...stages.behind];
+    const prs = all.filter((c) => c.kind === "pr").map((c) => `${c.repo}#${c.number}`).sort();
+    assert.deepEqual(prs, [`${M}#20`, `${M}#21`, `${T}#8`, `${T}#9`]);
   });
 
   test("at the end of a run nothing shows as dispatched", () =>
