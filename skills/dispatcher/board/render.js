@@ -18,6 +18,12 @@ const repoChip = (repo) => {
 };
 // No chip for `blocked`: those cards have a stage of their own, and their reason names the blocker.
 const SUB = { decide: "Decide", afterMerge: "After merge", goAhead: "Go ahead?" };
+// On an issue without `ready-for-agent`: index.html adds the label when it's pressed.
+/** @param {{ repo: string, number: number, unready?: boolean }} c */
+const readyButton = (c) =>
+  c.unready
+    ? `<button type="button" class="ready" data-repo="${esc(c.repo)}" data-number="${c.number}">Mark ready for agent</button>`
+    : "";
 const DAY = 864e5;
 
 /** @param {Card} c */
@@ -33,13 +39,13 @@ const card = (c) => {
   return `<article class="card">
 <div class="title">${link(c.url, c.title)}</div>
 <div class="row">${chips.join("")}</div>
-<div class="why">${esc(c.reason)}</div>
+<div class="why">${esc(c.reason)}</div>${readyButton(c)}
 </article>`;
 };
 /** @param {Parked} p */
 const parkedCard = (p) => `<article class="card compact">
 <div class="title">${link(p.url, p.title)}</div>
-<div class="row">${repoChip(p.repo)}<span class="chip ref">#${p.number}</span><span class="why">${esc(p.reason)}</span></div>
+<div class="row">${repoChip(p.repo)}<span class="chip ref">#${p.number}</span><span class="why">${esc(p.reason)}</span></div>${readyButton(p)}
 </article>`;
 /**
  * @param {string} id @param {string} name @param {string} hint @param {string[]} cards
