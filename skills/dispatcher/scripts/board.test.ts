@@ -21,7 +21,7 @@ const plan: BoardPlan = {
   decide: [it(2, { why: "Keep it?", sub: "decide" })],
   triage: [it(3, { why: "sonnet", sub: "goAhead", tier: "sonnet", unready: true })],
   notPicked: [
-    it(4, { why: "blocked by o/r#2", waiting: true, sub: "blocked" }),
+    it(4, { why: "blocked by o/r#2", sub: "blocked" }),
     it(5, { why: "`plan`; start a plan session by hand", unready: true }),
   ],
   queue: [it(6, { tier: "haiku" }), it(7, { tier: "opus" })],

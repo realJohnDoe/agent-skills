@@ -16,7 +16,6 @@ const DIGEST = "realJohnDoe/agent-skills";
 const M = "realJohnDoe/meridian";
 const T = "realJohnDoe/tracemap";
 const TODAY = "2026-11-13"; // a Friday
-const SINCE = "2026-11-10";
 
 type Any = any;
 const issue = (n: number, title: string, labels: string[], extra: Any = {}) => ({
@@ -56,7 +55,7 @@ const repoFixture = (repo: string, { issues, prs, labels = ALL_LABELS }: Any) =>
     [`repos/${repo}/issues`]: issues,
     [`repos/${repo}/pulls`]: prs.map(({ runs, mergeable, ...p }: Any) => p),
     [`repos/${repo}/labels`]: labels,
-    [`search/issues?q=repo:${repo} is:pr is:merged merged:>=${SINCE}`]: { items: [] },
+    [`search/issues?q=repo:${repo} is:pr is:merged merged:>=${TODAY}`]: { items: [] },
     [`repos/${repo}/commits/main`]: { sha: `${repo}-main` },
   };
   for (const p of prs) {
@@ -224,8 +223,7 @@ describe("dispatch apply", () => {
 
   test("merges pinned to the checked commit, then waits for GitHub and reads the repo again", () => {
     assert.deepEqual(writes("PUT", `repos/${M}/pulls/50/merge`).map((w) => w.body), [{ sha: "sha50", merge_method: "merge" }]);
-    assert.match(res.plan.digest.body, /meridian#50\]\(\S+\) Fix it \(closes realJohnDoe\/meridian#51 · sonnet, ready-for-agent\)/);
-    assert.doesNotMatch(res.plan.digest.body, /meridian#51\]\(\S+\)[^\n]*no PR yet/);
+    assert.ok(!res.plan.board.stages.stuck.some((c: Any) => c.repo === M && c.number === 51));
   });
 
   test("claims each session in its own repo, the one the merge unblocked included", () => {
@@ -244,10 +242,11 @@ describe("dispatch apply", () => {
 });
 
 describe("dispatch finish", () => {
-  // Two open digest issues, on a due day.
+  // Two open digest issues, and a can't-push issue for a repo it can push to again.
   const digestIssue = (n: number, title: string) => issue(n, title, [], { body: "<!-- digest-since: 2026-11-10 -->" });
+  const stale = issue(95, `Workshop can't push to ${T}`, [], { body: `<!-- workshop-cant-push: ${T} -->\nold` });
   const fixture = world({
-    digestIssues: [digestIssue(90, "Workshop digest — 2026-11-06"), digestIssue(91, "Workshop digest (draft) — from 2026-11-06")],
+    digestIssues: [digestIssue(90, "Workshop digest — 2026-11-06"), digestIssue(91, "Workshop digest (draft) — from 2026-11-06"), stale],
     digestComments: { 91: [] },
     extra: {
       ...labelled(M, [
@@ -264,20 +263,27 @@ describe("dispatch finish", () => {
     assert.equal(res.status, 0, res.stderr);
     assert.deepEqual(res.plan.sessions, []);
     assert.deepEqual(res.plan.notStarted, []);
-    assert.doesNotMatch(res.plan.digest.body, /\(dispatched\)/);
     assert.deepEqual(res.writes.filter((w) => !w.path.startsWith(`repos/${DIGEST}/`) && !/\/issues\/\d+\/labels/.test(w.path)), []);
   });
 
-  test("keeps the newest digest, retitles it, closes the other into it and publishes", () => {
+  test("keeps the newest digest, retitles it, rewrites its markers and closes the other into it", () => {
     const d = (path: string) => res.writes.filter((w) => w.path === `repos/${DIGEST}/issues/${path}`);
     assert.equal(d("91")[0].body.title, "Workshop digest");
-    assert.match(d("91")[0].body.body, /realJohnDoe\/meridian#13/);
+    assert.match(d("91")[0].body.body, new RegExp(`<!-- digest-repos: ${M} ${T} -->`));
+    assert.doesNotMatch(d("91")[0].body.body, /meridian#13/);
     assert.match(d("90/comments")[0].body.body, /#91/);
     assert.deepEqual([d("90")[0].body.state, d("90")[0].body.state_reason], ["closed", "completed"]);
-    assert.match(d("91/comments")[0].body.body, /^<!-- workshop-published -->\nPublished: /);
+    assert.deepEqual(d("91/comments"), []); // nothing is published
     assert.equal(res.writes.filter((w) => w.path === `repos/${DIGEST}/issues`).length, 0);
     assert.equal(res.plan.digest.issue, 91);
     assert.deepEqual(res.plan.digest.closes, [90]);
+  });
+
+  test("closes the can't-push issue of a repo it can push to again", () => {
+    const d = (path: string) => res.writes.filter((w) => w.path === `repos/${DIGEST}/issues/${path}`);
+    assert.deepEqual(res.plan.cantPush, { open: [], close: [{ repo: T, number: 95 }] });
+    assert.match(d("95/comments")[0].body.body, /can push to realJohnDoe\/tracemap again/);
+    assert.equal(d("95")[0].body.state, "closed");
   });
 
   test("mirrors the Waiting for human stage onto the label, closed items included, then starts the board workflow", () => {
@@ -414,7 +420,7 @@ describe("the repos are the ones attached", () => {
 });
 
 describe("dispatch apply on a repo it can't push to", () => {
-  test("skips it, lists it and puts it in the digest; the others go on", () => {
+  test("skips it and lists it; the others go on", () => {
     const res = run("dispatch.ts", ["apply"], world(), { apply: true, noPush: [M] });
     assert.equal(res.status, 0, res.stderr);
     assert.deepEqual(res.plan.unpushable.map((u: Any) => u.repo), [M]);
@@ -423,7 +429,28 @@ describe("dispatch apply on a repo it can't push to", () => {
     assert.ok(res.plan.sessions.length > 0);
     assert.ok(res.plan.sessions.every((s: Any) => s.repo === T));
     assert.ok(res.plan.automerge.every((m: Any) => m.repo === T));
-    assert.match(res.plan.digest.body, /## Unstick\n\n- \[ \] \*\*Can't push:\*\* \[realJohnDoe\/meridian\]/);
+  });
+});
+
+describe("dispatch finish on a repo it can't push to", () => {
+  const res = run("dispatch.ts", ["finish"], world({ digestIssues: [issue(91, "Workshop digest", [])], digestComments: { 91: [] } }), { apply: true, noPush: [M] });
+  const filed = res.writes.filter((w: Any) => w.path === `repos/${DIGEST}/issues`);
+
+  test("files one issue for it in the digest repo, with the marker the board reads", () => {
+    assert.equal(res.status, 0, res.stderr);
+    assert.deepEqual(res.plan.cantPush.open.map((u: Any) => u.repo), [M]);
+    assert.equal(filed.length, 1);
+    assert.equal(filed[0].body.title, `Workshop can't push to ${M}`);
+    assert.match(filed[0].body.body, new RegExp(`^<!-- workshop-cant-push: ${M} -->\nThe workshop can't push to ${M} \\(`));
+    assert.match(filed[0].body.body, /claude\.ai\/code\/scheduled/);
+  });
+
+  test("files none while one is open", () => {
+    const open = issue(96, `Workshop can't push to ${M}`, [], { body: `<!-- workshop-cant-push: ${M} -->` });
+    const again = run("dispatch.ts", ["finish"], world({ digestIssues: [issue(91, "Workshop digest", []), open], digestComments: { 91: [] } }), { apply: true, noPush: [M] });
+    assert.equal(again.status, 0, again.stderr);
+    assert.deepEqual(again.plan.cantPush, { open: [], close: [] });
+    assert.equal(again.writes.filter((w: Any) => w.path.startsWith(`repos/${DIGEST}/issues/96`) || w.path === `repos/${DIGEST}/issues`).length, 0);
   });
 });
 

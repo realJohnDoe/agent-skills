@@ -10,7 +10,7 @@ Load the `surveys` skill before starting: its conventions apply to every run.
 # Session Retro Survey
 
 The other surveys review the product. This one reviews **the agent sessions that
-build it**: the dispatcher starts them, and the maintainer reads only the digest, so
+build it**: the dispatcher starts them, and the maintainer reads only the board, so
 nobody else watches them. The goal: find the **top 5 changes to the agents'
 environment** (`CLAUDE.md`/`AGENTS.md`, the gates, the PR template, the survey
 skills, scripts, docs, the workshop's own skills) that would have stopped a bad

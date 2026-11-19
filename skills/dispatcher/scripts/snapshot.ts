@@ -18,7 +18,7 @@ import {
 } from "../../_shared/github.ts";
 import { isDigest, marked } from "../../_shared/markers.ts";
 import { type Blocker, bodyBlockers } from "./bodyBlockers.ts";
-import { afterMerge, ciRunning, DISPATCH, linkedIssues, referencedIssues, type ResolvedBlocker, tierOf } from "./decide.ts";
+import { afterMerge, ciRunning, DISPATCH, referencedIssues, type ResolvedBlocker, tierOf } from "./decide.ts";
 import type { Card } from "./board.ts";
 
 export type PrSnapshot = {
@@ -44,9 +44,6 @@ export type RepoSnapshot = {
   closed: GhPull[];
   // Each issue assigned with no open PR (and no sub-issues): when its dispatch marker was left.
   dispatchedAt: Map<number, string | null>;
-  // What merged in the digest's window, each with the issues it closes and their labels;
-  // empty when the caller builds no digest.
-  merged: { pr: GhPull; closes: { number: number; labels: string[] }[] }[];
   labels: string[]; // the repo's label names
 };
 
@@ -69,7 +66,7 @@ const lookup = ({ repo, number }: Blocker) => {
 
 export const sleep = (ms: number) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 
-export function fetchRepo(r: Repo, since: string, { merged }: { merged: boolean }): RepoSnapshot {
+export function fetchRepo(r: Repo): RepoSnapshot {
   const { repo } = r;
   const base = api<{ default_branch: string }>(`repos/${repo}`).default_branch;
   const issues = all<GhIssue>(`repos/${repo}/issues?state=open&per_page=100`).filter((i) => !i.pull_request);
@@ -151,19 +148,12 @@ export function fetchRepo(r: Repo, since: string, { merged }: { merged: boolean 
     blockers,
     closed,
     dispatchedAt,
-    merged: merged
-      ? mergedSince(repo, since)
-          .items.sort((a, b) => a.number - b.number)
-          .map((pr) => ({
-            pr,
-            closes: linkedIssues(pr.body).map((n) => ({ number: n, labels: names(api(`repos/${repo}/issues/${n}`)) })),
-          }))
-      : [],
     labels: all<{ name: string }>(`repos/${repo}/labels?per_page=100`).map((l) => l.name),
   };
 }
 
-// The PRs merged in a repo since a date, from the search index.
+// The PRs merged in a repo since a date, from the search index: `apply` waits for its
+// merges to show here before it reads the repo again.
 export function mergedSince(repo: string, since: string) {
   return api<GhSearch>("search/issues", "-X", "GET", "-f", `q=repo:${repo} is:pr is:merged merged:>=${since}`, "-f", "per_page=100");
 }

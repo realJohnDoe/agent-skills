@@ -18,11 +18,10 @@ export type Item = {
   title: string;
   why?: string;
   ask?: string;
-  waiting?: boolean; // Not picked up, but only counted in the digest
   issue?: number;
   pr?: number;
   created?: string;
-  // What the workshop board shows; the digest ignores them.
+  // What the workshop board shows beyond the line itself.
   kind?: "issue" | "pr";
   tier?: "haiku" | "sonnet" | "opus";
   check?: "green" | "red" | "pending";

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // The dispatcher's plan over every attached repo: which issues to start,
-// which PRs need a follow-up session or get merged, and the one shared digest.
+// which PRs need a follow-up session or get merged, and the digest issue that holds its state.
 // See ../SKILL.md.
 // Usage: node dispatch.ts <command> --digest owner/repo [--max-sessions N] [--max-followups N]
 //   [--today YYYY-MM-DD] [--repos o/r,...] [--checkouts dir]
@@ -9,13 +9,14 @@
 //     reads again each repo where something merged, and claims the sessions it starts. It
 //     does not write the digest.
 //   finish [--no-digest] [--dry-run]  the last step of a run, once the sessions have
-//     finished: starts nothing and merges nothing; writes the digest (not with --no-digest,
-//     drain's last step), puts `waiting-for-human` on exactly the board's Waiting for human
-//     cards and starts the board workflow. --dry-run prints the same and writes nothing.
+//     finished: starts nothing and merges nothing; writes the digest's markers (not with
+//     --no-digest, drain's last step, nor the next), opens and closes the can't-push issues, puts
+//     `waiting-for-human` on exactly the board's Waiting for human cards and starts the
+//     board workflow. --dry-run prints the same and writes nothing.
 //   board  prints the board for its workflow (.github/workflows/board.yml), which deploys it
 //     to Pages: it covers the repos the digest says the last run covered, needs no clones,
-//     builds no prompts or digest, writes nothing and checks no push access, so it runs on
-//     the Actions token.
+//     builds no prompts, writes nothing and checks no push access, so it runs on the
+//     Actions token.
 // Every command reads GitHub through snapshot.ts and plans with plan.ts, which does no I/O.
 import { all, api, type GhIssue, names, post } from "../../_shared/github.ts";
 import { arg, flag, main } from "../../_shared/cli.ts";
@@ -25,6 +26,7 @@ import { AUTOMERGE, DISPATCH, FOLLOWUP, linkedIssues } from "./decide.ts";
 import { digestArg, FOOTER, loadConfig, readPause, unpushable } from "./lib.ts";
 import { type LabelSync, WAITING_LABEL, buildBoard, labelSync } from "./board.ts";
 import { buildDigest, readDigest, writeDigest } from "./digest.ts";
+import { cantPushWrites, readCantPush, writeCantPush } from "./cantPush.ts";
 import { assemble, LABELS, type Merge, planRepo, type RepoPlan, type Session } from "./plan.ts";
 import { fetchClosed, fetchRepo, mergedSince, sleep } from "./snapshot.ts";
 
@@ -40,7 +42,7 @@ const BOARD_REPO = "realJohnDoe/agent-skills";
 const BOARD_WORKFLOW = "board.yml"; // builds the board and deploys it to Pages
 const MAX_SESSIONS = Number(arg("--max-sessions", 4)); // across all repos
 const TODAY = new Date(arg("--today", new Date().toISOString().slice(0, 10)));
-// When this run's digest window ends; a new digest's window starts here.
+// When this run ran, for the digest's marker and the board.
 const NOW = arg("--today") ? TODAY.toISOString() : new Date().toISOString();
 
 main(() => {
@@ -54,21 +56,21 @@ main(() => {
   const dry = cmd === "plan" || board || flag("--dry-run");
   const noDigest = flag("--no-digest");
 
-  // The digest's state is read first: its window bounds "merged since", and the board
-  // covers the repos the last run did, read from it, rather than attached clones.
+  // The board covers the repos the last run did, read from the digest, rather than
+  // attached clones.
   const DIGEST = digestArg();
   // Attached clones are read before any GitHub call, so a run started from the wrong
   // folder stops on that, not on a failed lookup.
   const attached = board ? [] : loadConfig().repos;
-  const state = readDigest(DIGEST, TODAY);
+  const state = readDigest(DIGEST);
   const repos = board ? coveredRepos(state.covered) : attached;
-  // A repo it can't push to gets no writes and a digest entry, not a stopped run.
+  // A repo it can't push to gets no writes and an issue in the digest repo, not a stopped run.
   // The board writes nothing, and runs on a token that can push to no other repo.
   const unpushableRepos = board ? [] : unpushable(repos);
   const noPush = new Set(unpushableRepos.map((u) => u.repo));
   const opts = { today: TODAY, followupsOnly: flag("--followups-only"), maxFollowups: Number(arg("--max-followups", 2)), staleDays: 2 };
   const read = (r: Repo): RepoPlan => {
-    const p = planRepo(fetchRepo(r, state.since, { merged: !board }), opts);
+    const p = planRepo(fetchRepo(r), opts);
     return noPush.has(r.repo) ? { ...p, automerge: [], followups: [], dispatches: [], missingLabels: [] } : p;
   };
 
@@ -79,11 +81,10 @@ main(() => {
     ...first.filter((p) => p.missingLabels.length).map((p) => ({ repo: p.repo, missing: p.missingLabels })),
     ...(digestLabels.includes(PAUSE_LABEL) ? [] : [{ repo: DIGEST, missing: [PAUSE_LABEL] }]),
   ];
-  const { plans, merged } = cmd === "apply" ? applyMerges(first, repos, missingLabels, automerge, read, state.since) : { plans: first, merged: [] };
+  const { plans, merged } = cmd === "apply" ? applyMerges(first, repos, missingLabels, automerge, read, TODAY.toISOString().slice(0, 10)) : { plans: first, merged: [] };
 
   const run = assemble(plans, {
     ...(cmd === "plan" || cmd === "apply" ? { maxSessions: MAX_SESSIONS } : {}),
-    unpushable: unpushableRepos,
     automerge: automerge.filter((m) => !merged.includes(m)).map((m) => m.item),
   });
   const boardOut = buildBoard(run.board, {
@@ -113,7 +114,9 @@ main(() => {
     return;
   }
 
-  const built = buildDigest(state, { ...run.digest, repos, today: TODAY, now: NOW, followupsOnly: opts.followupsOnly });
+  const body = buildDigest({ repos, now: NOW });
+  // One open issue per repo it can't push to; read dry or not, so the plan shows it.
+  const cantPush = finish && !noDigest ? cantPushWrites(readCantPush(DIGEST), unpushableRepos) : { open: [], close: [] };
   // The last step mirrors the Waiting for human stage onto GitHub as a label; never
   // in a repo it can't push to. Read dry or not, so the plan shows it.
   const waitingLabel: LabelSync[] = finish
@@ -131,17 +134,14 @@ main(() => {
   const digest = {
     repo: DIGEST,
     issue: state.issue?.number ?? null,
-    publishedComment: null as string | null,
     closes: state.older.map((i) => i.number), // older digest issues closed into the newest
-    publish: built.publish,
-    replies: state.replies,
-    counts: built.counts,
   };
 
   let refresh: { triggered: boolean; why?: string } | undefined;
   if (cmd === "apply") claim(run.sessions);
   if (finish && !dry) {
-    if (!noDigest) Object.assign(digest, writeDigest(state, built));
+    if (!noDigest) digest.issue = writeDigest(state, body);
+    if (!noDigest) writeCantPush(DIGEST, cantPush);
     // Each write on its own: one refused is logged and corrected on the next run.
     const write = (what: string, path: string, body: unknown, method?: string) => {
       try {
@@ -165,7 +165,8 @@ main(() => {
         sessions: run.sessions.map(({ created, item, brief, ...s }) => s),
         ...common,
         notStarted: run.notStarted,
-        digest: { ...digest, body: built.body },
+        digest: { ...digest, body },
+        cantPush,
         waitingLabel,
         board: boardOut,
         ...(refresh && { boardRefresh: refresh }),
@@ -180,14 +181,14 @@ main(() => {
 // green CI: merge it now, pinned to the head commit that was checked. (GitHub refuses to
 // *enable* auto-merge on a PR that is already mergeable.) A refused merge is logged and
 // retried on the next run, not fatal. A repo where something merged is read again, so
-// sessions and the digest see it.
+// the sessions see it.
 function applyMerges(
   first: RepoPlan[],
   repos: Repo[],
   missingLabels: { repo: string; missing: string[] }[],
   automerge: Merge[],
   read: (r: Repo) => RepoPlan,
-  since: string,
+  today: string, // the merges just made show in the search index from this date
 ): { plans: RepoPlan[]; merged: Merge[] } {
   for (const { repo, missing } of missingLabels)
     for (const name of missing) post(`repos/${repo}/labels`, { name, color: name === PAUSE_LABEL ? "fbca04" : LABELS[name] });
@@ -205,7 +206,7 @@ function applyMerges(
   // carry on, and the next run corrects it).
   const settled = (m: Merge) =>
     linkedIssues(m.body).every((n) => api<{ state: string }>(`repos/${m.repo}/issues/${n}`).state === "closed") &&
-    mergedSince(m.repo, since).items.some((i) => i.number === m.pr);
+    mergedSince(m.repo, today).items.some((i) => i.number === m.pr);
   for (let waited = 0; merged.some((m) => !settled(m)); waited += 3000) {
     if (waited >= 30000) {
       console.error("merge not yet reflected by GitHub after 30 s; reading anyway");

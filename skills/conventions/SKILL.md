@@ -5,9 +5,9 @@ description: The labels and body sections the workshop dispatcher reads on issue
 
 # Conventions
 
-The `dispatcher` skill reads these labels and sections to decide what a session starts on and what waits for the maintainer. `../dispatcher/scripts/decide.ts` is the authority on how it reads them, with `../_shared/markers.ts` for what every skill reads (the digest, the pause label, marker comments, `Decision needed`); this skill is the authority on what to set. The `surveys` skill adds the survey labels, and a repo's own docs add labels of their own, such as Structra's `wayfinder:*`. A run that files many issues at once also follows `batch-findings.md` in this folder.
+The `dispatcher` skill reads these labels and sections to decide what a session starts on and what waits for the maintainer. `../dispatcher/scripts/decide.ts` is the authority on how it reads them, with `../_shared/markers.ts` for what every skill reads (the digest, the pause label, marker comments, `Decision needed`, the can't-push issue); this skill is the authority on what to set. The `surveys` skill adds the survey labels, and a repo's own docs add labels of their own, such as Structra's `wayfinder:*`. A run that files many issues at once also follows `batch-findings.md` in this folder.
 
-When you ask the maintainer to do something by hand, in an issue, PR, digest, notification or reply, link the page where they do it, e.g. `https://github.com/<owner>/<repo>/settings/secrets/actions`. Skip the link only where no stable URL exists.
+When you ask the maintainer to do something by hand, in an issue, PR, notification or reply, link the page where they do it, e.g. `https://github.com/<owner>/<repo>/settings/secrets/actions`. Skip the link only where no stable URL exists.
 
 ## Filing an issue
 
@@ -28,9 +28,9 @@ When you ask the maintainer to do something by hand, in an issue, PR, digest, no
    - **Option B:** …
    ```
 
-   The digest shows the first paragraph, so make it stand alone. The section stays open until it gains a `**Decided:** <answer>` line, which the dispatcher's relay adds when the maintainer answers on the digest; any agent recording a decision ends it the same way.
+   The board shows the first paragraph, so make it stand alone. The section stays open until it gains a `**Decided:** <answer>` line, which the maintainer adds on the issue, or a session they start from the board's ✳ chip; any agent recording a decision ends it the same way.
 3. **Plan.** Work spanning several PRs that needs a plan first gets the `plan` label next to the tier label (the model the plan session runs on, usually `opus`). A `plan` issue is never dispatched: a person starts a plan session for it, which files the PRs' issues as sub-issues, each with its own tier.
-4. **After merge.** When an issue needs a manual step once its PR has merged (switching a Pages source, say), add an `## After merge` section whose first paragraph says what to do and links the page where it's done; the digest shows it. Whoever files the issue adds it, and an agent that discovers such a step adds it to the body. First check whether the PR can do the step itself: only what genuinely needs the maintainer goes there. The maintainer closes the issue once the step is done, and anything blocked by it waits until then.
+4. **After merge.** When an issue needs a manual step once its PR has merged (switching a Pages source, say), add an `## After merge` section whose first paragraph says what to do and links the page where it's done; the board shows it. Whoever files the issue adds it, and an agent that discovers such a step adds it to the body. First check whether the PR can do the step itself: only what genuinely needs the maintainer goes there. The maintainer closes the issue once the step is done, and anything blocked by it waits until then.
 5. **Order.** When one issue must wait for another, add a native blocked-by edge:
 
    ```sh
@@ -38,7 +38,7 @@ When you ask the maintainer to do something by hand, in an issue, PR, digest, no
    ```
 
    `<blocker-db-id>` is the blocker's numeric database id (`gh api repos/<owner>/<repo>/issues/<n> --jq .id`, or the `id` MCP `issue_write` returns), not its `#number`; the blocker may be in another repo. Use `gh api` because the GitHub MCP tools have no dependency tool, and it works where GraphQL is blocked. Check the edge with `gh api repos/<owner>/<repo>/issues/<blocked>/dependencies/blocked_by --jq '.[].html_url'`. Only where `gh api` can't reach GitHub at all, put a `Blocked by: #n` line (`owner/repo#n` across repos) at the top of the body. To make an issue part of a larger one, make it a sub-issue: MCP `issue_write` with `parent_issue_number`, or `sub_issue_write` afterwards.
-6. **Approval.** `ready-for-agent` is the maintainer's go-ahead and nothing is dispatched without it, so the issue waits under the digest's **Waiting on you** until they add it. Agents never add it; the one exception is the dispatcher relaying the maintainer's own `ready` reply.
+6. **Approval.** `ready-for-agent` is the maintainer's go-ahead and nothing is dispatched without it, so the issue waits under the board's **Waiting for human** until they add it. Agents never add it.
 
 ## Choosing a tier
 

@@ -1,11 +1,11 @@
 // The dispatcher's plan, without I/O: planRepo sorts one repo's RepoSnapshot (from
 // snapshot.ts) into what to start, merge and list, and assemble puts every repo's plan
-// together into the run: one session cap, the board's lists and the digest's. A session's
+// together into the run: one session cap and the board's lists. A session's
 // prompt is written only for the sessions the run starts. See ../SKILL.md.
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type GhIssue, type GhPull, names } from "../../_shared/github.ts";
-import { isDigest, openQuestion } from "../../_shared/markers.ts";
+import { cantPushRepo, isDigest, openQuestion } from "../../_shared/markers.ts";
 import {
   afterMerge,
   assertNever,
@@ -15,7 +15,6 @@ import {
   claimState,
   FAILED,
   issueState,
-  linkedIssues,
   prVerdict,
   READY,
   referencedIssues,
@@ -23,7 +22,6 @@ import {
 } from "./decide.ts";
 import type { Item } from "./lib.ts";
 import { type BoardPlan, WAITING_LABEL } from "./board.ts";
-import type { DigestPlan } from "./digest.ts";
 import type { RepoSnapshot } from "./snapshot.ts";
 
 export type PlanOptions = {
@@ -73,11 +71,9 @@ export type RepoPlan = {
   triage: Item[];
   decide: Item[];
   afterMerge: Item[];
-  merged: string[];
-  unblocks: Map<string, string[]>;
   missingLabels: string[];
 };
-type ListKey = Exclude<keyof RepoPlan, "repo" | "unblocks" | "missingLabels">;
+type ListKey = Exclude<keyof RepoPlan, "repo" | "missingLabels">;
 
 // Created in each repo on first contact if missing.
 export const LABELS: Record<string, string> = {
@@ -102,7 +98,6 @@ export function planRepo(s: RepoSnapshot, opts: PlanOptions): RepoPlan {
   const ref = (n: number) => `${repo}#${n}`;
   const byNumber = new Map(issues.map((i) => [i.number, i]));
   const linked = new Set(s.pulls.flatMap((p) => referencedIssues(p.body)));
-  const sameRepo = (r: string) => r.toLowerCase() === repo.toLowerCase();
   const stepIssues = issues.filter((i) => !linked.has(i.number) && afterMerge(i.body));
   const prsFor = (n: number) => s.closed.filter((p) => referencedIssues(p.body).includes(n));
   const item = (x: GhIssue | GhPull, extra: Partial<Item>): Item => ({
@@ -128,8 +123,6 @@ export function planRepo(s: RepoSnapshot, opts: PlanOptions): RepoPlan {
     triage: [],
     decide: [],
     afterMerge: [],
-    merged: [],
-    unblocks: new Map(),
     missingLabels: [],
   };
 
@@ -231,6 +224,7 @@ export function planRepo(s: RepoSnapshot, opts: PlanOptions): RepoPlan {
       blockers: blockers.get(i.number) ?? [],
       question: openQuestion(i.body),
       afterMerge: doneStep(i),
+      cantPush: cantPushRepo(i.body),
     });
     switch (st.kind) {
       case "afterMerge":
@@ -239,6 +233,9 @@ export function planRepo(s: RepoSnapshot, opts: PlanOptions): RepoPlan {
       case "dispatchable":
       case "elsewhere":
         break;
+      case "cantPush":
+        out.unstick.push(item(i, { issue: i.number, why: `can't push to ${st.repo}; give the routine push access, or detach it` }));
+        break;
       case "decision":
         out.decide.push(item(i, { issue: i.number, why: st.question, sub: "decide" }));
         break;
@@ -246,7 +243,7 @@ export function planRepo(s: RepoSnapshot, opts: PlanOptions): RepoPlan {
         out.triage.push(item(i, { issue: i.number, why: tierOf(names(i)), sub: "goAhead" }));
         break;
       case "blocked":
-        out.notPicked.push(item(i, { issue: i.number, why: blockedText(st.blockers), waiting: true, sub: "blocked" }));
+        out.notPicked.push(item(i, { issue: i.number, why: blockedText(st.blockers), sub: "blocked" }));
         break;
       case "notPicked":
         out.notPicked.push(item(i, { issue: i.number, why: st.reason }));
@@ -271,7 +268,7 @@ export function planRepo(s: RepoSnapshot, opts: PlanOptions): RepoPlan {
 
   // Claimed by a dispatch, still no PR: stuck.
   for (const i of issues.filter((i) => i.assignees.length && !linked.has(i.number))) {
-    if (isDigest(i.title) || (i.sub_issues_summary?.total ?? 0) > 0 || doneStep(i)) continue;
+    if (isDigest(i.title) || cantPushRepo(i.body) || (i.sub_issues_summary?.total ?? 0) > 0 || doneStep(i)) continue;
     const at = s.dispatchedAt.get(i.number) ?? null;
     const state = claimState({ tiered: !!tierOf(names(i)), dispatchedAt: at });
     switch (state.kind) {
@@ -293,21 +290,6 @@ export function planRepo(s: RepoSnapshot, opts: PlanOptions): RepoPlan {
     }
   }
 
-  // What finishing an ask frees: the open issues waiting on it (or, for a PR, on
-  // the issues it closes).
-  const unblocked = (done: number[]) =>
-    issues
-      .filter((i) => done.some((n) => blockers.get(i.number)?.some((b) => sameRepo(b.repo) && b.number === n)))
-      .map((i) => ref(i.number));
-  for (const pr of s.pulls) out.unblocks.set(ref(pr.number), unblocked(linkedIssues(pr.body)));
-  for (const i of issues) out.unblocks.set(ref(i.number), unblocked([i.number]));
-
-  // What merged in this digest's window, each with the issue it closed and its labels.
-  out.merged = s.merged.map(({ pr, closes }) => {
-    const c = closes.map((x) => `${ref(x.number)} · ${x.labels.join(", ")}`);
-    return `- [${ref(pr.number)}](${pr.html_url}) ${pr.title}${c.length ? ` (closes ${c.join("; ")})` : ""}`;
-  });
-
   out.missingLabels = Object.keys(LABELS).filter((l) => !s.labels.includes(l));
   return out;
 }
@@ -316,22 +298,14 @@ export type Run = {
   sessions: Session[];
   notStarted: string[]; // past the session cap
   board: BoardPlan;
-  digest: Pick<
-    DigestPlan,
-    "review" | "unstick" | "decide" | "afterMerge" | "triage" | "inProgress" | "queue" | "notPicked" | "merged" | "unblocksOf"
-  >;
 };
 
 /**
  * Every repo's plan as one run. `maxSessions` caps the sessions it starts across all
  * repos; without it the run starts none and lists nothing as not started (the end of a
- * run, and the board). `unpushable` repos head the digest's Unstick; `automerge` is the
- * automerge PRs still open after this run's merges.
+ * run, and the board). `automerge` is the automerge PRs still open after this run's merges.
  */
-export function assemble(
-  plans: RepoPlan[],
-  { maxSessions, unpushable, automerge }: { maxSessions?: number; unpushable: { repo: string; reason: string }[]; automerge: Item[] },
-): Run {
+export function assemble(plans: RepoPlan[], { maxSessions, automerge }: { maxSessions?: number; automerge: Item[] }): Run {
   const pick = <K extends ListKey>(k: K): RepoPlan[K] => plans.flatMap((p) => p[k] as unknown[]) as RepoPlan[K];
   // Follow-ups first: finishing beats starting. Follow-ups go newest PR first and
   // dispatches newest issue first, each across every repo.
@@ -347,27 +321,19 @@ export function assemble(
     ...followups.slice(cap).map((s) => ({ ...s.item, why: "follow-up next run" })),
     ...pick("inProgress"),
   ];
-  const lists = {
-    review: pick("review"),
-    decide: pick("decide"),
-    afterMerge: pick("afterMerge"),
-    triage: pick("triage"),
-    inProgress,
-    queue,
-    notPicked: pick("notPicked"),
-  };
   return {
     sessions,
     notStarted: maxSessions === undefined ? [] : [...followups, ...dispatches].slice(cap).map((s) => `${s.repo}: ${s.title}`),
-    board: { ...lists, unstick: pick("unstick"), automerge },
-    digest: {
-      ...lists,
-      unstick: [
-        ...unpushable.map((u) => ({ repo: u.repo, ref: u.repo, url: `https://github.com/${u.repo}`, title: u.reason, ask: "Can't push:" })),
-        ...pick("unstick"),
-      ],
-      merged: pick("merged"),
-      unblocksOf: new Map(plans.flatMap((p) => [...p.unblocks])),
+    board: {
+      review: pick("review"),
+      decide: pick("decide"),
+      afterMerge: pick("afterMerge"),
+      triage: pick("triage"),
+      inProgress,
+      queue,
+      notPicked: pick("notPicked"),
+      unstick: pick("unstick"),
+      automerge,
     },
   };
 }
