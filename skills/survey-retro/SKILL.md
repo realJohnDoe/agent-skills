@@ -42,7 +42,7 @@ trailer in its commits. It tags each PR with the signals it can read from GitHub
 
 | Signal | Read from |
 |---|---|
-| `red-ci` | a failed Actions run on the PR's head branch |
+| `red-ci` | a failed Actions run on the PR's head branch, started before the PR closed |
 | `not-run` | the PR body says it did not run, re-run, re-measure, verify or test something |
 | `follow-up` | another PR in the window fixes the same issue, or the title says follow-up |
 | `reverted` | a later PR titled `Revert "<this title>"` |

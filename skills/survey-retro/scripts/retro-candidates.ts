@@ -17,12 +17,11 @@ main(() => {
   const since = arg("--since");
   if (!repo || !since) throw new Error("usage: --repo owner/repo --since YYYY-MM-DD");
   const prs = sessionPrs(repo, since);
-  const red = new Set(
-    pages<string>(
-      `repos/${repo}/actions/runs?status=failure&created=>=${since}`,
-      (r) => r.workflow_runs.map((w: { head_branch: string }) => w.head_branch),
-      () => false,
-    ),
+  // A run started once the PR closed (a `closed`-event cleanup job) says nothing about the session.
+  const failed = pages<{ head_branch: string; created_at: string }>(
+    `repos/${repo}/actions/runs?status=failure&created=>=${since}`,
+    (r) => r.workflow_runs,
+    () => false,
   );
   const issueCount: Record<string, number> = {};
   for (const p of prs) for (const n of fixes(p.body)) issueCount[n] = (issueCount[n] ?? 0) + 1;
@@ -30,7 +29,7 @@ main(() => {
   const rows = prs
     .map((p) => {
       const s = [];
-      if (red.has(p.ref)) s.push("red-ci");
+      if (failed.some((w) => w.head_branch === p.ref && (!p.closedAt || w.created_at < p.closedAt))) s.push("red-ci");
       if (NOT_RUN.test(p.body)) s.push("not-run");
       if (fixes(p.body).some((n) => issueCount[n] > 1) || /follow-?up/i.test(p.title)) s.push("follow-up");
       if (reverted.includes(p.title)) s.push("reverted");

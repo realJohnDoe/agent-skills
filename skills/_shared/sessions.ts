@@ -2,7 +2,7 @@
 // surveys chooser counts them as the retro's activity.
 import { api, pages } from "./github.ts";
 
-type Pr = { number: number; title: string; body: string; ref: string; abandoned: boolean; created: string };
+type Pr = { number: number; title: string; body: string; ref: string; abandoned: boolean; created: string; closedAt: string | null };
 
 const SESSION = /session_[A-Za-z0-9]{20,}/;
 
@@ -21,6 +21,7 @@ export const sessionPrs = (repo: string, since: string) =>
         ref: p.head.ref,
         abandoned: p.state === "closed" && !p.merged_at,
         created: p.created_at.slice(0, 10),
+        closedAt: p.closed_at,
       })),
     (p) => p.created < since,
   )
