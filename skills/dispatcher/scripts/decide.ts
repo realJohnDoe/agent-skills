@@ -4,7 +4,7 @@
 
 import type { Blocker } from "./bodyBlockers.ts";
 import type { GhCheckRun, GhComment, GhReview } from "../../_shared/github.ts";
-import { isDigest, marked, notRunSentence, sectionParagraph } from "../../_shared/markers.ts";
+import { isWorkshopIssue, marked, notRunSentence, sectionParagraph } from "../../_shared/markers.ts";
 
 export const TIERS = ["haiku", "sonnet", "opus"];
 // A plan spanning several PRs, never dispatched. Orthogonal to the tier, which
@@ -47,7 +47,7 @@ const days = (today: Date, iso: string) => (+today - +new Date(iso)) / 864e5;
 /**
  * What the workshop does with an open issue, the first matching rule winning:
  * - `dispatchable`: start a session on it
- * - `elsewhere`: shown by its PR or Stuck, or is the digest itself, not as an issue
+ * - `elsewhere`: shown by its PR or Stuck, or is one of the workshop's own (a pause issue), not as an issue
  * - `cantPush`: the workshop's own issue saying it can't push to `repo`: Stuck
  * - `decision`: Waiting for human, with its open question
  * - `afterMerge`: Waiting for human, with its manual step: its PR has merged
@@ -87,7 +87,7 @@ export type IssueFacts = {
 
 export const issueState = (issue: IssueFacts): IssueState => {
   const l = issue.labels;
-  if (isDigest(issue.title) || issue.subIssues > 0) return { kind: "elsewhere" };
+  if (isWorkshopIssue(issue.title) || issue.subIssues > 0) return { kind: "elsewhere" };
   if (issue.cantPush) return { kind: "cantPush", repo: issue.cantPush };
   if (issue.linked) return { kind: "elsewhere" };
   // Assigned by the dispatch that made its PR, but the work is done: never again.

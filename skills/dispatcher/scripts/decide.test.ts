@@ -2,7 +2,7 @@
 // scripts/workshop-dispatch.ts made them before the move (realJohnDoe/meridian#1434).
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { isDigest, openQuestion } from "../../_shared/markers.ts";
+import { isPause, isWorkshopIssue, openQuestion } from "../../_shared/markers.ts";
 import {
   afterMerge,
   claimState,
@@ -40,10 +40,18 @@ test("tierOf picks the first tier label", () => {
   assert.equal(tierOf(["opus-plan"]), undefined);
 });
 
-test("isDigest matches workshop and pre-rename farm digests", () => {
-  assert.ok(isDigest("Workshop digest (draft) — from 2026-11-10"));
-  assert.ok(isDigest("Farm digest — 2026-01-02"));
-  assert.ok(!isDigest("Fix the Workshop digest layout"));
+test("isPause matches the pause issue's title, whatever follows it", () => {
+  assert.ok(isPause("Pause workshop"));
+  assert.ok(isPause("pause workshop for the holidays"));
+  assert.ok(!isPause("Fix the Pause workshop notice"));
+  assert.ok(!isPause("Pause workshops"));
+});
+
+test("the workshop's own issues: pause issues, and the retired digest until it is closed", () => {
+  assert.ok(isWorkshopIssue("Pause workshop"));
+  assert.ok(isWorkshopIssue("Workshop digest (draft) — from 2026-11-10"));
+  assert.ok(isWorkshopIssue("Farm digest — 2026-01-02"));
+  assert.ok(!isWorkshopIssue("Fix the Workshop digest layout"));
 });
 
 const ELSEWHERE = { kind: "elsewhere" };
@@ -72,8 +80,9 @@ describe("issueState", () => {
   });
 
   describe("shown elsewhere", () => {
-    test("a digest issue", () =>
-      assert.deepEqual(issueState(issue({ title: "Workshop digest (draft) — from x" })), ELSEWHERE));
+    test("a pause issue", () => assert.deepEqual(issueState(issue({ title: "Pause workshop" })), ELSEWHERE));
+    test("the retired digest issue", () =>
+      assert.deepEqual(issueState(issue({ title: "Workshop digest" })), ELSEWHERE));
     test("has sub-issues", () =>
       assert.deepEqual(issueState(issue({ subIssues: 2 })), ELSEWHERE));
     test("an open PR closes it", () =>
@@ -125,9 +134,9 @@ describe("issueState", () => {
   });
 
   describe("order: the first matching reason wins", () => {
-    test("digest before everything", () =>
+    test("a pause issue before everything", () =>
       assert.deepEqual(
-        issueState(issue({ title: "Workshop digest — x", labels: [], blockers: [1] })),
+        issueState(issue({ title: "Pause workshop", labels: [], blockers: [1] })),
         ELSEWHERE,
       ));
     test("plan beats a tier label", () =>

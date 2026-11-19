@@ -8,7 +8,7 @@ A re-run mostly re-derives findings that are already open. Search the open paren
 
 ## Where
 
-File each finding in the repo whose files the fix changes, even when the parent is elsewhere; a sub-issue may be in another repo. A fix to the workshop's shared files (the dispatcher's prompts, these conventions, the survey skills) goes in the workshop's own repo, the digest repo the `dispatcher` skill names.
+File each finding in the repo whose files the fix changes, even when the parent is elsewhere; a sub-issue may be in another repo. A fix to the workshop's shared files (the dispatcher's prompts, these conventions, the survey skills) goes in the workshop's own repo, the home repo the `dispatcher` skill names.
 
 ## Fields
 

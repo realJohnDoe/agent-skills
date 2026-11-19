@@ -1,8 +1,10 @@
 # Builds the workshop board from GitHub and deploys it to Pages, so the board shows
 # manual changes (merges, labels, closed issues) between dispatcher runs. The build is
 # `dispatch.ts board`, which only reads, so the Actions token is enough: every
-# workshop repo is public. It covers the repos the last dispatcher run covered, which the
-# digest names, so the workshop's repo list lives only in the Timetable routine.
+# workshop repo is public. It covers the repos the last dispatcher run covered and shows
+# when that run was: the run's last step passes both as this workflow's inputs, and every
+# other build carries them over from the live board.json. So the workshop's repo list
+# lives only in the Timetable routine.
 # See skills/dispatcher/SKILL.md, "Developing".
 #
 # Runs every half hour, which picks up changes in every workshop repo; on this repo's
@@ -30,6 +32,13 @@ on:
       - skills/_shared/**
       - .github/workflows/board.yml
   workflow_dispatch:
+    inputs:
+      last_run:
+        description: When the dispatcher run that started this ran (ISO time). Empty keeps the live board's.
+        required: false
+      repos:
+        description: The repos that run covered, space-separated owner/name. Empty keeps the live board's.
+        required: false
 
 permissions:
   contents: read
@@ -59,8 +68,13 @@ jobs:
         id: board
         env:
           GH_TOKEN: ${{ github.token }}
+          LAST_RUN: ${{ inputs.last_run }}
+          REPOS: ${{ inputs.repos }}
         run: |
-          node skills/dispatcher/scripts/dispatch.ts board --digest "$GITHUB_REPOSITORY" > plan.json
+          args=()
+          if [ -n "$LAST_RUN" ]; then args+=(--last-run "$LAST_RUN"); fi
+          if [ -n "$REPOS" ]; then args+=(--repos-covered "$REPOS"); fi
+          node skills/dispatcher/scripts/dispatch.ts board --home "$GITHUB_REPOSITORY" "${args[@]}" > plan.json
           mkdir _site
           cp -r skills/dispatcher/board/. _site/
           jq .board plan.json > _site/board.json

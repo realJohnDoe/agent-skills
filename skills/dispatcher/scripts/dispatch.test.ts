@@ -12,7 +12,7 @@ import { fileURLToPath } from "node:url";
 import { fakeBin } from "../../_shared/fake-bin.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const DIGEST = "realJohnDoe/agent-skills";
+const HOME = "realJohnDoe/agent-skills";
 const M = "realJohnDoe/meridian";
 const T = "realJohnDoe/tracemap";
 const TODAY = "2026-11-13"; // a Friday
@@ -69,12 +69,14 @@ const repoFixture = (repo: string, { issues, prs, labels = ALL_LABELS }: Any) =>
   return f;
 };
 
+// `homeIssues` are the home repo's open issues, `homeClosed` its newest closed ones, and
+// `homeComments` the comments on any of them, by number.
 const world = ({
-  digestIssues = [],
-  digestComments = {},
-  digestLabels = [{ name: "workshop-paused" }],
+  homeIssues = [],
+  homeClosed = [],
+  homeComments = {},
   extra = {},
-}: { digestIssues?: Any[]; digestComments?: Any; digestLabels?: Any[]; extra?: Any } = {}) => ({
+}: { homeIssues?: Any[]; homeClosed?: Any[]; homeComments?: Any; extra?: Any } = {}) => ({
   ...repoFixture(M, {
     issues: [
       issue(10, "Meridian sonnet task", ["sonnet", "ready-for-agent"], { created_at: "2026-10-01T00:00:00Z" }),
@@ -112,10 +114,10 @@ const world = ({
     { event: "cross-referenced", source: { issue: { number: 8, pull_request: { merged_at: "2026-11-12T01:00:00Z" } } } },
     { event: "cross-referenced", source: { issue: { number: 9, pull_request: { merged_at: null } } } },
   ],
-  [`repos/${DIGEST}/issues`]: digestIssues,
-  [`repos/${DIGEST}/labels`]: digestLabels,
+  [`repos/${HOME}/issues`]: homeIssues,
+  [`repos/${HOME}/issues?state=closed`]: homeClosed,
   ...Object.fromEntries(
-    Object.entries(digestComments).map(([n, cs]) => [`repos/${DIGEST}/issues/${n}/comments`, cs]),
+    Object.entries(homeComments).map(([n, cs]) => [`repos/${HOME}/issues/${n}/comments`, cs]),
   ),
   ...extra,
 });
@@ -152,7 +154,7 @@ const run = (
   writeFileSync(gitLog, "");
   const res = spawnSync(
     process.execPath,
-    [join(here, script), ...args, "--today", TODAY, "--digest", DIGEST, "--checkouts", checkouts, ...(apply && script === "pause.ts" ? ["--apply"] : [])],
+    [join(here, script), ...args, "--today", TODAY, "--home", HOME, "--checkouts", checkouts, ...(apply && script === "pause.ts" ? ["--apply"] : [])],
     {
       encoding: "utf8",
       env: {
@@ -173,7 +175,7 @@ const run = (
 
 // Waiting for human in world(): meridian#13 (decide), meridian#14 (go-ahead), tracemap#8 (review).
 const labelled = (repo: string, items: Any[]) => ({ [`repos/${repo}/issues?labels=waiting-for-human&state=all&per_page=100`]: items });
-const BOARD_RUN = { method: "POST", path: `repos/${DIGEST}/actions/workflows/board.yml/dispatches`, body: { ref: "main" } };
+const BOARD_RUN = { method: "POST", path: `repos/${HOME}/actions/workflows/board.yml/dispatches`, body: { ref: "main" } };
 const labelWrites = (r: Any) => r.writes.filter((w: Any) => /\/issues\/\d+\/labels/.test(w.path)).map((w: Any) => `${w.method} ${w.path}`);
 
 describe("dispatch plan", () => {
@@ -188,7 +190,6 @@ describe("dispatch plan", () => {
     assert.deepEqual(res.plan.notStarted, [`${M}: meridian#10 Meridian sonnet task`, `${T}: tracemap#3 Tracemap haiku task`]);
     assert.deepEqual(res.plan.automerge, [{ repo: M, pr: 20, sha: "sha20", title: "Meridian green automerge" }]);
     assert.deepEqual(res.plan.missingLabels, [{ repo: T, missing: ["opus", "plan", "automerge", "preview", "waiting-for-human"] }]);
-    assert.match(res.plan.digest.body, /\nRepos covered: realJohnDoe\/meridian, realJohnDoe\/tracemap\.\n/);
     assert.deepEqual(res.plan.waitingLabel, []);
   });
 
@@ -234,66 +235,78 @@ describe("dispatch apply", () => {
     assert.equal(writes("POST", `repos/${T}/issues/3/assignees`).length, 0);
   });
 
-  test("writes no digest and no waiting-for-human label: that is finish's", () => {
-    assert.equal(res.writes.filter((w) => w.path.startsWith(`repos/${DIGEST}/`)).length, 0);
+  test("writes nothing in the home repo and no waiting-for-human label: that is finish's", () => {
+    assert.equal(res.writes.filter((w) => w.path.startsWith(`repos/${HOME}/`)).length, 0);
     assert.deepEqual(labelWrites(res), []);
     assert.deepEqual(res.plan.waitingLabel, []);
   });
 });
 
 describe("dispatch finish", () => {
-  // Two open digest issues, and a can't-push issue for a repo it can push to again.
-  const digestIssue = (n: number, title: string) => issue(n, title, [], { body: "<!-- digest-since: 2026-11-10 -->" });
+  // The retired digest issues, and a can't-push issue for a repo it can push to again.
   const stale = issue(95, `Workshop can't push to ${T}`, [], { body: `<!-- workshop-cant-push: ${T} -->\nold` });
-  const fixture = world({
-    digestIssues: [digestIssue(90, "Workshop digest — 2026-11-06"), digestIssue(91, "Workshop digest (draft) — from 2026-11-06"), stale],
-    digestComments: { 91: [] },
-    extra: {
-      ...labelled(M, [
-        issue(13, "Meridian needs a call", ["sonnet", "waiting-for-human"]),
-        issue(10, "Meridian sonnet task", ["sonnet", "ready-for-agent", "waiting-for-human"]),
-        issue(5, "Closed since", ["waiting-for-human"], { state: "closed" }),
-      ]),
-      ...labelled(T, []),
-    },
-  });
+  const digests = [issue(90, "Workshop digest — 2026-11-06", []), issue(91, "Workshop digest", [])];
+  const waiting = {
+    ...labelled(M, [
+      issue(13, "Meridian needs a call", ["sonnet", "waiting-for-human"]),
+      issue(10, "Meridian sonnet task", ["sonnet", "ready-for-agent", "waiting-for-human"]),
+      issue(5, "Closed since", ["waiting-for-human"], { state: "closed" }),
+    ]),
+    ...labelled(T, []),
+  };
+  const fixture = world({ homeIssues: [...digests, stale], extra: waiting });
   const res = run("dispatch.ts", ["finish"], fixture, { apply: true });
+  const d = (r: Any, path: string) => r.writes.filter((w: Any) => w.path === `repos/${HOME}/issues/${path}`);
 
   test("starts nothing and merges nothing", () => {
     assert.equal(res.status, 0, res.stderr);
     assert.deepEqual(res.plan.sessions, []);
     assert.deepEqual(res.plan.notStarted, []);
-    assert.deepEqual(res.writes.filter((w) => !w.path.startsWith(`repos/${DIGEST}/`) && !/\/issues\/\d+\/labels/.test(w.path)), []);
+    assert.deepEqual(res.writes.filter((w) => !w.path.startsWith(`repos/${HOME}/`) && !/\/issues\/\d+\/labels/.test(w.path)), []);
   });
 
-  test("keeps the newest digest, retitles it, rewrites its markers and closes the other into it", () => {
-    const d = (path: string) => res.writes.filter((w) => w.path === `repos/${DIGEST}/issues/${path}`);
-    assert.equal(d("91")[0].body.title, "Workshop digest");
-    assert.match(d("91")[0].body.body, new RegExp(`<!-- digest-repos: ${M} ${T} -->`));
-    assert.doesNotMatch(d("91")[0].body.body, /meridian#13/);
-    assert.match(d("90/comments")[0].body.body, /#91/);
-    assert.deepEqual([d("90")[0].body.state, d("90")[0].body.state_reason], ["closed", "completed"]);
-    assert.deepEqual(d("91/comments"), []); // nothing is published
-    assert.equal(res.writes.filter((w) => w.path === `repos/${DIGEST}/issues`).length, 0);
-    assert.equal(res.plan.digest.issue, 91);
-    assert.deepEqual(res.plan.digest.closes, [90]);
+  test("closes the retired digest issues with a comment, and opens no pause issue for unpaused ones", () => {
+    assert.deepEqual(res.plan.retire, { close: [90, 91], openPause: false });
+    for (const n of [90, 91]) {
+      assert.match(d(res, `${n}/comments`)[0].body.body, /Retired/);
+      assert.deepEqual([d(res, `${n}`)[0].body.state, d(res, `${n}`)[0].body.state_reason], ["closed", "completed"]);
+    }
+    assert.equal(res.writes.filter((w) => w.path === `repos/${HOME}/issues`).length, 0);
+  });
+
+  test("a retired digest that pauses the workshop gets a pause issue first, so closing it doesn't resume", () => {
+    const paused = run("dispatch.ts", ["finish"], world({ homeIssues: [issue(91, "Workshop digest", ["workshop-paused"])], extra: waiting }), { apply: true });
+    assert.equal(paused.status, 0, paused.stderr);
+    assert.deepEqual(paused.plan.retire, { close: [91], openPause: true });
+    const home = paused.writes.filter((w: Any) => w.path.startsWith(`repos/${HOME}/issues`)).map((w: Any) => w.path);
+    assert.deepEqual(home, [`repos/${HOME}/issues`, `repos/${HOME}/issues/91/comments`, `repos/${HOME}/issues/91`]);
+    assert.equal(paused.writes.find((w: Any) => w.path === `repos/${HOME}/issues`).body.title, "Pause workshop");
+  });
+
+  test("a retired digest that pauses the workshop opens none while a pause issue is open", () => {
+    const both = world({ homeIssues: [issue(91, "Workshop digest", ["workshop-paused"]), issue(92, "Pause workshop", [])], homeComments: { 92: [] }, extra: waiting });
+    const r = run("dispatch.ts", ["finish"], both, { apply: true });
+    assert.equal(r.status, 0, r.stderr);
+    assert.deepEqual(r.plan.retire, { close: [91], openPause: false });
   });
 
   test("closes the can't-push issue of a repo it can push to again", () => {
-    const d = (path: string) => res.writes.filter((w) => w.path === `repos/${DIGEST}/issues/${path}`);
     assert.deepEqual(res.plan.cantPush, { open: [], close: [{ repo: T, number: 95 }] });
-    assert.match(d("95/comments")[0].body.body, /can push to realJohnDoe\/tracemap again/);
-    assert.equal(d("95")[0].body.state, "closed");
+    assert.match(d(res, "95/comments")[0].body.body, /can push to realJohnDoe\/tracemap again/);
+    assert.equal(d(res, "95")[0].body.state, "closed");
   });
 
-  test("mirrors the Waiting for human stage onto the label, closed items included, then starts the board workflow", () => {
+  test("mirrors the Waiting for human stage onto the label, closed items included, then starts the board workflow with this run", () => {
     assert.deepEqual(labelWrites(res).sort(), [
       `DELETE repos/${M}/issues/10/labels/waiting-for-human`,
       `DELETE repos/${M}/issues/5/labels/waiting-for-human`,
       `POST repos/${M}/issues/14/labels`,
       `POST repos/${T}/issues/8/labels`,
     ]);
-    assert.deepEqual(res.writes.at(-1), BOARD_RUN);
+    const inputs = { last_run: "2026-11-13T00:00:00.000Z", repos: `${M} ${T}` };
+    assert.deepEqual(res.writes.at(-1), { ...BOARD_RUN, body: { ref: "main", inputs } });
+    assert.deepEqual(res.plan.boardInputs, inputs);
+    assert.equal(res.plan.board.lastRun, inputs.last_run);
     assert.deepEqual(res.plan.boardRefresh, { triggered: true });
   });
 
@@ -302,7 +315,8 @@ describe("dispatch finish", () => {
     assert.equal(dry.status, 0, dry.stderr);
     assert.equal(dry.plan.applied, false);
     assert.deepEqual(dry.plan.waitingLabel, res.plan.waitingLabel);
-    assert.equal(dry.plan.digest.body, res.plan.digest.body);
+    assert.deepEqual(dry.plan.retire, res.plan.retire);
+    assert.deepEqual(dry.plan.boardInputs, res.plan.boardInputs);
     assert.equal(dry.plan.boardRefresh, undefined);
   });
 
@@ -313,53 +327,66 @@ describe("dispatch finish", () => {
     assert.deepEqual(blocked.plan.waitingLabel.map((s: Any) => s.repo), [M]);
   });
 
-  test("--no-digest, drain's last step: only the label and the board workflow", () => {
-    const drain = run("dispatch.ts", ["finish", "--no-digest"], fixture, { apply: true });
+  test("--no-run-marker, drain's last step: only the label, and the board workflow with no run", () => {
+    const drain = run("dispatch.ts", ["finish", "--no-run-marker"], world({ homeIssues: [stale], extra: waiting }), { apply: true });
     assert.equal(drain.status, 0, drain.stderr);
     assert.deepEqual(drain.writes.filter((w) => !/\/issues\/\d+\/labels/.test(w.path) && w.path !== BOARD_RUN.path), []);
     assert.deepEqual(drain.writes.at(-1), BOARD_RUN);
+    assert.equal(drain.plan.boardInputs, null);
+    assert.equal(drain.plan.board.lastRun, undefined);
   });
 });
 
 describe("dispatch board, the board workflow's build", () => {
   // As in the workflow: only agent-skills is checked out, nothing can be pushed to, and
-  // the digest, as a run leaves it, names the repos to cover. The workshop is paused.
+  // the live board, as the last build left it, names the repos to cover. The workshop is paused.
   const snapshot = { body: "<!-- workshop-snapshot -->\nWorkshop paused.", created_at: "2026-11-13T00:00:00Z", html_url: "https://github.com/x/issues/50#c1", user: { login: "b", type: "User" } };
-  const { [`search/issues?q=repo:${M} repo:${T} is:issue is:closed reason:completed`]: _, ...w } = world({
-    digestIssues: [
-      issue(50, "Workshop digest", ["workshop-paused"], {
-        body: `<!-- digest-since: 2026-11-10 -->\n<!-- digest-run: 2026-11-12T20:00:00.000Z -->\n<!-- digest-repos: ${DIGEST} ${M} ${T} -->`,
-      }),
-    ],
-    digestComments: { 50: [snapshot] },
-    extra: { [`repos/${DIGEST}/issues/50/events`]: [{ event: "labeled", label: { name: "workshop-paused" }, created_at: "2026-11-12T00:00:00Z" }] },
-  }) as Any;
-  // No merged-since search in the fixture: the board builds no digest, so it reads none.
+  const PAGES = "https://realjohndoe.github.io/agent-skills/";
+  const { [`search/issues?q=repo:${M} repo:${T} is:issue is:closed reason:completed`]: closedMT, ...w } = world({ homeComments: { 50: [snapshot] } }) as Any;
+  // No merged-since search in the fixture: the board reads none.
   const fixture = {
-    ...Object.fromEntries(Object.entries({ ...repoFixture(DIGEST, { issues: [], prs: [] }), ...w }).filter(([k]) => !k.includes("is:merged"))),
-    [`search/issues?q=repo:${DIGEST} repo:${M} repo:${T} is:issue is:closed reason:completed`]: { items: [] },
+    ...Object.fromEntries(Object.entries({ ...repoFixture(HOME, { issues: [], prs: [] }), ...w }).filter(([k]) => !k.includes("is:merged"))),
+    [`repos/${HOME}/issues`]: [issue(50, "Pause workshop", [])],
+    [`search/issues?q=repo:${HOME} repo:${M} repo:${T} is:issue is:closed reason:completed`]: { items: [] },
+    [`repos/${HOME}/pages`]: { html_url: PAGES },
+    [`${PAGES}board.json`]: { repos: [HOME, M, T], lastRun: "2026-11-12T20:00:00.000Z", stages: {} },
   };
-  const res = run("dispatch.ts", ["board"], fixture, { apply: true, missing: [M, T], noPush: [DIGEST] });
+  const res = run("dispatch.ts", ["board"], fixture, { apply: true, missing: [M, T], noPush: [HOME] });
 
-  test("covers the repos the digest names, not the clones, and shows the run and the pause", () => {
+  test("with no inputs, covers the repos and shows the run the live board has, not the clones, and shows the pause", () => {
     assert.equal(res.status, 0, res.stderr);
-    assert.deepEqual(res.plan.repos, [DIGEST, M, T]);
+    assert.deepEqual(res.plan.repos, [HOME, M, T]);
     assert.equal(res.plan.board.lastRun, "2026-11-12T20:00:00.000Z");
     assert.equal(res.plan.board.state, "paused");
     assert.deepEqual(res.plan.board.paused, { since: "2026-11-13", snapshot: "https://github.com/x/issues/50#c1" });
+    assert.ok(!("digest" in res.plan.board));
   });
 
-  test("writes nothing, checks no push access, and prints no sessions or digest", () => {
+  test("with inputs, covers and shows those instead", () => {
+    const given = { ...fixture, [`search/issues?q=repo:${M} repo:${T} is:issue is:closed reason:completed`]: closedMT };
+    const r = run("dispatch.ts", ["board", "--repos-covered", `${M} ${T}`, "--last-run", "2026-11-13T17:00:00.000Z"], given, { missing: [M, T] });
+    assert.equal(r.status, 0, r.stderr);
+    assert.deepEqual(r.plan.repos, [M, T]);
+    assert.equal(r.plan.board.lastRun, "2026-11-13T17:00:00.000Z");
+  });
+
+  test("writes nothing, checks no push access, and prints no sessions", () => {
     assert.deepEqual(res.writes, []);
     assert.equal(res.gitCalls.some((c) => c.args.includes("--dry-run")), false);
     assert.deepEqual(res.plan.unpushable, []);
-    for (const k of ["sessions", "notStarted", "digest", "boardRefresh"]) assert.ok(!(k in res.plan), k);
+    for (const k of ["sessions", "notStarted", "retire", "boardRefresh"]) assert.ok(!(k in res.plan), k);
   });
 
-  test("a digest that names no repos yet stops it with why", () => {
+  test("no inputs and no live board stops it with why", () => {
     const fresh = run("dispatch.ts", ["board"], world());
     assert.equal(fresh.status, 1);
-    assert.match(fresh.stderr, /names no covered repos yet/);
+    assert.match(fresh.stderr, /no covered repos: pass --repos-covered, or run the dispatcher once first/);
+  });
+
+  test("an input that isn't a repo stops it", () => {
+    const bad = run("dispatch.ts", ["board", "--repos-covered", "meridian", "--last-run", "2026-11-13T17:00:00.000Z"], world());
+    assert.equal(bad.status, 1);
+    assert.match(bad.stderr, /not owner\/repo: meridian/);
   });
 });
 
@@ -372,15 +399,16 @@ describe("the command line", () => {
     assert.equal(retired.status, 1);
     assert.match(retired.stderr, /--apply, --digest-only: not an option of `dispatch\.ts finish`/);
     assert.match(run("dispatch.ts", ["board", "--dry-run"], world()).stderr, /--dry-run: not an option/);
+    assert.match(run("dispatch.ts", ["finish", "--no-digest"], world()).stderr, /--no-digest: not an option/);
   });
 });
 
 describe("the repos are the ones attached", () => {
-  test("a repo that isn't attached isn't covered, and the digest says which are", () => {
+  test("a repo that isn't attached isn't covered, and the plan says which are", () => {
     const res = run("dispatch.ts", ["plan"], world(), { missing: [T] });
     assert.equal(res.status, 0, res.stderr);
     assert.deepEqual(res.plan.repos, [M]);
-    assert.match(res.plan.digest.body, /\nRepos covered: realJohnDoe\/meridian\.\n/);
+    assert.deepEqual(res.plan.board.repos, [M]);
   });
   test("--repos naming a repo that isn't attached stops the run", () => {
     const res = run("dispatch.ts", ["plan", "--repos", T], world(), { missing: [T] });
@@ -388,10 +416,12 @@ describe("the repos are the ones attached", () => {
     assert.match(res.stderr, /--repos names repos not checked out under .*: realjohndoe\/tracemap/);
     assert.equal(res.stdout, "");
   });
-  test("no --digest stops the run", () => {
+  test("no --home stops the run, and the retired --digest says so", () => {
     const res = spawnSync(process.execPath, [join(here, "dispatch.ts"), "plan"], { encoding: "utf8" });
     assert.equal(res.status, 1);
-    assert.match(res.stderr, /pass --digest owner\/repo/);
+    assert.match(res.stderr, /pass --home owner\/repo/);
+    const old = spawnSync(process.execPath, [join(here, "dispatch.ts"), "plan", "--digest", HOME], { encoding: "utf8" });
+    assert.match(old.stderr, /--digest is retired: pass --home owner\/repo/);
   });
   test("run from inside the skill's folder without --checkouts stops the run", () => {
     // An installed plugin's skill folder isn't a git clone, so copy the scripts out of this one.
@@ -399,7 +429,7 @@ describe("the repos are the ones attached", () => {
     const skillDir = join(skills, "dispatcher");
     cpSync(here, join(skillDir, "scripts"), { recursive: true });
     cpSync(join(here, "..", "..", "_shared"), join(skills, "_shared"), { recursive: true });
-    const res = spawnSync(process.execPath, [join(skillDir, "scripts", "dispatch.ts"), "plan", "--digest", DIGEST], {
+    const res = spawnSync(process.execPath, [join(skillDir, "scripts", "dispatch.ts"), "plan", "--home", HOME], {
       cwd: skillDir,
       encoding: "utf8",
       env: { ...process.env, WORKSHOP_CHECKOUTS: "" },
@@ -433,10 +463,10 @@ describe("dispatch apply on a repo it can't push to", () => {
 });
 
 describe("dispatch finish on a repo it can't push to", () => {
-  const res = run("dispatch.ts", ["finish"], world({ digestIssues: [issue(91, "Workshop digest", [])], digestComments: { 91: [] } }), { apply: true, noPush: [M] });
-  const filed = res.writes.filter((w: Any) => w.path === `repos/${DIGEST}/issues`);
+  const res = run("dispatch.ts", ["finish"], world(), { apply: true, noPush: [M] });
+  const filed = res.writes.filter((w: Any) => w.path === `repos/${HOME}/issues`);
 
-  test("files one issue for it in the digest repo, with the marker the board reads", () => {
+  test("files one issue for it in the home repo, with the marker the board reads", () => {
     assert.equal(res.status, 0, res.stderr);
     assert.deepEqual(res.plan.cantPush.open.map((u: Any) => u.repo), [M]);
     assert.equal(filed.length, 1);
@@ -447,26 +477,17 @@ describe("dispatch finish on a repo it can't push to", () => {
 
   test("files none while one is open", () => {
     const open = issue(96, `Workshop can't push to ${M}`, [], { body: `<!-- workshop-cant-push: ${M} -->` });
-    const again = run("dispatch.ts", ["finish"], world({ digestIssues: [issue(91, "Workshop digest", []), open], digestComments: { 91: [] } }), { apply: true, noPush: [M] });
+    const again = run("dispatch.ts", ["finish"], world({ homeIssues: [open] }), { apply: true, noPush: [M] });
     assert.equal(again.status, 0, again.stderr);
     assert.deepEqual(again.plan.cantPush, { open: [], close: [] });
-    assert.equal(again.writes.filter((w: Any) => w.path.startsWith(`repos/${DIGEST}/issues/96`) || w.path === `repos/${DIGEST}/issues`).length, 0);
+    assert.equal(again.writes.filter((w: Any) => w.path.startsWith(`repos/${HOME}/issues/96`) || w.path === `repos/${HOME}/issues`).length, 0);
   });
 });
 
 describe("pause over two repos", () => {
-  const draft = { number: 50, title: "Workshop digest (draft) — from 2026-11-10", labels: [{ name: "workshop-paused" }], body: "" };
-  const fixture = world({
-    digestIssues: [draft],
-    digestComments: { 50: [] },
-    extra: {
-      [`repos/${DIGEST}/issues/50/events`]: [
-        { event: "labeled", label: { name: "workshop-paused" }, created_at: "2026-11-12T00:00:00Z" },
-      ],
-    },
-  });
+  const fixture = world({ homeIssues: [issue(50, "Pause workshop", [])], homeComments: { 50: [] } });
 
-  test("the label on the shared digest drains every repo", () => {
+  test("an open pause issue drains every repo", () => {
     const res = run("pause.ts", [], fixture);
     assert.equal(res.status, 0, res.stderr);
     assert.equal(res.plan.state, "drain");
@@ -475,11 +496,12 @@ describe("pause over two repos", () => {
     assert.match(res.plan.plan.snapshot, /\*\*realJohnDoe\/tracemap\*\*/);
   });
 
-  test("apply posts the one snapshot on the digest, last", () => {
+  test("apply posts the one snapshot on the pause issue, last", () => {
     const res = run("pause.ts", [], fixture, { apply: true });
     assert.equal(res.status, 0, res.stderr);
-    assert.equal(res.writes.at(-1).path, `repos/${DIGEST}/issues/50/comments`);
+    assert.equal(res.writes.at(-1).path, `repos/${HOME}/issues/50/comments`);
     assert.match(res.writes.at(-1).body.body, /workshop-snapshot/);
+    assert.match(res.writes.at(-1).body.body, /Close this issue to resume the workshop\./);
   });
 
   test("stops on a repo it can't push to before writing anything", () => {
@@ -489,14 +511,20 @@ describe("pause over two repos", () => {
     assert.deepEqual(res.writes, []);
   });
 
-  test("without a digest the workshop runs normally", () => {
+  test("paused: writes nothing", () => {
+    const snap = { body: "<!-- workshop-snapshot -->", created_at: "2026-11-12T00:00:00Z" };
+    const res = run("pause.ts", [], world({ homeIssues: [issue(50, "Pause workshop", [])], homeComments: { 50: [snap] } }), { apply: true });
+    assert.equal(res.plan.state, "paused");
+    assert.deepEqual(res.writes, []);
+  });
+
+  test("without a pause issue the workshop runs normally", () => {
     const res = run("pause.ts", [], world());
     assert.equal(res.plan.state, "normal");
   });
 });
 
 describe("pause drain closes red PRs", () => {
-  const draft = { number: 50, title: "Workshop digest (draft) — from 2026-11-10", labels: [{ name: "workshop-paused" }], body: "" };
   const linkedIssue = (n: number, tier: string) =>
     issue(n, `Issue ${n}`, [tier, "ready-for-agent"], { assignees: [{ login: "workshop-bot" }] });
   const prs = [
@@ -507,14 +535,9 @@ describe("pause drain closes red PRs", () => {
   ];
   const issues = [60, 62, 63].map((n) => linkedIssue(n, "sonnet")).concat(linkedIssue(61, "opus"));
   const w: Any = world({
-    digestIssues: [draft],
-    digestComments: { 50: [] },
-    extra: {
-      [`repos/${DIGEST}/issues/50/events`]: [
-        { event: "labeled", label: { name: "workshop-paused" }, created_at: "2026-11-12T00:00:00Z" },
-      ],
-      ...Object.fromEntries(issues.map((i) => [`repos/${M}/issues/${i.number}`, i])),
-    },
+    homeIssues: [issue(50, "Pause workshop", [])],
+    homeComments: { 50: [] },
+    extra: Object.fromEntries(issues.map((i) => [`repos/${M}/issues/${i.number}`, i])),
   });
   Object.assign(w, repoFixture(M, { issues, prs }));
   const res = run("pause.ts", [], w, { apply: true });
@@ -546,11 +569,13 @@ describe("pause drain closes red PRs", () => {
 
 describe("pause resume", () => {
   const snap = { body: "<!-- workshop-snapshot -->", created_at: "2026-11-12T00:00:00Z" };
-  const res = run("pause.ts", [], world({ digestIssues: [{ number: 50, title: "Workshop digest (draft) — from 2026-11-10", labels: [], body: "" }], digestComments: { 50: [snap] } }), { apply: true });
+  const closed = issue(50, "Pause workshop", [], { state: "closed", closed_at: "2026-11-13T00:00:00Z" });
+  const res = run("pause.ts", [], world({ homeClosed: [closed], homeComments: { 50: [snap] } }), { apply: true });
 
-  test("only posts the resumed comment", () => {
+  test("only posts the resumed comment, on the closed pause issue", () => {
+    assert.equal(res.status, 0, res.stderr);
     assert.equal(res.plan.state, "resume");
-    assert.deepEqual(res.writes.map((w) => w.path), [`repos/${DIGEST}/issues/50/comments`]);
+    assert.deepEqual(res.writes.map((w) => w.path), [`repos/${HOME}/issues/50/comments`]);
     assert.match(res.writes[0].body.body, /workshop-resumed/);
   });
 });

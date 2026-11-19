@@ -1,11 +1,10 @@
-// planRepo and assemble on RepoSnapshot fixtures, and the board and digest built from
+// planRepo and assemble on RepoSnapshot fixtures, and the board built from
 // the run: what the dispatcher plans, with no `gh` at all. dispatch.test.ts runs each
 // command end to end; snapshot.test.ts covers the reads.
 import assert from "node:assert/strict";
 import { join } from "node:path";
 import { describe, test } from "node:test";
 import { buildBoard } from "./board.ts";
-import { buildDigest, digestState } from "./digest.ts";
 import { assemble, LABELS, type PlanOptions, planRepo, type RepoPlan } from "./plan.ts";
 import type { RepoSnapshot } from "./snapshot.ts";
 
@@ -101,7 +100,7 @@ const plans = (opts = OPTS) => [planRepo(meridian(), opts), planRepo(tracemap(),
 const automergeOf = (ps: RepoPlan[]) => ps.flatMap((p) => p.automerge.map((m) => m.item));
 const runOf = (ps: RepoPlan[], maxSessions?: number) =>
   assemble(ps, { ...(maxSessions !== undefined && { maxSessions }), automerge: automergeOf(ps) });
-const boardOf = (run: ReturnType<typeof runOf>) => buildBoard(run.board, { generated: NOW, repos: [M, T], digest: "u", closed: [] }).stages;
+const boardOf = (run: ReturnType<typeof runOf>) => buildBoard(run.board, { generated: NOW, repos: [M, T], closed: [] }).stages;
 
 describe("planRepo", () => {
   test("merges only the green automerge PR, pinned to its head", () =>
@@ -229,48 +228,22 @@ describe("assemble", () => {
   });
 });
 
-describe("the board and digest of a run", () => {
+describe("the board of a run", () => {
   const ps = plans();
   const run = runOf(ps, 3);
 
   test("the board: red PRs first, the Dependabot PR waits for review", () => {
-    const { stages } = buildBoard(run.board, { generated: NOW, repos: [M, T], digest: "u", closed: [] });
+    const { stages } = buildBoard(run.board, { generated: NOW, repos: [M, T], closed: [] });
     assert.deepEqual(stages.prInProgress.map((c) => [c.number, c.check]), [[9, "red"], [21, "red"], [20, "green"]]);
     assert.ok(stages.waiting.cards.some((c) => c.number === 8 && c.needsReview));
   });
 
   test("the board flags every open issue without ready-for-agent, and nothing else", () => {
-    const { stages } = buildBoard(run.board, { generated: NOW, repos: [M, T], digest: "u", closed: [] });
+    const { stages } = buildBoard(run.board, { generated: NOW, repos: [M, T], closed: [] });
     const all = [...stages.stuck, ...stages.waiting.cards, ...stages.waiting.parked, ...stages.queue, ...stages.prInProgress, ...stages.behind];
     assert.deepEqual(all.filter((c) => c.unready).map((c) => c.number).sort((a, b) => a - b), [12, 13, 14]);
   });
 
-  test("the digest holds only the markers the board reads, and points to the board", () => {
-    const body = buildDigest({ repos: ps.map((p) => ({ repo: p.repo, name: "", path: "" })), now: NOW });
-    assert.match(body, /^<!-- digest-run: 2026-11-13T00:00:00.000Z -->\n/);
-    assert.match(body, new RegExp(`\n<!-- digest-repos: ${M} ${T} -->\n`));
-    assert.match(body, /\nRepos covered: realJohnDoe\/meridian, realJohnDoe\/tracemap\./);
-    assert.match(body, /\[workshop board\]\(https:\/\/realjohndoe\.github\.io\/agent-skills\/\)/);
-    assert.doesNotMatch(body, /meridian#/);
-  });
-
   test("at the end of a run nothing shows as dispatched", () =>
     assert.ok(boardOf(runOf(ps)).prInProgress.every((c) => c.reason !== "dispatched")));
-});
-
-describe("the digest's state", () => {
-  const digestIssue = (n: number, title = "Workshop digest", body = "") => issue(n, title, [], { body }) as Any;
-
-  test("the newest open digest is the digest; older ones are closed into it; its markers are read back", () => {
-    const s = digestState("o/d", [
-      digestIssue(90, "Workshop digest — 2026-11-06"),
-      digestIssue(91, "Workshop digest", `<!-- digest-since: 2026-11-10 -->\n<!-- digest-run: 2026-11-12T20:00:00.000Z -->\n<!-- digest-repos: ${M} ${T} -->`),
-    ]);
-    assert.equal(s.issue?.number, 91);
-    assert.deepEqual(s.older.map((i) => i.number), [90]);
-    assert.equal(s.lastRun, "2026-11-12T20:00:00.000Z");
-    assert.deepEqual(s.covered, [M, T]);
-  });
-
-  test("no digest issue yet: no markers", () => assert.deepEqual(digestState("o/d", []), { repo: "o/d", issue: undefined, older: [] }));
 });

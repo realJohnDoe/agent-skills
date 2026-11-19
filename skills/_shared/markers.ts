@@ -1,16 +1,23 @@
 // How every skill reads the workshop's shared conventions on issues and comments: the
-// digest issue, the pause label, marker comments, an issue body's open question, and the
-// issue that says the workshop can't push to a repo.
+// pause issue, marker comments, an issue body's open question, and the issue that says
+// the workshop can't push to a repo.
 // The `conventions` skill says what to set; this file and the dispatcher's decide.ts
 // say how it is read.
 
-export const PAUSE_LABEL = "workshop-paused";
 // An issue that needs the maintainer to decide something says so in its body.
 export const DECISION = "Decision needed";
 
-export const isDigest = (title: string) => /^(Workshop|Farm) digest/.test(title);
+// The maintainer pauses the workshop by opening an issue with this title in the home repo,
+// and resumes it by closing that issue.
+export const PAUSE_TITLE = "Pause workshop";
+export const isPause = (title: string) => /^pause workshop\b/i.test(title);
+// The retired digest issue. Matched only so the first `finish` after its retirement can
+// close it, and so it never shows as a card before then; remove once it is closed.
+export const isRetiredDigest = (title: string) => /^(Workshop|Farm) digest/.test(title);
+// The workshop's own issues in the home repo, which the board never shows as cards.
+export const isWorkshopIssue = (title: string) => isPause(title) || isRetiredDigest(title);
 
-// Heads the body of the issue the dispatcher files in the digest repo when it can't push
+// Heads the body of the issue the dispatcher files in the home repo when it can't push
 // to a repo; the board shows that issue as Stuck.
 export const cantPushMarker = (repo: string) => `<!-- workshop-cant-push: ${repo} -->`;
 /** The repo a can't-push issue's body names; undefined for any other body. */

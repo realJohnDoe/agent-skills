@@ -36,7 +36,7 @@ const plan: BoardPlan = {
   afterMerge: [it(16, { why: "switch Pages; merged in x", linkedPrs: [40, 41] })],
 };
 const closed = [{ repo: R, kind: "issue" as const, number: 30, title: "Done", url: "u", prs: [31, 32], reason: "closed" }];
-const board = buildBoard(plan, { generated: "2026-11-17T00:00:00Z", repos: [R], digest: "d", lastRun: "2026-11-16T20:00:00Z", closed });
+const board = buildBoard(plan, { generated: "2026-11-17T00:00:00Z", repos: [R], lastRun: "2026-11-16T20:00:00Z", closed });
 const { stages } = board;
 
 describe("buildBoard", () => {
@@ -79,7 +79,7 @@ describe("buildBoard", () => {
   test("the board is normal and carries the run", () => {
     assert.equal(board.state, "normal");
     assert.equal(board.paused, undefined);
-    assert.deepEqual([board.generated, board.repos, board.digest], ["2026-11-17T00:00:00Z", [R], "d"]);
+    assert.deepEqual([board.generated, board.repos], ["2026-11-17T00:00:00Z", [R]]);
   });
 });
 
@@ -112,7 +112,7 @@ describe("render", () => {
   test("Stuck hides when empty; the other modules show an empty message", () => {
     const empty = buildBoard(
       { review: [], unstick: [], decide: [], afterMerge: [], triage: [], inProgress: [], queue: [], notPicked: [], automerge: [] },
-      { generated: board.generated, repos: [R], digest: "d", closed: [] },
+      { generated: board.generated, repos: [R], closed: [] },
     );
     const h = render(empty, now);
     assert.doesNotMatch(h, /m-stuck/);

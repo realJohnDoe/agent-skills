@@ -10,9 +10,13 @@ The skills in this repo, and the workshop they run: an automated loop that works
 The whole system of scheduled runs that dispatches issues to agent sessions, follows up on their PRs and merges them, across every attached repo.
 _Avoid_: Factory, pipeline
 
-**Digest**:
-The one long-lived issue in the digest repo that holds the workshop's state: the markers the board reads (when the dispatcher last ran, which repos it covered) and the pause label. It lists no items; what waits on the maintainer is on the board, and they decide on each issue itself.
-_Avoid_: Report, summary
+**Home repo**:
+The workshop's own repo, `realJohnDoe/agent-skills`, which the scripts take as `--home`: it holds the pause issue, the can't-push issues and the workshop board. What waits on the maintainer is on the board, and they decide on each issue itself.
+_Avoid_: Digest repo
+
+**Pause issue**:
+An issue titled `Pause workshop` in the home repo. While one is open the workshop is paused: the dispatcher drains it once and then only waits. Closing it resumes the workshop. The drain's snapshot and the resume's marker are comments on it, so each pause is one short-lived issue.
+_Avoid_: Pause label, digest
 
 **Workshop board**:
 A read-only public page that shows every open issue and PR of the workshop by stage: where the maintainer sees what waits on them. You can't decide anything on it, but its ✳ chips open a Claude Code session on a card's issue.
@@ -25,7 +29,7 @@ Where an issue or PR stands in the workshop's flow: Stuck, Waiting for human, Cl
 _Avoid_: Column, status
 
 **Stuck**:
-The stage for work the workshop can't move without the maintainer stepping in. That covers a PR at its follow-up cap, a stale follow-up, a dispatched issue with no PR, and the issue the dispatcher files in the digest repo for a repo it can't push to.
+The stage for work the workshop can't move without the maintainer stepping in. That covers a PR at its follow-up cap, a stale follow-up, a dispatched issue with no PR, and the issue the dispatcher files in the home repo for a repo it can't push to.
 _Avoid_: Blocked, failed
 
 **Waiting for human**:

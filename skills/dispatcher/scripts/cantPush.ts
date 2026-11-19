@@ -1,4 +1,4 @@
-// The issue the dispatcher files in the digest repo for each attached repo it can't push
+// The issue the dispatcher files in the home repo for each attached repo it can't push
 // to: one per repo, opened while the problem lasts and closed by the first run that can
 // push again. The board shows it as Stuck (decide.ts, `cantPush`). See ../SKILL.md.
 import { all, type GhIssue, post } from "../../_shared/github.ts";
@@ -10,9 +10,9 @@ export type CantPush = {
   close: { repo: string; number: number }[]; // issues whose repo can be pushed to again, or is detached
 };
 
-/** The open can't-push issues in the digest repo, each with the repo it names. */
-export const readCantPush = (digest: string) =>
-  all<GhIssue>(`repos/${digest}/issues?state=open&per_page=100`)
+/** The open can't-push issues in the home repo, each with the repo it names. */
+export const readCantPush = (home: string) =>
+  all<GhIssue>(`repos/${home}/issues?state=open&per_page=100`)
     .filter((i) => !i.pull_request && cantPushRepo(i.body))
     .map((i) => ({ repo: cantPushRepo(i.body)!, number: i.number }));
 
@@ -38,7 +38,7 @@ Give the \`Timetable\` routine push access to [${repo}](https://github.com/${rep
 
 // On `finish`: file and close the issues. Each write on its own: one refused is logged and
 // retried on the next run.
-export function writeCantPush(digest: string, { open, close }: CantPush) {
+export function writeCantPush(home: string, { open, close }: CantPush) {
   const tryPost = (what: string, path: string, body: unknown, method?: string) => {
     try {
       post(path, body, method);
@@ -48,11 +48,11 @@ export function writeCantPush(digest: string, { open, close }: CantPush) {
     }
   };
   for (const u of open)
-    tryPost(`can't-push issue for ${u.repo}`, `repos/${digest}/issues`, { title: `Workshop can't push to ${u.repo}`, body: cantPushBody(u) });
+    tryPost(`can't-push issue for ${u.repo}`, `repos/${home}/issues`, { title: `Workshop can't push to ${u.repo}`, body: cantPushBody(u) });
   for (const c of close) {
-    tryPost(`comment ${digest}#${c.number}`, `repos/${digest}/issues/${c.number}/comments`, {
+    tryPost(`comment ${home}#${c.number}`, `repos/${home}/issues/${c.number}/comments`, {
       body: `The workshop can push to ${c.repo} again, or it is no longer attached.${FOOTER}`,
     });
-    tryPost(`close ${digest}#${c.number}`, `repos/${digest}/issues/${c.number}`, { state: "closed", state_reason: "completed" }, "PATCH");
+    tryPost(`close ${home}#${c.number}`, `repos/${home}/issues/${c.number}`, { state: "closed", state_reason: "completed" }, "PATCH");
   }
 }

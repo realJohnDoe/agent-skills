@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Stand-ins for `gh` and `git`, so the workshop scripts can be run end to end in
-// tests. Installed by fakeBin() as `gh` and `git` on PATH.
+// Stand-ins for `gh`, `git` and `curl`, so the workshop scripts can be run end to end in
+// tests. Installed by fakeBin() as `gh`, `git` and `curl` on PATH.
 //
 // gh: reads answers from $FAKE_GH_FIXTURE, a JSON object keyed by the API path
 //   without its query string, except `?state=closed` (search: `search/issues?q=<q>`), or by
@@ -15,6 +15,8 @@
 //   --show-toplevel` answers the working directory. The board push's commands
 //   (fetch, rev-parse FETCH_HEAD, hash-object, mktree, commit-tree, push) answer
 //   made-up ids and are appended to $FAKE_GIT_LOG as `{args, input}` when it is set.
+// curl: answers a URL from $FAKE_GH_FIXTURE's key of that whole URL, as JSON; a URL that
+//   isn't in it fails, as `curl -f` does on an HTTP error.
 import { appendFileSync, chmodSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
@@ -22,9 +24,9 @@ import { fileURLToPath } from "node:url";
 
 const self = fileURLToPath(import.meta.url);
 
-// A directory holding `gh` and `git` wrappers (or just `tools`) around this file; put it
-// first on PATH.
-export const fakeBin = (tools = ["gh", "git"]) => {
+// A directory holding `gh`, `git` and `curl` wrappers (or just `tools`) around this file;
+// put it first on PATH.
+export const fakeBin = (tools = ["gh", "git", "curl"]) => {
   const dir = mkdtempSync(join(tmpdir(), "workshop-fake-bin-"));
   for (const tool of tools) {
     const file = join(dir, tool);
@@ -116,7 +118,17 @@ const git = (args: string[]) => {
   fail(`fake git: unexpected ${cmd}`);
 };
 
-if (process.argv[1] === self && basename(process.argv[2] ?? "") in { gh: 1, git: 1 }) {
+const curl = (args: string[]) => {
+  const url = args.find((a) => /^https?:/.test(a)) ?? fail("fake curl: no URL");
+  const fixture = JSON.parse(readFileSync(process.env.FAKE_GH_FIXTURE!, "utf8"));
+  if (!(url in fixture)) {
+    process.stderr.write(`curl: (22) The requested URL returned error: 404\n`);
+    process.exit(22);
+  }
+  process.stdout.write(JSON.stringify(fixture[url]));
+};
+
+if (process.argv[1] === self && basename(process.argv[2] ?? "") in { gh: 1, git: 1, curl: 1 }) {
   const [tool, ...args] = process.argv.slice(2);
-  (tool === "gh" ? gh : git)(args);
+  ({ gh, git, curl })[tool as "gh" | "git" | "curl"](args);
 }

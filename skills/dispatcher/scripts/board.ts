@@ -21,9 +21,10 @@ export type Card = {
 export type Parked = { repo: string; number: number; title: string; url: string; reason: string; unready?: boolean };
 export type Board = {
   generated: string; // ISO time it was built: a dispatcher run or the board workflow
-  lastRun?: string; // ISO time of the last dispatcher run, from the digest's marker
-  repos: string[]; // owner/name of every repo covered
-  digest: string; // URL of the current digest issue
+  // ISO time of the last dispatcher run: its `finish` passes it to the board workflow,
+  // and every other build carries it over from the live board.json.
+  lastRun?: string;
+  repos: string[]; // owner/name of every repo covered: the last run's, carried over the same way
   state: "normal" | "paused";
   paused?: { since: string; snapshot: string }; // set only when paused: date, snapshot comment URL
   stages: {
@@ -41,7 +42,7 @@ export type BoardPlan = Record<
   "review" | "unstick" | "decide" | "afterMerge" | "triage" | "inProgress" | "queue" | "notPicked" | "automerge",
   Item[]
 >;
-export type BoardRun = Pick<Board, "generated" | "repos" | "digest" | "lastRun"> & { closed: Card[] };
+export type BoardRun = Pick<Board, "generated" | "repos" | "lastRun"> & { closed: Card[] };
 
 const card = (x: Item, reason: string, extra: Partial<Card> = {}): Card => ({
   repo: x.repo,
@@ -69,7 +70,6 @@ export const buildBoard = (plan: BoardPlan, run: BoardRun): Board => {
   return {
     generated: run.generated,
     repos: run.repos,
-    digest: run.digest,
     ...(run.lastRun && { lastRun: run.lastRun }),
     state: "normal",
     stages: {

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // The workshop's pause state and its two one-shot transitions, over every
 // attached repo at once. See ../SKILL.md (Pausing).
-// Usage: node pause.ts --digest owner/repo [--apply] [--today YYYY-MM-DD]
+// Usage: node pause.ts --home owner/repo [--apply] [--today YYYY-MM-DD]
 //   [--repos o/r,...] [--checkouts dir]
 // Prints {state, plan}. state is normal | drain | paused | resume. Without --apply
 // nothing is written; with it, drain/resume carry out the plan and post their marker
@@ -82,6 +82,7 @@ const drainSnapshot = (plan: Drain[]) =>
         `Open decisions: ${list(r.decisions.map((x) => ref(r.repo, x)))}.`,
       ].join(" "),
     ),
+    "Close this issue to resume the workshop.",
   ].join("\n\n") + FOOTER;
 
 const resumeComment = `${RESUMED}
@@ -112,11 +113,10 @@ function print(state: PauseState, plan: object | null) {
 }
 
 main(() => {
-  const { digest: DIGEST, repos } = loadConfig();
+  const { home: HOME, repos } = loadConfig();
   preflight(repos);
 
-  const { state, digest } = readPause(DIGEST);
-  if (!digest) return print("normal", null);
+  const { state, issue } = readPause(HOME);
 
   let marker: string;
   let plan: object;
@@ -139,7 +139,7 @@ main(() => {
     default:
       return assertNever(state);
   }
-  // The marker goes last, so a crash before it is retried next firing.
-  if (APPLY) post(`repos/${DIGEST}/issues/${digest.number}/comments`, { body: marker });
+  // The marker goes last, on the pause issue, so a crash before it is retried next firing.
+  if (APPLY) post(`repos/${HOME}/issues/${issue!.number}/comments`, { body: marker });
   print(state, plan);
 });
