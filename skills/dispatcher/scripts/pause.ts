@@ -34,7 +34,7 @@ const openOf = (repo: string) => ({
   prs: all<GhPull>(`repos/${repo}/pulls?state=open&per_page=100`),
 });
 
-// `dispatch.ts --apply --followups-only` ran first: it merged the green PRs
+// `dispatch.ts apply --followups-only` ran first: it merged the green PRs
 // and gave red ones their last follow-up. Whatever is still red is closed.
 function planDrain({ repo }: Repo): Drain {
   const { issues, prs, base } = openOf(repo);

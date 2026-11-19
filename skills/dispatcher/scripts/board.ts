@@ -1,6 +1,6 @@
 // The workshop board's data: the dispatcher's plan sorted into stages, one card per
 // item. dispatch.ts prints it as `board` (board.json). Pure: the closed-issue
-// lookup is dispatch.ts's, passed in as `run.closed`. See GLOSSARY.md for the stages.
+// lookup is snapshot.ts's `fetchClosed`, passed in as `run.closed`. See GLOSSARY.md for the stages.
 import type { Item } from "./lib.ts";
 
 export type Card = {
