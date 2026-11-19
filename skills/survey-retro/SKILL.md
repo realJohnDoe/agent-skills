@@ -147,8 +147,8 @@ Check what review a PR gets before it merges, here and in the workshop: does an
 `automerge` PR, or any other, pass a diff-only review stage, or only CI? Did a
 mistake reach a PR or the default branch that such a reviewer would have caught? A
 missing stage is a finding when the sessions show what it would have caught, and
-its fix usually belongs in the workshop's shared files (see the `conventions`
-skill's **Filing a batch of findings**, **Where**).
+its fix usually belongs in the workshop's shared files (see `../conventions/batch-findings.md`,
+**Where**).
 
 ### 3. Coding standards (`standards`)
 The standards are whatever the repo's lint rules, other gates, PR template's

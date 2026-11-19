@@ -9,7 +9,7 @@ Dependabot already proposes every available version and can auto-merge the non-m
 
 **Scope:** the repos the user names. If they name none, use the current repo. Use every repo attached to the session if they asked for "all", or if the working directory isn't a repo but holds several. With several repos, a dependency they share gets one decision, applied in each repo that has it.
 
-**Previous runs:** each run's parent is a `Dependency maintenance <date>` issue in realJohnDoe/agent-skills, filed per the `conventions` skill's **Filing a batch of findings** (`../conventions/SKILL.md`), which this pass follows for searching, fields, tiers and closing. The newest parent, open or closed, is the last run. The open sub-issues of every open parent are decisions already made: re-check their facts and update an issue only when a fact has changed.
+**Previous runs:** each run's parent is a `Dependency maintenance <date>` issue in realJohnDoe/agent-skills, filed per `../conventions/batch-findings.md`, which this pass follows for searching, fields, tiers and closing. The newest parent, open or closed, is the last run. The open sub-issues of every open parent are decisions already made: re-check their facts and update an issue only when a fact has changed.
 
 **Start** by closing the finished parents in realJohnDoe/agent-skills, per **Closing** there. They carry the `dependencies` label, or, filed before it, are found by title.
 
@@ -63,7 +63,7 @@ Two things are not findings: a major you'd hold anyway with no reason having cha
 
 ## 4. File issues where the fix happens
 
-Write one issue per decision, in the repo that changes, with the fields of **Filing a batch of findings** after searching as it says (search the repo's open issues for the dependency name too). A cross-repo decision gets one issue in each affected repo, and each one links the others.
+Write one issue per decision, in the repo that changes, with the fields of `../conventions/batch-findings.md` after searching as it says (search the repo's open issues for the dependency name too). A cross-repo decision gets one issue in each affected repo, and each one links the others.
 
 - **Title:** `deps: <verb> <package> <from> → <to>`, for example `deps: replace moment with date-fns` or `deps: lift typescript <7 pin`.
 - **What this pass adds to the fields:** the **Problem** is the verdict from step 3; the **Evidence** is the step 2 command plus its output excerpt, dated; the **Task context** names the gating risk; the **Fix**'s check is the repo's own build and test commands plus the specific check.
