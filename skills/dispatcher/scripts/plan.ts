@@ -46,7 +46,7 @@ export type Followup = Candidate & {
   pr: number;
   issue: number | undefined;
   branch: string;
-  brief: { url: string; base: string; conflict: boolean; failing: string[]; feedback: string[]; bot: boolean };
+  brief: { url: string; base: string; conflict: boolean; failing: string[]; feedback: string[]; bot: boolean; major: boolean };
 };
 export type Dispatch = Candidate & { kind: "dispatch"; issue: number; brief: { url: string; base: string; refs: boolean } };
 export type Session = (Followup | Dispatch) & { prompt: string };
@@ -207,6 +207,7 @@ export function planRepo(s: RepoSnapshot, opts: PlanOptions): RepoPlan {
             failing: v.failing.map((r) => `${r.name}: ${r.html_url}`),
             feedback: v.feedback.map((c) => c.html_url),
             bot,
+            major: bot && isMajorBump(pr.title),
           },
         });
         break;
@@ -349,6 +350,12 @@ export function assemble(plans: RepoPlan[], { maxSessions, automerge }: { maxSes
   };
 }
 
+// Dependabot titles a bump "from X to Y"; a major is a different leading number.
+const isMajorBump = (title: string) => {
+  const m = /from v?(\d+)\S* to v?(\d+)/.exec(title);
+  return !!m && m[1] !== m[2];
+};
+
 // A session's prompt: its own worktree, the work, and how it ends.
 export function prompt(c: Followup | Dispatch): string {
   const { repo, checkout: path, worktree: wt } = c;
@@ -370,6 +377,11 @@ export function prompt(c: Followup | Dispatch): string {
       b.bot
         ? `This is a Dependabot bump: adapt the code or config to the new versions rather than reverting a bump, and leave the PR description as Dependabot wrote it. If a bump can't be adopted narrowly, say why in a PR comment instead of pushing.`
         : `If the repo has a PR template, the PR description must still meet it.`,
+      ...(b.major
+        ? [
+            `This is a major bump, so green CI is not enough: read the changelog's breaking changes between the two versions, check each against how the repo uses the package (grep its imports), run the repo's acceptance check (the built app on its example data) on base and head, and post what you checked as a PR comment, since the description stays Dependabot's.`,
+          ]
+        : []),
       `Do not subscribe to PR activity: the dispatcher checks this PR again on its next run.`,
       end,
     ].join("\n");
