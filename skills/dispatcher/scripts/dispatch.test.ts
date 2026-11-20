@@ -300,6 +300,7 @@ describe("dispatch finish", () => {
     assert.deepEqual(labelWrites(res).sort(), [
       `DELETE repos/${M}/issues/10/labels/waiting-for-human`,
       `DELETE repos/${M}/issues/5/labels/waiting-for-human`,
+      `POST repos/${M}/issues/12/labels`, // no tier label: a Waiting for human card
       `POST repos/${M}/issues/14/labels`,
       `POST repos/${T}/issues/8/labels`,
     ]);

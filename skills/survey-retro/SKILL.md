@@ -17,9 +17,7 @@ skills, scripts, docs, the workshop's own skills) that would have stopped a bad
 session going wrong. Each finding cites the session or sessions it came from.
 
 Adapted from the `retro` skill in [mattpocock/skills](https://github.com/mattpocock/skills)
-(`skills/in-progress/retro`, MIT). It is copied here, not called, for two reasons. It
-sits in that plugin's `in-progress` folder, so it can change without notice. And it
-sets `disable-model-invocation: true`, so a scheduled task can't load it.
+(`skills/in-progress/retro`, MIT), copied because that one can't be loaded by a scheduled task.
 
 A finding about the product itself goes to the survey that owns that product area.
 This survey only files the reason the session didn't catch it.
@@ -52,7 +50,10 @@ trailer in its commits. It tags each PR with the signals it can read from GitHub
 ran that survey. Its parent issue links the survey-file PR, whose body carries
 the session id.
 
-Read the **worst-tagged 5 to 10 sessions** and skip the clean ones. A `not-run`
+Every tag reads the PR before it merged, so `clean` can hide the worst session: also
+list the failed runs since `<date>` (`gh api "repos/<owner/repo>/actions/runs?status=failure"`)
+and read the session whose merge each one follows. Read the **worst-tagged 5 to 10
+sessions** and skip the clean ones. A `not-run`
 that skips a gate outside the diff's scope ("nothing outside `animations/`
 changed") is noise. One that skips a finding's acceptance check is a lead:
 re-run that check yourself where it is cheap (headless Chrome is usually at

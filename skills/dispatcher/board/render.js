@@ -1,6 +1,6 @@
 // The workshop board's page body, rendered from board.json (the `Board` type in
 // ../scripts/board.ts). Pure, so index.html and board.test.ts both load it.
-/** @import { Board, Card, Parked } from "../scripts/board.ts" */
+/** @import { Board, Card } from "../scripts/board.ts" */
 
 /** @param {unknown} s */
 const esc = (s) =>
@@ -17,7 +17,7 @@ const repoChip = (repo) => {
   return `<span class="chip repo" style="--repo:${REPO_COLORS[h % REPO_COLORS.length]}">${esc(repo.split("/")[1] ?? repo)}</span>`;
 };
 // No chip for `blocked`: those cards have a stage of their own, and their reason names the blocker.
-const SUB = { decide: "Decide", afterMerge: "After merge", goAhead: "Go ahead?" };
+const SUB = { decide: "Decide", afterMerge: "After merge", goAhead: "Go ahead?", plan: "Plan", tier: "Tier?", assigned: "Assigned" };
 // On every Stuck and Waiting for human card, and on any other issue without `ready-for-agent`
 // (which the dispatcher won't pick up): a link that opens a new Claude Code session on its
 // repo with "Regarding owner/name#n: " prefilled, for you to finish and send. Not on cards the
@@ -50,18 +50,10 @@ const cardWith = (c, claude) => {
 const card = (c) => cardWith(c, false);
 /** @param {Card} c on Stuck and Waiting for human: always with the Claude chip */
 const askCard = (c) => cardWith(c, true);
-/** @param {Parked} p */
-const parkedCard = (p) => `<article class="card compact">
-<div class="title">${link(p.url, p.title)}</div>
-<div class="row">${repoChip(p.repo)}<span class="chip ref">#${p.number}</span>${claudeChip(p)}<span class="why">${esc(p.reason)}</span></div>
-</article>`;
-/**
- * @param {string} id @param {string} name @param {string} hint @param {string[]} cards
- * @param {string} empty @param {string} [foot]
- */
-const stageModule = (id, name, hint, cards, empty, foot = "") => `<section class="module m-${id}" aria-label="${name}">
+/** @param {string} id @param {string} name @param {string} hint @param {string[]} cards @param {string} empty */
+const stageModule = (id, name, hint, cards, empty) => `<section class="module m-${id}" aria-label="${name}">
 <div class="module-head"><span class="led"></span><h2>${name}</h2><span class="hint">${hint}</span><span class="readout">${String(cards.length).padStart(2, "0")}</span></div>
-<div class="stack">${cards.length ? cards.join("") : `<div class="empty">${empty}</div>`}</div>${foot}
+<div class="stack">${cards.length ? cards.join("") : `<div class="empty">${empty}</div>`}</div>
 </section>`;
 
 /** @param {string} iso */
@@ -94,20 +86,17 @@ export const render = (board, now = new Date()) => {
     ...(board.lastRun ? [`last run <b>${esc(when(board.lastRun))}</b>`] : []),
     `repos <b>${board.repos.length}</b>`,
     `stuck <b class="bad">${stuck.length}</b>`,
-    `waiting for human <b>${s.waiting.cards.length}</b>`,
+    `waiting for human <b>${s.waiting.length}</b>`,
     `queue <b>${s.queue.length}</b>`,
     `behind another issue <b>${behind.length}</b>`,
   ].join('<span class="sep"></span>');
-  const parked = s.waiting.parked.length
-    ? `<details class="parked"><summary>${s.waiting.parked.length} parked</summary><div class="stack">${s.waiting.parked.map(parkedCard).join("")}</div></details>`
-    : "";
 
   return [
     ...notices,
     `<div class="status">${status}</div>`,
     `<div class="line">`,
     stuck.length ? stageModule("stuck", "Stuck", "needs a hand", stuck, "") : "",
-    stageModule("waiting", "Waiting for human", "after merge, review, go ahead, decide", s.waiting.cards.map(askCard), "Nothing waits on you", parked),
+    stageModule("waiting", "Waiting for human", "after merge, review, go ahead, decide, plan, tier, assigned", s.waiting.map(askCard), "Nothing waits on you"),
     stageModule("closed", "Closed", "latest 5", s.closed.map(card), "Nothing closed yet"),
     stageModule("pr", "PR in progress", "red first", s.prInProgress.map(card), "No open PRs"),
     stageModule("queue", "Queue", "in pickup order", s.queue.map(card), "Queue empty"),

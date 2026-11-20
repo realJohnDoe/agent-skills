@@ -13,12 +13,11 @@ export type Card = {
   check?: "green" | "red" | "pending";
   automerge?: boolean;
   needsReview?: boolean; // green, quiet, no automerge
-  sub?: "decide" | "afterMerge" | "goAhead" | "blocked";
+  sub?: Item["sub"];
   prs?: number[]; // every PR linked to an issue card
   unready?: boolean; // an open issue without `ready-for-agent`: the page links it to a new Claude Code session
   reason: string; // the dispatcher's one-line why
 };
-export type Parked = { repo: string; number: number; title: string; url: string; reason: string; unready?: boolean };
 export type Board = {
   generated: string; // ISO time it was built: a dispatcher run or the board workflow
   // ISO time of the last dispatcher run: its `finish` passes it to the board workflow,
@@ -29,7 +28,7 @@ export type Board = {
   paused?: { since: string; snapshot: string }; // set only when paused: date, snapshot comment URL
   stages: {
     stuck: Card[];
-    waiting: { cards: Card[]; parked: Parked[] }; // Waiting for human. parked: a collapsed fold, not a stage of its own
+    waiting: Card[]; // Waiting for human
     queue: Card[];
     prInProgress: Card[];
     closed: Card[];
@@ -39,7 +38,7 @@ export type Board = {
 
 /** The plan's lists. Follow-up sessions' PRs sit in `inProgress`; dispatched issues and `merged` have no stage. */
 export type BoardPlan = Record<
-  "review" | "unstick" | "decide" | "afterMerge" | "triage" | "inProgress" | "queue" | "notPicked" | "automerge",
+  "review" | "unstick" | "decide" | "afterMerge" | "triage" | "asks" | "inProgress" | "queue" | "behind" | "automerge",
   Item[]
 >;
 export type BoardRun = Pick<Board, "generated" | "repos" | "lastRun"> & { closed: Card[] };
@@ -65,7 +64,6 @@ const prRank = (c: Card) => (c.check === "red" ? 0 : c.check === "pending" ? 1 :
 
 export const buildBoard = (plan: BoardPlan, run: BoardRun): Board => {
   const why = (fallback: string) => (x: Item) => card(x, x.why ?? fallback);
-  const blocked = (x: Item) => x.sub === "blocked";
   const prs = (xs: Item[]) => xs.filter((x) => x.kind === "pr");
   return {
     generated: run.generated,
@@ -74,17 +72,14 @@ export const buildBoard = (plan: BoardPlan, run: BoardRun): Board => {
     state: "normal",
     stages: {
       stuck: plan.unstick.map(why("stuck")),
-      waiting: {
-        cards: [
-          ...plan.afterMerge.map((x) => card(x, x.why ?? "after merge", { sub: "afterMerge" })),
-          ...plan.review.map((x) => card(x, x.why ?? "green; waiting for your review", { needsReview: true })),
-          ...plan.triage.map((x) => card(x, "waiting for your go-ahead", { sub: "goAhead" })),
-          ...plan.decide.map((x) => card(x, x.why ?? "needs a decision", { sub: "decide" })),
-        ],
-        parked: plan.notPicked
-          .filter((x) => !blocked(x))
-          .map((x) => ({ repo: x.repo, number: x.issue!, title: x.title, url: x.url, reason: x.why ?? "", ...(x.unready && { unready: true }) })),
-      },
+      waiting: [
+        ...plan.afterMerge.map((x) => card(x, x.why ?? "after merge", { sub: "afterMerge" })),
+        ...plan.review.map((x) => card(x, x.why ?? "green; waiting for your review", { needsReview: true })),
+        ...plan.triage.map((x) => card(x, "waiting for your go-ahead", { sub: "goAhead" })),
+        ...plan.decide.map((x) => card(x, x.why ?? "needs a decision", { sub: "decide" })),
+        // plan, then tier, then assigned
+        ...(["plan", "tier", "assigned"] as const).flatMap((sub) => plan.asks.filter((x) => x.sub === sub).map(why(sub))),
+      ],
       queue: plan.queue.map(why("dispatched next")),
       prInProgress: [
         ...prs(plan.inProgress).map(why("in progress")),
@@ -94,7 +89,7 @@ export const buildBoard = (plan: BoardPlan, run: BoardRun): Board => {
         .sort((a, b) => prRank(a.c) - prRank(b.c) || a.i - b.i)
         .map(({ c }) => c),
       closed: run.closed,
-      behind: plan.notPicked.filter(blocked).map(why("blocked")),
+      behind: plan.behind.map(why("blocked")),
     },
   };
 };
@@ -106,13 +101,13 @@ export const WAITING_LABEL = "waiting-for-human";
 export type LabelSync = { repo: string; add: number[]; remove: number[] };
 
 /**
- * The label writes that make `WAITING_LABEL` sit on exactly the Waiting for human cards
- * (not the parked fold), per repo. `labelled` is every issue or PR in a covered repo that
+ * The label writes that make `WAITING_LABEL` sit on exactly the Waiting for human cards,
+ * per repo. `labelled` is every issue or PR in a covered repo that
  * has the label now, open or closed: a closed one loses it. Repos with nothing to do are left out.
  */
 export const labelSync = (board: Board, labelled: { repo: string; number: number }[]): LabelSync[] => {
   const key = (x: { repo: string; number: number }) => `${x.repo.toLowerCase()}#${x.number}`;
-  const want = new Map(board.stages.waiting.cards.map((c) => [key(c), c]));
+  const want = new Map(board.stages.waiting.map((c) => [key(c), c]));
   const have = new Set(labelled.map(key));
   const numbers = (xs: { number: number }[]) => [...new Set(xs.map((x) => x.number))].sort((a, b) => a - b);
   return board.repos

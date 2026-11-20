@@ -67,10 +67,11 @@ export type RepoPlan = {
   unstick: Item[];
   automerge: Merge[];
   inProgress: Item[];
-  notPicked: Item[];
+  behind: Item[];
   triage: Item[];
   decide: Item[];
   afterMerge: Item[];
+  asks: Item[]; // the other Waiting for human asks: a plan session, a tier label, a hand claim on a ready issue
   missingLabels: string[];
 };
 type ListKey = Exclude<keyof RepoPlan, "repo" | "missingLabels">;
@@ -119,10 +120,11 @@ export function planRepo(s: RepoSnapshot, opts: PlanOptions): RepoPlan {
     unstick: [],
     automerge: [],
     inProgress: [],
-    notPicked: [],
+    behind: [],
     triage: [],
     decide: [],
     afterMerge: [],
+    asks: [],
     missingLabels: [],
   };
 
@@ -243,10 +245,13 @@ export function planRepo(s: RepoSnapshot, opts: PlanOptions): RepoPlan {
         out.triage.push(item(i, { issue: i.number, why: tierOf(names(i)), sub: "goAhead" }));
         break;
       case "blocked":
-        out.notPicked.push(item(i, { issue: i.number, why: blockedText(st.blockers), sub: "blocked" }));
+        out.behind.push(item(i, { issue: i.number, why: blockedText(st.blockers), sub: "blocked" }));
         break;
-      case "notPicked":
-        out.notPicked.push(item(i, { issue: i.number, why: st.reason }));
+      case "plan":
+        out.asks.push(item(i, { issue: i.number, why: "`plan`; start a plan session", sub: "plan" }));
+        break;
+      case "untiered":
+        out.asks.push(item(i, { issue: i.number, why: "no tier label; add `haiku`, `sonnet` or `opus`", sub: "tier" }));
         break;
       default:
         assertNever(st);
@@ -266,17 +271,18 @@ export function planRepo(s: RepoSnapshot, opts: PlanOptions): RepoPlan {
     });
   }
 
-  // Claimed by a dispatch, still no PR: stuck.
+  // Claimed by a dispatch, still no PR: stuck. Claimed by hand but ready for an agent: ask.
   for (const i of issues.filter((i) => i.assignees.length && !linked.has(i.number))) {
     if (isWorkshopIssue(i.title) || cantPushRepo(i.body) || (i.sub_issues_summary?.total ?? 0) > 0 || doneStep(i)) continue;
     const at = s.dispatchedAt.get(i.number) ?? null;
-    const state = claimState({ tiered: !!tierOf(names(i)), dispatchedAt: at });
+    const state = claimState({ ready: names(i).includes(READY), dispatchedAt: at });
     switch (state.kind) {
-      case "notPicked":
-        out.notPicked.push(
+      case "assigned":
+        out.asks.push(
           item(i, {
             issue: i.number,
-            why: `assigned to ${i.assignees.map((a) => `@${a.login}`).join(", ")}; unassign to queue it`,
+            why: `assigned to ${i.assignees.map((a) => `@${a.login}`).join(", ")} but ready for an agent; unassign it or remove ${READY}`,
+            sub: "assigned",
           }),
         );
         break;
@@ -331,7 +337,8 @@ export function assemble(plans: RepoPlan[], { maxSessions, automerge }: { maxSes
       triage: pick("triage"),
       inProgress,
       queue,
-      notPicked: pick("notPicked"),
+      behind: pick("behind"),
+      asks: pick("asks"),
       unstick: pick("unstick"),
       automerge,
     },
