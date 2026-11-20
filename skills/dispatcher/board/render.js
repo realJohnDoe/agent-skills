@@ -29,20 +29,43 @@ const claudeChip = (c, always = false) =>
     : "";
 const DAY = 864e5;
 
+// GitHub's Octicons (MIT), 16px: the same marks GitHub uses for issues, PRs and check results.
+const ICONS = {
+  issue: '<path d="M8 9.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"/><path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Z"/>',
+  pr: '<path d="M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.573.677A.25.25 0 0 1 10 .854V2.5h1A2.5 2.5 0 0 1 13.5 5v5.628a2.251 2.251 0 1 1-1.5 0V5a1 1 0 0 0-1-1h-1v1.646a.25.25 0 0 1-.427.177L7.177 3.427a.25.25 0 0 1 0-.354ZM3.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm0 9.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm8.25.75a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Z"/>',
+  green: '<path d="M8 16A8 8 0 1 1 8 0a8 8 0 0 1 0 16Zm3.78-9.72a.751.751 0 0 0-.018-1.042.751.751 0 0 0-1.042-.018L6.75 9.19 5.28 7.72a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042l2 2a.75.75 0 0 0 1.06 0Z"/>',
+  red: '<path d="M2.343 13.657A8 8 0 1 1 13.658 2.343 8 8 0 0 1 2.343 13.657ZM6.03 4.97a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042L6.94 8 4.97 9.97a.749.749 0 0 0 .326 1.275.749.749 0 0 0 .734-.215L8 9.06l1.97 1.97a.749.749 0 0 0 1.275-.326.749.749 0 0 0-.215-.734L9.06 8l1.97-1.97a.749.749 0 0 0-.326-1.275.749.749 0 0 0-.734.215L8 6.94Z"/>',
+  pending: '<path d="M8 4a4 4 0 1 1 0 8 4 4 0 0 1 0-8Z"/>',
+};
+/** @param {keyof typeof ICONS} name */
+const icon = (name) => `<svg class="ic" viewBox="0 0 16 16" aria-hidden="true">${ICONS[name]}</svg>`;
+/** @param {"issue" | "pr"} kind */
+const kindMark = (kind) => `<span class="kind ${kind}">${icon(kind)}${kind === "pr" ? "PR" : "Issue"}</span>`;
+
 /** @param {Card} c @param {boolean} claude show the Claude chip whether or not it is unready */
 const cardWith = (c, claude) => {
-  const chips = [repoChip(c.repo), `<span class="chip ref">#${c.number}</span>`];
-  for (const n of c.prs ?? []) chips.push(link(`https://github.com/${c.repo}/pull/${n}`, `PR #${n}`, "chip prlink"));
+  // A card leads with what it is. A PR card (a PR's stage is about the PR: its CI, its review) names its
+  // open issue in a badge; an issue card names its merged PRs in badges.
+  const pr = c.kind === "pr";
+  const chips = [kindMark(c.kind), repoChip(c.repo), `<span class="chip ref">#${c.number}</span>`];
+  if (c.check) chips.push(`<span class="check ${c.check}" title="CI ${c.check}">${icon(c.check)}${c.check}</span>`);
+  for (const n of c.prs ?? [])
+    chips.push(`<a class="badge pr" href="${esc(`https://github.com/${c.repo}/pull/${n}`)}" target="_blank" rel="noopener" title="Pull request #${n}">${icon("pr")}#${n}</a>`);
   if (c.tier) chips.push(`<span class="chip tier">${c.tier}</span>`);
   const sub = c.sub && SUB[/** @type {keyof typeof SUB} */ (c.sub)];
   if (sub) chips.push(`<span class="chip sub">${sub}</span>`);
   if (c.needsReview) chips.push(`<span class="chip sub">Needs review</span>`); // styled like the other Waiting for human asks
   if (c.automerge) chips.push(`<span class="chip auto">automerge</span>`);
-  if (c.check) chips.push(`<span class="check ${c.check}">${c.check}</span>`);
   chips.push(claudeChip(c, claude));
-  return `<article class="card">
-<div class="title">${link(c.url, c.title)}</div>
+  const parent = pr
+    ? c.parent
+      ? `<a class="badge issue wide" href="${esc(c.parent.url)}" target="_blank" rel="noopener">${icon("issue")}#${c.parent.number} <span class="tt">${esc(c.parent.title)}</span></a>`
+      : `<div class="noissue">no issue</div>`
+    : "";
+  return `<article class="card ${c.kind}">
 <div class="row">${chips.join("")}</div>
+<div class="title">${link(c.url, c.title)}</div>
+${parent}
 <div class="why">${esc(c.reason)}</div>
 </article>`;
 };

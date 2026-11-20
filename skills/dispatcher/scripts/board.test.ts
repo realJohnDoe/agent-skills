@@ -97,10 +97,28 @@ describe("render", () => {
     assert.match(section(html, "waiting"), />Plan<[\s\S]*>Tier\?<[\s\S]*>Assigned</);
     assert.doesNotMatch(html, /parked/);
     assert.match(section(html, "waiting"), /<h2>Waiting for human<\/h2>/);
-    assert.match(section(html, "waiting"), /href="https:\/\/github.com\/o\/r\/pull\/40"[^>]*>PR #40</);
+    assert.match(section(html, "waiting"), /href="https:\/\/github.com\/o\/r\/pull\/40"[^>]*>[\s\S]*?<\/svg>#40</);
     assert.match(section(html, "waiting"), />Needs review</);
     assert.doesNotMatch(section(html, "pr"), />Needs review</);
     assert.match(html, /as of <b>2026-11-17 00:00 UTC<\/b>/);
+  });
+
+  test("a PR card leads with the PR and badges its open issue; an issue card leads with the issue", () => {
+    const withParent = buildBoard(
+      { ...plan, review: [pr(10, { check: "green", parent: { number: 20, title: "Parent <i>", url: `https://github.com/${R}/issues/20` } })] },
+      { generated: board.generated, repos: [R], closed },
+    );
+    const h = render(withParent, now);
+    const review = section(h, "waiting").match(/<article class="card pr">[\s\S]*?T10[\s\S]*?<\/article>/)?.[0] ?? "";
+    assert.match(review, /class="kind pr"/);
+    assert.match(review, /class="check green"/);
+    assert.match(review, /class="badge issue wide" href="https:\/\/github.com\/o\/r\/issues\/20"[^>]*>[\s\S]*?<\/svg>#20 <span class="tt">Parent &lt;i&gt;</);
+    // a PR without an issue says so; an issue card is issue-led and has no issue badge
+    assert.match(section(h, "stuck"), /class="noissue">no issue</);
+    const issue = section(h, "waiting").match(/<article class="card issue">[\s\S]*?T16[\s\S]*?<\/article>/)?.[0] ?? "";
+    assert.match(issue, /class="kind issue"/);
+    assert.doesNotMatch(issue, /badge issue|noissue/);
+    assert.equal(issue.match(/class="badge pr"/g)?.length, 2); // its two merged PRs
   });
 
   test("a Claude chip on every Stuck and Waiting for human card and each other issue without the label", () => {
