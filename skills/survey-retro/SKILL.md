@@ -52,7 +52,8 @@ the session id.
 
 Every tag reads the PR before it merged, so `clean` can hide the worst session: also
 list the failed runs since `<date>` (`gh api "repos/<owner/repo>/actions/runs?status=failure"`)
-and read the session whose merge each one follows. Read the **worst-tagged 5 to 10
+and read the session whose merge each one follows, and any PR still open after two
+days: a stuck PR is tagged `clean` too. Read the **worst-tagged 5 to 10
 sessions** and skip the clean ones. A `not-run`
 that skips a gate outside the diff's scope ("nothing outside `animations/`
 changed") is noise. One that skips a finding's acceptance check is a lead:
