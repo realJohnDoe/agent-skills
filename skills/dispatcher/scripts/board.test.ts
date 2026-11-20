@@ -125,7 +125,7 @@ describe("render", () => {
   test("a closed issue gets the closed-issue icon; automerge is a chip like the other asks", () => {
     assert.match(section(html, "closed"), /class="badge issue closed"[^>]*title="Closed issue #30"/);
     assert.doesNotMatch(section(html, "queue"), /Closed issue/);
-    assert.match(section(html, "pr"), /class="chip sub">Automerge</);
+    assert.match(section(html, "pr"), /class="chip sub">automerge</);
   });
 
   test("a Claude chip on every Stuck and Waiting for human card and each other issue without the label", () => {

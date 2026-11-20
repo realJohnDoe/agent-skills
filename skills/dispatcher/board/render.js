@@ -71,7 +71,7 @@ const cardWith = (c, claude, closed = false) => {
   const sub = c.sub && SUB[/** @type {keyof typeof SUB} */ (c.sub)];
   if (sub) chips.push(`<span class="chip sub">${sub}</span>`);
   if (c.needsReview) chips.push(`<span class="chip sub">Needs review</span>`); // styled like the other Waiting for human asks
-  if (c.automerge) chips.push(`<span class="chip sub">Automerge</span>`);
+  if (c.automerge) chips.push(`<span class="chip sub">automerge</span>`);
   chips.push(claudeChip(c, claude));
   const parent = pr
     ? c.parent
