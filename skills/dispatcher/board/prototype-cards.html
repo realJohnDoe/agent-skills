@@ -1,6 +1,6 @@
 <!doctype html>
 <!-- PROTOTYPE, throwaway. Question: how should the board show issues AND their PRs so the two are easy to tell apart?
-     Three variants of the card layout, switchable with ?variant=A|B|C or the ←/→ keys. Mock data, no board.json.
+     Two variants (A chosen by the user, B explores the PR stages), switchable with ?variant=A|B or the ←/→ keys. Octicons inline. Mock data, no board.json.
      Open via any static server from this directory (or double-click: it only needs board.css). -->
 <html lang="en">
 <head>
@@ -12,52 +12,28 @@
   body { padding-top: 24px; padding-bottom: 96px; }
   main { max-width: 1080px; margin: 0 auto; }
   :root { --issue: #6fd38a; --pr: #b99cff; }
-  /* shared kind marks: issue = open circle, PR = filled square-ish merge mark */
+  /* Octicons (16px, fill currentColor) */
+  .ic { width: 14px; height: 14px; flex: none; fill: currentColor; vertical-align: -2px; }
   .k { display: inline-flex; align-items: center; gap: 5px; font: 700 11px/1 var(--f-mono); letter-spacing: .04em; text-transform: uppercase; }
   .k.issue { color: var(--issue); } .k.pr { color: var(--pr); }
-  .k i { width: 10px; height: 10px; flex: none; display: inline-block; }
-  .k.issue i { border: 2px solid currentColor; border-radius: 50%; }
-  .k.pr i { background: currentColor; border-radius: 2px; transform: rotate(45deg) scale(.85); }
-  .ck { font: 11px var(--f-mono); color: var(--muted); display: inline-flex; align-items: center; gap: 5px; }
-  .ck::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--l); box-shadow: 0 0 6px var(--l); }
-  .ck.green { --l: var(--ok); } .ck.red { --l: var(--bad); } .ck.pending { --l: var(--lamp); }
-  .none { color: var(--muted); font: italic 12px var(--f-body); }
+  .ck { font: 11px var(--f-mono); display: inline-flex; align-items: center; gap: 4px; }
+  .ck.green { color: var(--ok); } .ck.red { color: var(--bad); } .ck.pending { color: var(--lamp); }
   a.t { text-decoration: none; font-weight: 700; overflow-wrap: anywhere; } a.t:hover { text-decoration: underline; }
   .why { color: var(--muted); font-size: 13px; }
+  .none { color: var(--muted); font: italic 12px var(--f-body); }
 
-  /* ===== A: issue-led group. One card per issue; its PRs nest inside as rows. Orphan PR = card with a "no issue" header. ===== */
-  .grp { position: relative; border: 1px solid #000; border-radius: 4px; background: var(--glass); box-shadow: inset 0 0 0 1px var(--holo-dim); overflow: hidden; }
-  .grp .head { padding: 10px 12px; display: grid; gap: 6px; border-left: 3px solid var(--issue); }
-  .grp .head.orphan { border-left-color: var(--pr); }
-  .grp .head .row, .grp .prrow .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-  .grp .prrow { padding: 8px 12px 8px 22px; border-top: 1px dashed var(--seam); border-left: 3px solid var(--pr); background: rgba(185,156,255,.05); display: grid; gap: 4px; }
-  .grp .prrow::before { content: "↳"; position: absolute; left: 9px; color: var(--muted); }
-  .grp .prrow { position: relative; }
-
-  /* ===== B: two-lane ledger. Left lane issues, right lane PRs, one row per issue; PRs stack in the right lane. ===== */
-  .ledger { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0,1fr) 28px minmax(0,1.1fr); gap: 0 0; align-items: stretch; }
-  .ledger .lh { font: 700 11px var(--f-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); padding: 0 4px 6px; }
-  .ledger .cell { background: var(--glass); border: 1px solid #000; padding: 9px 12px; display: grid; gap: 5px; align-content: start; margin-bottom: 8px; }
-  .ledger .cell.i { border-left: 3px solid var(--issue); border-radius: 18px 4px 4px 18px; }
-  .ledger .cell.p { border-left: 3px solid var(--pr); border-radius: 4px; margin-bottom: 6px; }
-  .ledger .cell.void { background: transparent; border: 1px dashed var(--seam); color: var(--muted); font: italic 12px var(--f-body); }
-  .ledger .gap { display: grid; place-items: center; color: var(--muted); margin-bottom: 8px; }
-  .ledger .rt { display: grid; align-content: start; margin-bottom: 2px; }
-  .ledger .rt .cell:last-child { margin-bottom: 8px; }
-  .ledger .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-  @media (max-width: 700px) { .ledger { grid-template-columns: 1fr; } .ledger .gap { display: none; } .ledger .lh { display: none; } }
-
-  /* ===== C: separate cards, tinted by kind, joined by a "closes" tie. Closest to today. Issue cards get a rounded left cap, PR cards a square one. ===== */
-  .kc { position: relative; padding: 10px 12px 10px 16px; display: grid; gap: 6px; align-content: start; border: 1px solid #000; background: var(--glass); }
-  .kc.issue { border-radius: 14px 4px 4px 14px; background: linear-gradient(90deg, rgba(111,211,138,.10), transparent 40%), var(--glass); box-shadow: inset 3px 0 0 var(--issue); }
-  .kc.pr { border-radius: 4px; background: linear-gradient(90deg, rgba(185,156,255,.12), transparent 40%), var(--glass); box-shadow: inset 3px 0 0 var(--pr); }
+  .kc { position: relative; padding: 10px 12px 10px 14px; display: grid; gap: 7px; align-content: start; border: 1px solid #000; background: var(--glass); border-radius: 4px; box-shadow: inset 3px 0 0 var(--edge), inset 0 0 0 1px var(--holo-dim); }
+  .kc.issue { --edge: var(--issue); } .kc.pr { --edge: var(--pr); }
   .kc .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-  .tie { font: 11px var(--f-mono); color: var(--muted); }
-  .tie b { color: var(--fg); font-weight: 600; }
-  .kc.pr.child { margin-left: 18px; }
-  .kc.pr.child::before { content: ""; position: absolute; left: -12px; top: -12px; bottom: 50%; width: 10px; border-left: 2px solid var(--seam); border-bottom: 2px solid var(--seam); border-bottom-left-radius: 6px; }
-  .cluster { display: grid; gap: 6px; align-content: start; }
-
+  .kc.pr .t { display: flex; gap: 7px; align-items: baseline; }
+  /* the badge: a small link chip for the *other* kind */
+  .badge { display: inline-flex; align-items: center; gap: 5px; font: 600 11px/1 var(--f-mono); padding: 4px 7px; border-radius: var(--r); border: 1px solid currentColor; text-decoration: none; white-space: nowrap; max-width: 100%; }
+  .badge.pr { color: var(--pr); } .badge.issue { color: var(--issue); }
+  .badge:hover { background: rgba(255,255,255,.06); }
+  .badge .tt { color: var(--fg); font-weight: 400; overflow: hidden; text-overflow: ellipsis; }
+  .badge.wide { white-space: normal; }
+  .prsub { display: grid; gap: 6px; margin-top: 2px; padding-top: 8px; border-top: 1px dashed var(--seam); }
+  .prsub .r { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
   /* switcher */
   .switch { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); display: flex; align-items: center; gap: 14px; padding: 8px 14px; border-radius: 999px; background: #fff; color: #111; font: 600 13px var(--f-body); box-shadow: 0 6px 24px #000a; z-index: 9; }
   .switch button { border: 0; background: #eee; border-radius: 50%; width: 28px; height: 28px; cursor: pointer; font-size: 15px; }
@@ -88,58 +64,60 @@ const MOCK = {
     { issue: { n: 105, title: "Support ESM-only consumers", tier: "sonnet" }, prs: [], why: "dispatched next" },
   ],
 };
+const P = { // Octicons 16px, inner paths
+  issue: '<path d="M8 9.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"/><path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Z"/>',
+  pr: '<path d="M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.573.677A.25.25 0 0 1 10 .854V2.5h1A2.5 2.5 0 0 1 13.5 5v5.628a2.251 2.251 0 1 1-1.5 0V5a1 1 0 0 0-1-1h-1v1.646a.25.25 0 0 1-.427.177L7.177 3.427a.25.25 0 0 1 0-.354ZM3.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm0 9.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm8.25.75a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Z"/>',
+  green: '<path d="M8 16A8 8 0 1 1 8 0a8 8 0 0 1 0 16Zm3.78-9.72a.751.751 0 0 0-.018-1.042.751.751 0 0 0-1.042-.018L6.75 9.19 5.28 7.72a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042l2 2a.75.75 0 0 0 1.06 0Z"/>',
+  red: '<path d="M2.343 13.657A8 8 0 1 1 13.658 2.343 8 8 0 0 1 2.343 13.657ZM6.03 4.97a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042L6.94 8 4.97 9.97a.749.749 0 0 0 .326 1.275.749.749 0 0 0 .734-.215L8 9.06l1.97 1.97a.749.749 0 0 0 1.275-.326.749.749 0 0 0-.215-.734L9.06 8l1.97-1.97a.749.749 0 0 0-.326-1.275.749.749 0 0 0-.734.215L8 6.94Z"/>',
+  pending: '<path d="M8 4a4 4 0 1 1 0 8 4 4 0 0 1 0-8Z"/>',
+  bot: '<path d="M5.75 7.5a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0v-1.5a.75.75 0 0 1 .75-.75Zm5.25.75a.75.75 0 0 0-1.5 0v1.5a.75.75 0 0 0 1.5 0v-1.5Z"/><path d="M6.25 0h2A.75.75 0 0 1 9 .75V3.5h3.25a2.25 2.25 0 0 1 2.25 2.25V8h.75a.75.75 0 0 1 0 1.5h-.75v2.75a2.25 2.25 0 0 1-2.25 2.25h-8.5a2.25 2.25 0 0 1-2.25-2.25V9.5H.75a.75.75 0 0 1 0-1.5h.75V5.75A2.25 2.25 0 0 1 3.75 3.5H7.5v-2H6.25a.75.75 0 0 1 0-1.5ZM3 5.75v6.5c0 .414.336.75.75.75h8.5a.75.75 0 0 0 .75-.75v-6.5a.75.75 0 0 0-.75-.75h-8.5a.75.75 0 0 0-.75.75Z"/>',
+};
+const ic = (n) => `<svg class="ic" viewBox="0 0 16 16" aria-hidden="true">${P[n]}</svg>`;
 const url = (n, kind) => `https://github.com/${R}/${kind === "pr" ? "pull" : "issues"}/${n}`;
 const repoChip = `<span class="chip repo" style="--repo:#7fb2ff">widgets</span>`;
-const kind = (k) => `<span class="k ${k}"><i></i>${k === "pr" ? "PR" : "Issue"}</span>`;
-const ck = (c) => `<span class="ck ${c}">${c}</span>`;
 const ref = (n) => `<span class="chip ref">#${n}</span>`;
 const tier = (t) => t ? `<span class="chip tier">${t}</span>` : "";
+const ck = (c) => `<span class="ck ${c}" title="CI ${c}">${ic(c)}${c}</span>`;
+const bot = `<span class="chip sub">${ic("bot")} dependabot</span>`;
 const a = (n, kd, title) => `<a class="t" href="${url(n, kd)}">${title}</a>`;
+const prBadge = (p) => `<a class="badge pr" href="${url(p.n, "pr")}" title="${p.title}">${ic("pr")}#${p.n} ${ck(p.check)}</a>`;
+const issueBadge = (i) => `<a class="badge issue wide" href="${url(i.n, "issue")}">${ic("issue")}#${i.n} <span class="tt">${i.title}</span></a>`;
+const stripe = (g) => g.prs.some((p) => p.check === "red") ? "red" : g.prs.some((p) => p.check === "pending") ? "pending" : "green";
 
-// ---- variant A: issue-led group, PRs nested ----
-const A = (g) => {
-  const head = g.issue
-    ? `<div class="head">${kind("issue")}${a(g.issue.n, "issue", g.issue.title)}<div class="row">${repoChip}${ref(g.issue.n)}${tier(g.issue.tier)}${g.prs.length > 1 ? `<span class="chip sub">${g.prs.length} PRs</span>` : ""}</div></div>`
-    : `<div class="head orphan"><span class="none">No issue: opened without one</span></div>`;
-  const prs = g.prs.map((p) => `<div class="prrow"><div class="row">${kind("pr")}${ref(p.n)}${ck(p.check)}${p.bot ? '<span class="chip sub">dependabot</span>' : ""}</div>${a(p.n, "pr", p.title)}</div>`).join("");
-  const none = g.prs.length ? "" : `<div class="prrow"><span class="none">No PR yet</span></div>`;
-  return `<article class="grp">${head}${prs}${none}<div class="head" style="border-left-color:transparent;padding-top:0"><span class="why">${g.why}</span></div></article>`;
+// ---- A: the issue always leads. 1:1 = PR as a small badge; several PRs = a sub-list; orphan PR = PR-led card. ----
+const cardA = (g, stage) => {
+  if (!g.issue) { const p = g.prs[0]; // orphan PR
+    return `<article class="kc pr"><div class="row"><span class="k pr">${ic("pr")}PR</span>${repoChip}${ref(p.n)}${ck(p.check)}${p.bot ? bot : ""}</div>${a(p.n, "pr", p.title)}<span class="why">${g.why}</span></article>`; }
+  const i = g.issue;
+  const one = g.prs.length === 1, many = g.prs.length > 1;
+  return `<article class="kc issue"><div class="row"><span class="k issue">${ic("issue")}Issue</span>${repoChip}${ref(i.n)}${tier(i.tier)}${one ? prBadge(g.prs[0]) : ""}</div>
+    ${a(i.n, "issue", i.title)}
+    ${many ? `<div class="prsub">${g.prs.map((p) => `<div class="r">${prBadge(p)}<span class="why">${p.title}</span></div>`).join("")}</div>` : ""}
+    <span class="why">${g.why}</span></article>`;
 };
-const renderA = (gs) => `<div class="stack">${gs.map(A).join("")}</div>`;
 
-// ---- variant B: two-lane ledger, issues left, PRs right ----
-const renderB = (gs) => `<div class="stack"><div class="ledger">
-  <div class="lh">Issues</div><div></div><div class="lh">Pull requests</div>
-  ${gs.map((g) => `
-    ${g.issue
-      ? `<div class="cell i"><div class="row">${kind("issue")}${ref(g.issue.n)}${tier(g.issue.tier)}</div>${a(g.issue.n, "issue", g.issue.title)}<span class="why">${g.why}</span></div>`
-      : `<div class="cell void">no issue</div>`}
-    <div class="gap">${g.prs.length ? "→" : "·"}</div>
-    <div class="rt">${g.prs.length
-      ? g.prs.map((p) => `<div class="cell p"><div class="row">${kind("pr")}${ref(p.n)}${ck(p.check)}${p.bot ? '<span class="chip sub">dependabot</span>' : ""}</div>${a(p.n, "pr", p.title)}</div>`).join("")
-      : `<div class="cell void">no PR yet</div>`}</div>`).join("")}
-</div></div>`;
-
-// ---- variant C: separate kind-tinted cards, PRs tied to their issue ----
-const renderC = (gs) => `<div class="stack">${gs.map((g) => `<div class="cluster">
-  ${g.issue ? `<article class="kc issue"><div class="row">${kind("issue")}${repoChip}${ref(g.issue.n)}${tier(g.issue.tier)}</div>${a(g.issue.n, "issue", g.issue.title)}${g.prs.length ? "" : `<span class="why">${g.why}</span>`}</article>` : ""}
-  ${g.prs.map((p) => `<article class="kc pr${g.issue ? " child" : ""}"><div class="row">${kind("pr")}${g.issue ? "" : repoChip}${ref(p.n)}${ck(p.check)}${p.bot ? '<span class="chip sub">dependabot</span>' : ""}</div>${a(p.n, "pr", p.title)}<span class="tie">${g.issue ? `closes <b>#${g.issue.n}</b>` : "closes nothing"} · ${g.why}</span></article>`).join("")}
-</div>`).join("")}</div>`;
+// ---- B: the stage decides who leads. PR stages: PR-led cards (one per PR) with the issue as a badge. Issue stages: as A. ----
+const cardB = (g, stage) => {
+  if (stage === "queue" || !g.prs.length) return cardA(g, stage);
+  return g.prs.map((p) => `<article class="kc pr"><div class="row"><span class="k pr">${ic("pr")}PR</span>${repoChip}${ref(p.n)}${ck(p.check)}${p.bot ? bot : ""}</div>
+    ${a(p.n, "pr", p.title)}
+    ${g.issue ? issueBadge(g.issue) : `<span class="none">no issue</span>`}
+    <span class="why">${g.prs.length > 1 ? `1 of ${g.prs.length} PRs for #${g.issue.n} · ` : ""}${g.why}</span></article>`).join("");
+};
 
 const VARIANTS = {
-  A: { name: "Issue group, PRs nested", fn: renderA, note: "One card per issue; its PRs sit inside as rows. A PR without an issue gets a card with a 'no issue' header." },
-  B: { name: "Two lanes: issues | PRs", fn: renderB, note: "A ledger: issues in the left lane, PRs in the right. Multiple PRs stack beside their issue; gaps show as dashed 'no issue' / 'no PR yet'." },
-  C: { name: "Separate cards, tied", fn: renderC, note: "Every issue and every PR is its own card, tinted and shaped by kind. PR cards hang off their issue with a 'closes #n' tie." },
+  A: { name: "Issue always leads", card: cardA, note: "One card per issue. A 1:1 PR is a small badge (icon, number, CI) in the chip row; several PRs get a sub-list; a PR without an issue is a PR-led card." },
+  B: { name: "Stage decides the lead", card: cardB, note: "In the PR stages the PR leads (its title, CI) and the parent issue is a badge underneath; one card per PR. In Queue the issue leads, as in A." },
 };
 const keys = Object.keys(VARIANTS);
-const module = (id, name, hint, groups, v) => `<section class="module m-${id}"><div class="module-head"><span class="led"></span><h2>${name}</h2><span class="hint">${hint}</span><span class="readout">${String(groups.length).padStart(2, "0")}</span></div>${v.fn(groups)}</section>`;
+const module = (id, name, hint, groups, v) => { const cards = groups.map((g) => v.card(g, id)); const n = cards.reduce((t, c) => t + (c.match(/<article/g) || []).length, 0); return `<section class="module m-${id}"><div class="module-head"><span class="led"></span><h2>${name}</h2><span class="hint">${hint}</span><span class="readout">${String(n).padStart(2, "0")}</span></div><div class="stack">${cards.join("")}</div></section>`; };
 
 function show(k) {
   const v = VARIANTS[k];
   document.getElementById("label").textContent = `${k} (${v.name})`;
   document.getElementById("note").textContent = v.note;
   document.getElementById("out").innerHTML =
-    `<div class="line">${module("waiting", "Waiting for human", "needs review", MOCK.review, v)}${module("pr", "PR in progress", "red first", MOCK.progress, v)}</div>`;
+    `<div class="line">${module("waiting", "Waiting for human", "needs review", MOCK.review, v)}${module("pr", "PR in progress", "red first", MOCK.progress.filter((g) => g.prs.length), v)}${module("queue", "Queue", "in pickup order", MOCK.progress.filter((g) => !g.prs.length), v)}</div>`;
   const u = new URL(location.href); u.searchParams.set("variant", k); history.replaceState(null, "", u);
 }
 const cur = () => { const k = new URLSearchParams(location.search).get("variant"); return keys.includes(k) ? k : "A"; };
