@@ -289,8 +289,13 @@ describe("prVerdict", () => {
         prVerdict(pr({ runs: [{ name: "b", status: "in_progress", conclusion: null }] })).kind,
         "wait",
       ));
-    test("no checks at all: wait", () =>
-      assert.equal(prVerdict(pr({ runs: [] })).kind, "wait"));
+    test("no checks at all within the grace hour: wait", () =>
+      assert.equal(prVerdict(pr({ runs: [], headDate: new Date(+TODAY - 36e5 / 2).toISOString() })).kind, "wait"));
+    test("no checks at all past the grace hour: follow up, never merge", () => {
+      const v = prVerdict(pr({ runs: [], labels: ["automerge"] }));
+      assert.equal(v.kind, "followup");
+      assert.equal(v.noCi, true);
+    });
     test("conflict without CI: follow up without waiting", () => {
       const v = prVerdict(pr({ runs: [], mergeable: false }));
       assert.equal(v.kind, "followup");

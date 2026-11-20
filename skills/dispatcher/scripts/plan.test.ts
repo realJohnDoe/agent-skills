@@ -40,6 +40,7 @@ const pr = (n: number, title: string, extra: Any = {}) => ({
   ...extra,
 });
 const green = [{ name: "build", status: "completed", conclusion: "success" }];
+const pending = [{ name: "build", status: "in_progress", conclusion: null }];
 const red = [{ name: "build", status: "completed", conclusion: "failure", html_url: "https://ci/1" }];
 const claim = (at: string) => [{ body: "<!-- workshop-dispatch -->", created_at: at, html_url: "u", user: { login: "b", type: "User" } }];
 
@@ -136,7 +137,7 @@ describe("planRepo", () => {
           issue(63, "Someone's own work", ["sonnet"], { assignees: [{ login: "someone" }] }),
           issue(64, "Someone's own plan", ["plan"], { assignees: [{ login: "someone" }] }),
         ],
-        prs: [pr(70, "Do 60", { body: "Fixes #60", runs: [], mergeable: true })],
+        prs: [pr(70, "Do 60", { body: "Fixes #60", runs: pending, mergeable: true })],
         dispatchedAt: { 61: "2026-11-13T10:00:00Z", 62: null, 63: null, 64: null },
       }),
       OPTS,
@@ -154,9 +155,9 @@ describe("planRepo", () => {
       snap(M, {
         issues: [issue(60, "Parent one", ["sonnet", "ready-for-agent"]), issue(61, "Parent two", [])],
         prs: [
-          pr(70, "Closes", { body: "Fixes #60", runs: [], mergeable: true }),
-          pr(71, "Only refs", { body: "Refs #61", runs: [], mergeable: true }),
-          pr(72, "Orphan", { body: "Closes #99", runs: [], mergeable: true }),
+          pr(70, "Closes", { body: "Fixes #60", runs: pending, mergeable: true }),
+          pr(71, "Only refs", { body: "Refs #61", runs: pending, mergeable: true }),
+          pr(72, "Orphan", { body: "Closes #99", runs: pending, mergeable: true }),
         ],
       }),
       OPTS,

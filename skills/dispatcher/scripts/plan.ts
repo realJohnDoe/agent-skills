@@ -46,7 +46,7 @@ export type Followup = Candidate & {
   pr: number;
   issue: number | undefined;
   branch: string;
-  brief: { url: string; base: string; conflict: boolean; failing: string[]; feedback: string[]; bot: boolean };
+  brief: { url: string; base: string; conflict: boolean; noCi: boolean; failing: string[]; feedback: string[]; bot: boolean };
 };
 export type Dispatch = Candidate & { kind: "dispatch"; issue: number; brief: { url: string; base: string; refs: boolean } };
 export type Session = (Followup | Dispatch) & { prompt: string };
@@ -153,7 +153,7 @@ export function planRepo(s: RepoSnapshot, opts: PlanOptions): RepoPlan {
             ? "green"
             : "pending",
     });
-    if (ciRunning(runs, mergeable)) {
+    if (ciRunning(runs, mergeable, headDate, opts.today)) {
       out.inProgress.push({ ...it, why: "CI running" });
       continue;
     }
@@ -204,6 +204,7 @@ export function planRepo(s: RepoSnapshot, opts: PlanOptions): RepoPlan {
             url: pr.html_url,
             base,
             conflict: v.conflict,
+            noCi: v.noCi,
             failing: v.failing.map((r) => `${r.name}: ${r.html_url}`),
             feedback: v.feedback.map((c) => c.html_url),
             bot,
@@ -362,6 +363,11 @@ export function prompt(c: Followup | Dispatch): string {
       ...(b.conflict
         ? [
             `- Merge conflict with ${b.base}: merge or rebase \`${b.base}\` into the branch, resolve the conflicts and push. This is a conflict resolution, not a CI fix; CI runs once it pushes.`,
+          ]
+        : []),
+      ...(b.noCi
+        ? [
+            `- No CI ran on this PR (it may predate the repo's workflows): rebase it onto \`${b.base}\` and push, which starts them. If the repo has no workflow that runs on \`pull_request\`, push nothing and say so in a PR comment.`,
           ]
         : []),
       ...b.failing.map((r) => `- CI failing: ${r}`),

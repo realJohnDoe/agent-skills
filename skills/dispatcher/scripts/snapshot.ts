@@ -114,7 +114,7 @@ export function fetchRepo(r: Repo): RepoSnapshot {
       sleep(3000);
       mergeable = readMergeable();
     }
-    const decided = !ciRunning(runs, mergeable);
+    const decided = !ciRunning(runs, mergeable, head.commit.committer.date, new Date());
     return {
       pr,
       headDate: head.commit.committer.date,
