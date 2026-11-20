@@ -117,7 +117,7 @@ export const blockedText = (blockers: ResolvedBlocker[]) =>
 
 export type Feedback = GhComment | GhReview;
 
-type Facts = { conflict: boolean; failing: GhCheckRun[]; feedback: Feedback[] };
+type Facts = { conflict: boolean; failing: GhCheckRun[]; feedback: Feedback[]; noCi: boolean };
 type Verdict =
   | { kind: "wait"; why: string }
   | { kind: "review"; why?: string }
@@ -135,13 +135,18 @@ type Verdict =
  *   (a session that opened its PR with another session's description)
  * - `merge`: green, quiet and labelled `automerge`
  * - `unstick`: at its follow-up cap, or a follow-up went stale; `why` says which
- * - `followup`: conflict, red CI or human feedback newer than the head commit
+ * - `followup`: conflict, red CI, no CI at all an hour after the head commit
+ *   (`noCi`) or human feedback newer than the head commit
  */
 export type PrVerdict = Facts & Verdict;
 
 /** CI still running on a PR that doesn't conflict: nothing to decide yet, so its feedback isn't read. */
-export const ciRunning = (runs: GhCheckRun[], mergeable: boolean | null) =>
-  mergeable !== false && !(runs.length > 0 && runs.every((r) => r.status === "completed"));
+export const ciRunning = (runs: GhCheckRun[], mergeable: boolean | null, headDate: string, today: Date) =>
+  mergeable !== false && !(runs.length > 0 && runs.every((r) => r.status === "completed")) && !noCiRan(runs, headDate, today);
+
+/** No check run at all an hour after the head commit: no workflow triggered on it, so CI isn't "running". */
+export const noCiRan = (runs: GhCheckRun[], headDate: string, today: Date) =>
+  runs.length === 0 && days(today, headDate) > 1 / 24;
 
 export type PrFacts = {
   dependabot: boolean;
@@ -173,8 +178,9 @@ export const prVerdict = (pr: PrFacts): PrVerdict => {
     ? pr.runs.filter((r) => FAILED.includes(r.conclusion ?? ""))
     : [];
   let feedback: Feedback[] = [];
-  const out = (v: Verdict): PrVerdict => ({ ...v, conflict, failing, feedback });
-  if (!finished && !conflict) return out({ kind: "wait", why: "CI running" });
+  const noCi = noCiRan(pr.runs, pr.headDate, pr.today);
+  const out = (v: Verdict): PrVerdict => ({ ...v, conflict, failing, feedback, noCi });
+  if (!finished && !conflict && !noCi) return out({ kind: "wait", why: "CI running" });
   feedback = [
     ...pr.comments,
     ...pr.reviewComments,
@@ -185,7 +191,7 @@ export const prVerdict = (pr: PrFacts): PrVerdict => {
       c.user.type !== "Bot" &&
       !AGENT.test(c.body ?? ""),
   );
-  if (failing.length === 0 && feedback.length === 0 && !conflict) {
+  if (failing.length === 0 && feedback.length === 0 && !conflict && !noCi) {
     // Each repo's Dependabot workflow labels all but majors `automerge`, and
     // drops the label when anyone else pushes; those wait for a human. The
     // script merges rather than GitHub's auto-merge because a merge with the
@@ -211,7 +217,7 @@ export const prVerdict = (pr: PrFacts): PrVerdict => {
   )
     return out({
       kind: "unstick",
-      why: `${conflict ? `conflicts with ${pr.base ?? "main"}` : failing.length ? "CI red" : "unanswered review"} after ${marks.length} follow-up(s)`,
+      why: `${conflict ? `conflicts with ${pr.base ?? "main"}` : failing.length ? "CI red" : noCi ? "no CI ran" : "unanswered review"} after ${marks.length} follow-up(s)`,
     });
   if (pending) return out({ kind: "wait", why: "follow-up pending" });
   return out({ kind: "followup" });
