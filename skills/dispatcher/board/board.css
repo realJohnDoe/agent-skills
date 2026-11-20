@@ -20,6 +20,8 @@
   --bad: #ff5d76;
   --bad-dim: rgba(255, 93, 118, .12);
   --indigo: #9d8cff;
+  --issue: #6fd38a;         /* an issue's mark and card edge */
+  --pr: #b99cff;            /* a PR's */
   --f-display: "Chakra Petch", "Segoe UI", system-ui, sans-serif;
   --f-body: "Atkinson Hyperlegible", system-ui, -apple-system, sans-serif;
   --f-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -146,8 +148,11 @@ main { max-width: 1080px; margin: 0 auto; }
   border: 1px solid #000;
   box-shadow: inset 0 0 0 1px var(--holo-dim), inset 0 0 18px rgba(94, 231, 242, .05);
 }
-.card::before { /* the stage's colour as a thin lit edge */
-  content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 2px; background: var(--c); box-shadow: 0 0 6px var(--c);
+.card { --edge: var(--c); }
+.card.issue { --edge: var(--issue); }
+.card.pr { --edge: var(--pr); }
+.card::before { /* the kind's colour as a thin lit edge: green for an issue, purple for a PR */
+  content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 2px; background: var(--edge); box-shadow: 0 0 6px var(--edge);
 }
 .card .title { font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
 .card .title a { text-decoration: none; }
@@ -156,21 +161,30 @@ main { max-width: 1080px; margin: 0 auto; }
 .card .why { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
 
 /* every chip is the same rectangle; only its fill or outline changes */
-.chip { font: 600 11px/1 var(--f-mono); padding: 4px 7px; border-radius: var(--r); letter-spacing: .03em; border: 1px solid transparent; }
+/* every chip and badge on a card's top row is --h tall, whatever its font or icon */
+.card { --h: 22px; }
+.chip { display: inline-flex; align-items: center; height: var(--h); font: 600 11px/1 var(--f-mono); padding: 0 7px; border-radius: var(--r); letter-spacing: .03em; border: 1px solid transparent; }
 .chip.repo { color: var(--repo); border-color: currentColor; }
-.chip.ref { color: var(--muted); padding-inline: 0; }
 .chip.tier { background: var(--holo-dim); color: var(--holo); }
 .chip.sub { background: var(--metal-hi); color: var(--fg); }
-.chip.prlink { color: var(--holo); border-color: var(--holo); text-decoration: none; }
-.chip.prlink:hover { background: var(--holo-dim); }
-.chip.claude { color: #f0a283; border-color: currentColor; text-decoration: none; padding: 1px 5px; font: 700 15px/1 var(--f-body); } /* Claude's coral */
+/* Octicons, and the badge: a small link to the card itself (its kind's icon, number and a PR's CI)
+   or to its other kind (a PR's issue, an issue's merged PRs) */
+.ic { width: 14px; height: 14px; flex: none; fill: currentColor; }
+.badge { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; height: var(--h); font: 600 11px/14px var(--f-mono); /* 14px: the icon's height, so it sits on the text's line */ padding: 0 7px; border-radius: var(--r); border: 1px solid currentColor; text-decoration: none; }
+.badge.issue { justify-self: start; }
+/* by state, as on GitHub: open green, merged PR and closed (done) issue purple */
+.badge.open { color: var(--ok); }
+.badge.merged, .badge.closed { color: var(--pr); }
+.badge:hover { background: rgba(255, 255, 255, .06); }
+.badge .tt { color: var(--fg); font-weight: 400; overflow-wrap: anywhere; }
+.badge.wide { align-items: flex-start; height: auto; min-height: var(--h); padding-block: 3px; } /* a wrapped title keeps the icon on its first line */
+.noissue { color: var(--muted); font: italic 12px var(--f-body); }
+.chip.claude { color: #f0a283; border-color: currentColor; text-decoration: none; padding: 0 5px; font: 700 15px/1 var(--f-body); } /* Claude's coral */
 .chip.claude:hover { background: rgba(240, 162, 131, .14); }
-.chip.auto { background: var(--ok); color: #062312; }
-.check { display: inline-flex; align-items: center; gap: 5px; font: 11px var(--f-mono); color: var(--muted); }
-.check::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--l); box-shadow: 0 0 6px var(--l); }
-.check.green { --l: var(--ok); }
-.check.red { --l: var(--bad); }
-.check.pending { --l: var(--lamp); }
+.check { display: inline-flex; align-items: center; margin-left: 2px; } /* a PR's CI, inside its badge after the number */
+.check.green { color: var(--ok); }
+.check.red { color: var(--bad); }
+.check.pending { color: var(--lamp); }
 
 .empty { grid-column: 1 / -1; font: 12px var(--f-mono); color: var(--muted); padding: 4px 0; letter-spacing: .04em; text-transform: uppercase; }
 .empty::before { content: "◦ "; color: var(--c); }

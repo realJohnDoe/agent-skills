@@ -149,6 +149,24 @@ describe("planRepo", () => {
     assert.deepEqual([p.dispatches, p.behind, p.triage, p.decide], [[], [], [], []]);
   });
 
+  test("a PR carries its open issue as `parent`, whether it closes or only references it; one with no open issue has none", () => {
+    const p = planRepo(
+      snap(M, {
+        issues: [issue(60, "Parent one", ["sonnet", "ready-for-agent"]), issue(61, "Parent two", [])],
+        prs: [
+          pr(70, "Closes", { body: "Fixes #60", runs: [], mergeable: true }),
+          pr(71, "Only refs", { body: "Refs #61", runs: [], mergeable: true }),
+          pr(72, "Orphan", { body: "Closes #99", runs: [], mergeable: true }),
+        ],
+      }),
+      OPTS,
+    );
+    const parent = (n: number) => p.inProgress.find((i) => i.pr === n)?.parent;
+    assert.deepEqual(parent(70), { number: 60, title: "Parent one", url: "https://github.com/x/issues/60" });
+    assert.equal(parent(71)?.number, 61);
+    assert.equal(parent(72), undefined);
+  });
+
   test("the workshop's can't-push issue is Stuck, never dispatched or waiting", () => {
     const body = `<!-- workshop-cant-push: ${T} -->\nThe workshop can't push to it.`;
     const p = planRepo(snap(M, { issues: [issue(70, `Workshop can't push to ${T}`, ["sonnet", "ready-for-agent"], { body })] }), OPTS);

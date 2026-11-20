@@ -27,6 +27,7 @@ export type Item = {
   check?: "green" | "red" | "pending";
   automerge?: boolean;
   linkedPrs?: number[]; // the PRs an issue's step waits on
+  parent?: { number: number; title: string; url: string }; // a PR's open issue: the first its description closes or references
   sub?: "decide" | "afterMerge" | "goAhead" | "plan" | "tier" | "assigned" | "blocked"; // why an issue waits
   unready?: boolean; // an issue without `ready-for-agent`: the board links it to a Claude Code session
 };
