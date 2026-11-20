@@ -40,7 +40,7 @@ const ICONS = {
 /** @param {keyof typeof ICONS} name */
 const icon = (name) => `<svg class="ic" viewBox="0 0 16 16" aria-hidden="true">${ICONS[name]}</svg>`;
 /** @param {"issue" | "pr"} kind */
-const kindMark = (kind) => `<span class="kind ${kind}">${icon(kind)}${kind === "pr" ? "PR" : "Issue"}</span>`;
+const kindMark = (kind) => `<span class="kind ${kind}">${icon(kind)}<span class="lbl">${kind === "pr" ? "PR" : "Issue"}</span></span>`;
 
 /** @param {Card} c @param {boolean} claude show the Claude chip whether or not it is unready */
 const cardWith = (c, claude) => {

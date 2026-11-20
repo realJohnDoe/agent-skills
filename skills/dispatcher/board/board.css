@@ -169,6 +169,7 @@ main { max-width: 1080px; margin: 0 auto; }
 /* Octicons, and the badge: a small link to the card's other kind (a PR's issue, an issue's merged PRs) */
 .ic { width: 14px; height: 14px; flex: none; fill: currentColor; }
 .kind { display: inline-flex; align-items: center; gap: 5px; font: 700 11px/1 var(--f-mono); letter-spacing: .04em; text-transform: uppercase; }
+.kind .lbl { position: relative; top: 1px; } /* caps sit above the centre of their line box; nudge them level with the icon */
 .kind.issue { color: var(--issue); }
 .kind.pr { color: var(--pr); }
 .badge { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; font: 600 11px/14px var(--f-mono); /* 14px: the icon's height, so it sits on the text's line */ padding: 4px 7px; border-radius: var(--r); border: 1px solid currentColor; text-decoration: none; }
