@@ -17,7 +17,7 @@ Every finding has these; the running skill adds its own (a category, an impact s
 - **Title**: short label.
 - **Breadth**: the number of **files** affected, from a search (grep/glob) you name; write "est." if you estimated. Where the exposure is a *condition* ("every entry, whenever two tabs are open"), say that instead, still naming the search, including one with **zero** hits where absence is the point.
 - **Tier**: per **Choosing a tier** in `SKILL.md`, rated with the Task context present, plus `plan` where the fix spans several PRs.
-- **Evidence**: at least one file path plus a short **verbatim quote** from it, grep-safe: one line, or the line range. For a toolchain or registry finding, a config quote plus the command and its output (dated).
+- **Evidence**: at least one file path plus a short **verbatim quote** from it, grep-safe: one line, or the line range. For a toolchain or registry finding, a config quote plus the command and its output (dated); for a CI failure, the failing step's error line from a job log of this repo (`gh api repos/<owner/repo>/actions/jobs/<id>/logs`), not a sibling repo's.
 - **Problem**: one sentence: what is wrong and why it matters.
 - **Fix**: one sentence: the concrete change, and the check that shows it's done. Where the run measured something, say how the measurement should read afterwards.
 - **Task context**: the specifics **Choosing a tier** lists, verified, with measured numbers dated for re-measuring. For an extraction, state what the moved code depends on *and* what still depends on it, and say you checked both.
