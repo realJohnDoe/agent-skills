@@ -133,6 +133,9 @@ export function planRepo(s: RepoSnapshot, opts: PlanOptions): RepoPlan {
     const issue = referencedIssues(pr.body)
       .map((n) => byNumber.get(n))
       .find((i) => i && tierOf(names(i)));
+    const parentIssue = referencedIssues(pr.body)
+      .map((n) => byNumber.get(n))
+      .find((i) => i);
     const bot = pr.user.login === "dependabot[bot]";
     // A red bump is undiagnosed and often rooted in a dependency's own change.
     const tier = issue ? tierOf(names(issue)) : bot ? "opus" : "sonnet";
@@ -141,6 +144,7 @@ export function planRepo(s: RepoSnapshot, opts: PlanOptions): RepoPlan {
       pr: pr.number,
       created: pr.created_at,
       tier: issue && (tierOf(names(issue)) as Item["tier"]),
+      ...(parentIssue && { parent: { number: parentIssue.number, title: parentIssue.title, url: parentIssue.html_url } }),
       automerge: names(pr).includes(AUTOMERGE) || !!pr.auto_merge,
       check:
         mergeable === false || (finished && runs.some((r) => FAILED.includes(r.conclusion ?? "")))
