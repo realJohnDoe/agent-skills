@@ -110,15 +110,22 @@ describe("render", () => {
     );
     const h = render(withParent, now);
     const review = section(h, "waiting").match(/<article class="card pr">[\s\S]*?T10[\s\S]*?<\/article>/)?.[0] ?? "";
-    assert.match(review, /class="kind pr"/);
-    assert.match(review, /class="check green"/);
+    assert.match(review, /class="badge pr" href="https:\/\/github.com\/o\/r\/issues\/10"[^>]*>[\s\S]*?<\/svg>#10<span class="check green"/);
     assert.match(review, /class="badge issue wide" href="https:\/\/github.com\/o\/r\/issues\/20"[^>]*>[\s\S]*?<\/svg>#20 <span class="tt">Parent &lt;i&gt;</);
     // a PR without an issue says so; an issue card is issue-led and has no issue badge
     assert.match(section(h, "stuck"), /class="noissue">no issue</);
     const issue = section(h, "waiting").match(/<article class="card issue">[\s\S]*?T16[\s\S]*?<\/article>/)?.[0] ?? "";
-    assert.match(issue, /class="kind issue"/);
-    assert.doesNotMatch(issue, /badge issue|noissue/);
+    assert.match(issue, /class="badge issue" href="https:\/\/github.com\/o\/r\/issues\/16"[^>]*>[\s\S]*?<\/svg>#16</);
+    assert.doesNotMatch(issue, /badge issue wide|noissue/);
     assert.equal(issue.match(/class="badge pr"/g)?.length, 2); // its two merged PRs
+    assert.match(issue, /title="Merged pull request #40"/);
+    assert.match(issue, /title="Issue #16"/);
+  });
+
+  test("a closed issue gets the closed-issue icon; automerge is a chip like the other asks", () => {
+    assert.match(section(html, "closed"), /title="Closed issue #30"/);
+    assert.doesNotMatch(section(html, "queue"), /Closed issue/);
+    assert.match(section(html, "pr"), /class="chip sub">Automerge</);
   });
 
   test("a Claude chip on every Stuck and Waiting for human card and each other issue without the label", () => {
