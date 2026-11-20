@@ -116,7 +116,7 @@ File the run per the `surveys` skill's **Reporting**, with `retro` as the survey
 4. **Findings — top 5.** The `surveys` skill's finding fields, plus:
    - **Sessions** — the PRs/session ids it was seen in, and what happened in each
      (one line, with a verbatim quote from the transcript or PR).
-   - **Category** — one of the tags below. Label only `retro` + `survey-finding` + the tier (and `plan` where it applies).
+   - **Category** — one of the tags below, in the body only: it is not a label.
    - **Impact** — 1–10, where 10 = it already shipped a wrong change that no
      check caught; 5 = it costs a red CI round or a follow-up session each time
      it fires; 1 = wasted tokens only.
