@@ -48,7 +48,7 @@ const cardWith = (c, claude) => {
   // open issue in a badge; an issue card names its merged PRs in badges.
   const pr = c.kind === "pr";
   const chips = [kindMark(c.kind), repoChip(c.repo), `<span class="chip ref">#${c.number}</span>`];
-  if (c.check) chips.push(`<span class="check ${c.check}" title="CI ${c.check}">${icon(c.check)}${c.check}</span>`);
+  if (c.check) chips.push(`<span class="check ${c.check}" role="img" title="CI ${c.check}" aria-label="CI ${c.check}">${icon(c.check)}</span>`); // the icon says it; the word would repeat it
   for (const n of c.prs ?? [])
     chips.push(`<a class="badge pr" href="${esc(`https://github.com/${c.repo}/pull/${n}`)}" target="_blank" rel="noopener" title="Pull request #${n}">${icon("pr")}#${n}</a>`);
   if (c.tier) chips.push(`<span class="chip tier">${c.tier}</span>`);
