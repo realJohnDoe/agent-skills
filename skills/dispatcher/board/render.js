@@ -40,14 +40,14 @@ const ICONS = {
 /** @param {keyof typeof ICONS} name */
 const icon = (name) => `<svg class="ic" viewBox="0 0 16 16" aria-hidden="true">${ICONS[name]}</svg>`;
 /** @param {"issue" | "pr"} kind */
-const kindMark = (kind) => `<span class="kind ${kind}">${icon(kind)}${kind === "pr" ? "PR" : "Issue"}</span>`;
+const kindMark = (kind) => `<span class="kind ${kind}">${icon(kind)}<span class="lbl">${kind === "pr" ? "PR" : "Issue"}</span></span>`;
 
 /** @param {Card} c @param {boolean} claude show the Claude chip whether or not it is unready */
 const cardWith = (c, claude) => {
-  // A card leads with what it is. A PR card (a PR's stage is about the PR: its CI, its review) names its
+  // A card leads with where it is (repo, number), then what it is (issue or PR, with its CI). A PR card (a PR's stage is about the PR: its CI, its review) names its
   // open issue in a badge; an issue card names its merged PRs in badges.
   const pr = c.kind === "pr";
-  const chips = [kindMark(c.kind), repoChip(c.repo), `<span class="chip ref">#${c.number}</span>`];
+  const chips = [repoChip(c.repo), `<span class="chip ref">#${c.number}</span>`, kindMark(c.kind)];
   if (c.check) chips.push(`<span class="check ${c.check}" role="img" title="CI ${c.check}" aria-label="CI ${c.check}">${icon(c.check)}</span>`); // the icon says it; the word would repeat it
   for (const n of c.prs ?? [])
     chips.push(`<a class="badge pr" href="${esc(`https://github.com/${c.repo}/pull/${n}`)}" target="_blank" rel="noopener" title="Pull request #${n}">${icon("pr")}#${n}</a>`);
