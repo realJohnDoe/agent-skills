@@ -238,6 +238,14 @@ describe("assemble", () => {
     assert.ok(dispatch.prompt.includes("`Fixes #4`, or `Refs #4` when"));
   });
 
+  test("a Dependabot major's follow-up must check breaking changes, a minor's need not", () => {
+    const f = (title: string) =>
+      runOf([planRepo(snap(T, { prs: [pr(8, title, { user: { login: "dependabot[bot]" }, runs: red, mergeable: true })] }), OPTS)], 1)
+        .sessions[0].prompt;
+    assert.ok(f("Bump js-yaml from 4.3.2 to 5.5.0").includes("read the changelog's breaking changes"));
+    assert.ok(!f("Bump x from 4.3.2 to 4.4.0").includes("breaking changes"));
+  });
+
   test("without a session cap it starts nothing, lists nothing as not started, and queues every dispatch", () => {
     const run = runOf(plans());
     assert.deepEqual(run.sessions, []);
