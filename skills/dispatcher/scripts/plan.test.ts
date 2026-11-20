@@ -236,6 +236,7 @@ describe("assemble", () => {
     assert.ok(followup.prompt.includes("- CI failing: build: https://ci/1"));
     assert.ok(dispatch.prompt.includes("Label the PR `automerge`"));
     assert.ok(dispatch.prompt.includes("`Fixes #4`, or `Refs #4` when"));
+    assert.ok(dispatch.prompt.includes("If you can't open a PR"));
   });
 
   test("a Dependabot major's follow-up must check breaking changes, a minor's need not", () => {

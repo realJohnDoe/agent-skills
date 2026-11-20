@@ -393,6 +393,7 @@ export function prompt(c: Followup | Dispatch): string {
     `Implement ${ref(n)} (${url}), following ${repo}'s CLAUDE.md and the docs it points to.`,
     ...setup(path, wt, [`git -C ${path} fetch origin ${base}`, `git -C ${path} worktree add -b ${branch} ${wt} origin/${base}`]),
     `Push the branch \`${branch}\` and open a PR in ${repo} that says ${refs ? `\`Refs #${n}\`` : `\`Fixes #${n}\`, or \`Refs #${n}\` when the \`conventions\` skill says so`}. If the repo has a PR template, fill it in. Before pushing, run the checks ${repo}'s CLAUDE.md asks for, and give their result in the PR.`,
+    `If you can't open a PR (the issue is obsolete, blocked, or only partly doable), comment on the issue with what you found, what is left and, for an obsolete issue, the evidence. Don't close the issue or add \`ready-for-agent\`.`,
     c.tier === "opus"
       ? `Don't label the PR \`${AUTOMERGE}\`: it waits for the maintainer's review.`
       : `Label the PR \`${AUTOMERGE}\`: the dispatcher merges it once green.`,
