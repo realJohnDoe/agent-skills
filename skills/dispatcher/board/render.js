@@ -42,8 +42,9 @@ const ICONS = {
 /** @param {keyof typeof ICONS} name */
 const icon = (name) => `<svg class="ic" viewBox="0 0 16 16" aria-hidden="true">${ICONS[name]}</svg>`;
 /**
- * The card's own badge: its icon (open or closed issue; a PR card is always open), its number
- * and, on a PR, its CI. Styled like the badges that link a card to its other kind.
+ * The card's own badge: its icon (open or closed issue; a PR card is always an open, non-draft PR),
+ * its number and, on a PR, its CI. Styled like the badges that link a card to its other kind, and
+ * coloured by state as GitHub does: open green, merged or closed (done) purple.
  * @param {Card} c @param {boolean} closed
  */
 const refBadge = (c, closed) => {
@@ -51,7 +52,7 @@ const refBadge = (c, closed) => {
   const what = pr ? "Pull request" : closed ? "Closed issue" : "Issue";
   // the check icon says it; the word would repeat it
   const check = pr && c.check ? `<span class="check ${c.check}" role="img" title="CI ${c.check}" aria-label="CI ${c.check}">${icon(c.check)}</span>` : "";
-  return `<a class="badge ${c.kind}" href="${esc(c.url)}" target="_blank" rel="noopener" title="${what} #${c.number}" aria-label="${what} #${c.number}">${icon(pr ? "pr" : closed ? "issueClosed" : "issue")}#${c.number}${check}</a>`;
+  return `<a class="badge ${c.kind} ${closed ? "closed" : "open"}" href="${esc(c.url)}" target="_blank" rel="noopener" title="${what} #${c.number}" aria-label="${what} #${c.number}">${icon(pr ? "pr" : closed ? "issueClosed" : "issue")}#${c.number}${check}</a>`;
 };
 
 /**
@@ -65,7 +66,7 @@ const cardWith = (c, claude, closed = false) => {
   const pr = c.kind === "pr";
   const chips = [repoChip(c.repo), refBadge(c, closed)];
   for (const n of c.prs ?? [])
-    chips.push(`<a class="badge pr" href="${esc(`https://github.com/${c.repo}/pull/${n}`)}" target="_blank" rel="noopener" title="Merged pull request #${n}">${icon("merged")}#${n}</a>`);
+    chips.push(`<a class="badge pr merged" href="${esc(`https://github.com/${c.repo}/pull/${n}`)}" target="_blank" rel="noopener" title="Merged pull request #${n}">${icon("merged")}#${n}</a>`);
   if (c.tier) chips.push(`<span class="chip tier">${c.tier}</span>`);
   const sub = c.sub && SUB[/** @type {keyof typeof SUB} */ (c.sub)];
   if (sub) chips.push(`<span class="chip sub">${sub}</span>`);
@@ -74,7 +75,7 @@ const cardWith = (c, claude, closed = false) => {
   chips.push(claudeChip(c, claude));
   const parent = pr
     ? c.parent
-      ? `<a class="badge issue wide" href="${esc(c.parent.url)}" target="_blank" rel="noopener">${icon("issue")}#${c.parent.number} <span class="tt">${esc(c.parent.title)}</span></a>`
+      ? `<a class="badge issue open wide" href="${esc(c.parent.url)}" target="_blank" rel="noopener">${icon("issue")}#${c.parent.number} <span class="tt">${esc(c.parent.title)}</span></a>`
       : `<div class="noissue">no issue</div>`
     : "";
   return `<article class="card ${c.kind}">
