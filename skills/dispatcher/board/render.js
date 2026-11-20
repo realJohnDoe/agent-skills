@@ -29,20 +29,59 @@ const claudeChip = (c, always = false) =>
     : "";
 const DAY = 864e5;
 
-/** @param {Card} c @param {boolean} claude show the Claude chip whether or not it is unready */
-const cardWith = (c, claude) => {
-  const chips = [repoChip(c.repo), `<span class="chip ref">#${c.number}</span>`];
-  for (const n of c.prs ?? []) chips.push(link(`https://github.com/${c.repo}/pull/${n}`, `PR #${n}`, "chip prlink"));
+// GitHub's Octicons (MIT), 16px: the same marks GitHub uses for issues, PRs and check results.
+const ICONS = {
+  issue: '<path d="M8 9.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"/><path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Z"/>',
+  issueClosed: '<path d="M11.28 6.78a.75.75 0 0 0-1.06-1.06L7.25 8.69 5.78 7.22a.75.75 0 0 0-1.06 1.06l2 2a.75.75 0 0 0 1.06 0l3.5-3.5Z"/><path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0Zm-1.5 0a6.5 6.5 0 1 0-13 0 6.5 6.5 0 0 0 13 0Z"/>',
+  pr: '<path d="M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.573.677A.25.25 0 0 1 10 .854V2.5h1A2.5 2.5 0 0 1 13.5 5v5.628a2.251 2.251 0 1 1-1.5 0V5a1 1 0 0 0-1-1h-1v1.646a.25.25 0 0 1-.427.177L7.177 3.427a.25.25 0 0 1 0-.354ZM3.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm0 9.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm8.25.75a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Z"/>',
+  merged: '<path d="M5.45 5.154A4.25 4.25 0 0 0 9.25 7.5h1.378a2.251 2.251 0 1 1 0 1.5H9.25A5.734 5.734 0 0 1 5 7.123v3.505a2.25 2.25 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.95-.218ZM4.25 13.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm8.5-4.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5ZM5 3.25a.75.75 0 1 0 0 .005V3.25Z"/>',
+  green: '<path d="M8 16A8 8 0 1 1 8 0a8 8 0 0 1 0 16Zm3.78-9.72a.751.751 0 0 0-.018-1.042.751.751 0 0 0-1.042-.018L6.75 9.19 5.28 7.72a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042l2 2a.75.75 0 0 0 1.06 0Z"/>',
+  red: '<path d="M2.343 13.657A8 8 0 1 1 13.658 2.343 8 8 0 0 1 2.343 13.657ZM6.03 4.97a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042L6.94 8 4.97 9.97a.749.749 0 0 0 .326 1.275.749.749 0 0 0 .734-.215L8 9.06l1.97 1.97a.749.749 0 0 0 1.275-.326.749.749 0 0 0-.215-.734L9.06 8l1.97-1.97a.749.749 0 0 0-.326-1.275.749.749 0 0 0-.734.215L8 6.94Z"/>',
+  pending: '<path d="M8 4a4 4 0 1 1 0 8 4 4 0 0 1 0-8Z"/>',
+};
+/** @param {keyof typeof ICONS} name */
+const icon = (name) => `<svg class="ic" viewBox="0 0 16 16" aria-hidden="true">${ICONS[name]}</svg>`;
+/**
+ * The card's own badge: its icon (open or closed issue; a PR card is always an open, non-draft PR),
+ * its number and, on a PR, its CI. Styled like the badges that link a card to its other kind, and
+ * coloured by state as GitHub does: open green, merged or closed (done) purple.
+ * @param {Card} c @param {boolean} closed
+ */
+const refBadge = (c, closed) => {
+  const pr = c.kind === "pr";
+  const what = pr ? "Pull request" : closed ? "Closed issue" : "Issue";
+  // the check icon says it; the word would repeat it
+  const check = pr && c.check ? `<span class="check ${c.check}" role="img" title="CI ${c.check}" aria-label="CI ${c.check}">${icon(c.check)}</span>` : "";
+  return `<a class="badge ${c.kind} ${closed ? "closed" : "open"}" href="${esc(c.url)}" target="_blank" rel="noopener" title="${what} #${c.number}" aria-label="${what} #${c.number}">${icon(pr ? "pr" : closed ? "issueClosed" : "issue")}#${c.number}${check}</a>`;
+};
+
+/**
+ * @param {Card} c
+ * @param {boolean} claude show the Claude chip whether or not it is unready
+ * @param {boolean} [closed] the Closed stage's issues, which get the closed-issue icon
+ */
+const cardWith = (c, claude, closed = false) => {
+  // A card leads with where it is (repo), then what it is (a badge: issue or PR, its number, a PR's CI). A PR card (a PR's stage is about the PR: its CI, its review) names its
+  // open issue in a badge; an issue card names its merged PRs in badges.
+  const pr = c.kind === "pr";
+  const chips = [repoChip(c.repo), refBadge(c, closed)];
+  for (const n of c.prs ?? [])
+    chips.push(`<a class="badge pr merged" href="${esc(`https://github.com/${c.repo}/pull/${n}`)}" target="_blank" rel="noopener" title="Merged pull request #${n}">${icon("merged")}#${n}</a>`);
   if (c.tier) chips.push(`<span class="chip tier">${c.tier}</span>`);
   const sub = c.sub && SUB[/** @type {keyof typeof SUB} */ (c.sub)];
   if (sub) chips.push(`<span class="chip sub">${sub}</span>`);
   if (c.needsReview) chips.push(`<span class="chip sub">Needs review</span>`); // styled like the other Waiting for human asks
-  if (c.automerge) chips.push(`<span class="chip auto">automerge</span>`);
-  if (c.check) chips.push(`<span class="check ${c.check}">${c.check}</span>`);
+  if (c.automerge) chips.push(`<span class="chip sub">automerge</span>`);
   chips.push(claudeChip(c, claude));
-  return `<article class="card">
-<div class="title">${link(c.url, c.title)}</div>
+  const parent = pr
+    ? c.parent
+      ? `<a class="badge issue open wide" href="${esc(c.parent.url)}" target="_blank" rel="noopener">${icon("issue")}#${c.parent.number} <span class="tt">${esc(c.parent.title)}</span></a>`
+      : `<div class="noissue">no issue</div>`
+    : "";
+  return `<article class="card ${c.kind}">
 <div class="row">${chips.join("")}</div>
+<div class="title">${link(c.url, c.title)}</div>
+${parent}
 <div class="why">${esc(c.reason)}</div>
 </article>`;
 };
@@ -97,7 +136,7 @@ export const render = (board, now = new Date()) => {
     `<div class="line">`,
     stuck.length ? stageModule("stuck", "Stuck", "needs a hand", stuck, "") : "",
     stageModule("waiting", "Waiting for human", "after merge, review, go ahead, decide, plan, tier, assigned", s.waiting.map(askCard), "Nothing waits on you"),
-    stageModule("closed", "Closed", "latest 5", s.closed.map(card), "Nothing closed yet"),
+    stageModule("closed", "Closed", "latest 5", s.closed.map((c) => cardWith(c, false, true)), "Nothing closed yet"),
     stageModule("pr", "PR in progress", "red first", s.prInProgress.map(card), "No open PRs"),
     stageModule("queue", "Queue", "in pickup order", s.queue.map(card), "Queue empty"),
     stageModule("behind", "Behind another issue", "moves on once its blocker closes", behind.map(card), "Nothing waits on another issue"),

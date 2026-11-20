@@ -15,6 +15,7 @@ export type Card = {
   needsReview?: boolean; // green, quiet, no automerge
   sub?: Item["sub"];
   prs?: number[]; // every PR linked to an issue card
+  parent?: { number: number; title: string; url: string }; // a PR card's open issue, shown as a badge on it
   unready?: boolean; // an open issue without `ready-for-agent`: the page links it to a new Claude Code session
   reason: string; // the dispatcher's one-line why
 };
@@ -54,6 +55,7 @@ const card = (x: Item, reason: string, extra: Partial<Card> = {}): Card => ({
   ...(x.automerge && { automerge: true }),
   ...(x.sub && { sub: x.sub }),
   ...(x.linkedPrs?.length && { prs: x.linkedPrs }),
+  ...(x.parent && { parent: x.parent }),
   ...(x.unready && { unready: true }),
   reason,
   ...extra,
