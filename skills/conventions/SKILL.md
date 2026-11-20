@@ -69,6 +69,7 @@ When a task leaves pushed commits on a branch with no open PR, open one, even if
 |---|---|---|
 | `automerge` | whoever opens the PR; a repo's Dependabot workflow for non-major bumps | Merged by the dispatcher once green and quiet |
 | `preview` | whoever opens a PR that changes what a page looks like; the maintainer on any PR | Deploys a live preview of the PR, in a repo with PR previews |
+| `ready-for-agent` | the maintainer only | The go-ahead to dispatch the issue (step 6, **Approval**). Agents never set it |
 | `waiting-for-human` | the dispatcher only, each run | The item is in the board's Waiting for human stage: a filter for GitHub, as fresh as the last run. Never set, remove or read it to decide anything |
 
 `decision-required` and `opus-plan` are retired: use a `## Decision needed` section, and `plan` with `opus`. The dispatcher still reads `opus-plan` as `plan` and ignores `decision-required`.
