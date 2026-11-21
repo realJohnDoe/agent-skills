@@ -251,7 +251,14 @@ describe("scene", () => {
     assert.match(h, /class="night"/);
     assert.doesNotMatch(h, /<animate/);
     assert.doesNotMatch(h, /class="ship"/);
-    assert.equal(count(h, /class="lid"[^>]*ry="13"/g), 5);
+    assert.equal(count(h, /class="lid"/g), 7); // every robot's eyes, the small fourth's too
+    assert.doesNotMatch(h, /class="lid"[^>]*ry="0"/);
+  });
+
+  test("every robot blinks, the small fourth one too", () => {
+    const h = scene(board);
+    assert.equal(count(h, /class="lid"[^>]*><animate attributeName="ry"/g), 7);
+    assert.match(h, /cx="1982" cy="484" rx="7" ry="0"/);
   });
 
   test("reduced motion: nothing moves and no ships fly", () => {

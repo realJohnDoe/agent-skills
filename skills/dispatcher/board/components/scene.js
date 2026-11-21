@@ -28,7 +28,13 @@ const PR_A = [1307, 486, 135, 89]; // beside the third robot
 const PR_B = [1600, 467, 130, 122]; // the one the third robot is tapping
 const HEALTH = [718, 463, 114, 77]; // beside the first robot
 const POTS = [[1317, 640], [1385, 645], [1600, 650], [1645, 652], [775, 672], [1280, 628]];
-const EYES = [[560, 530], [590, 528], [988, 493], [1014, 493], [1562, 500]]; // the robots' visible eyes
+// The robots' visible eyes: [x, y, lid rx, lid ry, blink phase in s]. A robot's eyes share a phase.
+const EYES = [
+  [560, 530, 12, 13, 0], [590, 528, 12, 13, 0], // the first robot, in the left bed
+  [988, 493, 12, 13, 2.3], [1014, 493, 12, 13, 2.3], // the second, at the crate
+  [1562, 500, 12, 13, 4.6], // the third, side on at the screen: one eye shows
+  [1982, 484, 7, 8, 1.2], [1997, 486, 7, 8, 1.2], // the small fourth, by the bonsai
+];
 // A leaf reaches from 16 above its origin to 6 below it, times its scale: mind its tip near a pane top.
 const LEAF = "M0 6 v-14 m0 4 q-9 -2 -10 -10 q9 1 10 10 m0 -2 q9 -2 10 -10 q-9 1 -10 10";
 
@@ -163,12 +169,12 @@ export const scene = (board, motion = true) => {
   });
 
   // Eyelids: a blink now and then, shut when paused.
-  EYES.forEach(([x, y], i) =>
+  EYES.forEach(([x, y, rx, ry, phase]) =>
     g.push(
       paused
-        ? `<ellipse class="lid" cx="${x}" cy="${y}" rx="12" ry="13" fill="#0b0b18"/>`
+        ? `<ellipse class="lid" cx="${x}" cy="${y}" rx="${rx}" ry="${ry}" fill="#0b0b18"/>`
         : move
-          ? `<ellipse class="lid" cx="${x}" cy="${y}" rx="12" ry="0" fill="#0b0b18">${anim("ry", "0;0;13;0", 7, -[0, 0, 2.3, 2.3, 4.6][i], ' keyTimes="0;.95;.97;1"')}</ellipse>`
+          ? `<ellipse class="lid" cx="${x}" cy="${y}" rx="${rx}" ry="0" fill="#0b0b18">${anim("ry", `0;0;${ry};0`, 7, -phase, ' keyTimes="0;.95;.97;1"')}</ellipse>`
           : "",
     ),
   );
