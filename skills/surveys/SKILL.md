@@ -52,7 +52,8 @@ Nothing in this plugin names a repo, its paths or its issues: those belong in th
 - **The category ranking is a tiebreaker, not a filter.** A serious finding in any category outranks a minor finding in a higher-priority one. Never omit a high-impact issue because its category ranks lower.
 - **Un-shallow the clone before you read any git history.** A session's checkout is often a shallow clone, and `git log` then answers silently from a truncated graph: the boundary looks exactly like the start of the project. Check with `git rev-parse --is-shallow-repository`, fix with `git fetch --unshallow`, and record the history's true span next to any tally you report.
 - **Read the merged-PR history for defect classes, not just for churn.** Commits tell you what changed; PR titles tell you what was *wrong*, which is the question a survey is asking. Sample the last ~200 and tally what was being fixed. A class the repo keeps paying for that no category names is a finding *about the survey*: fix it with a diff on the survey file (see the last section).
-- **Run what you need.** A survey that requires a measurement, a screenshot or the dev server says so, and that pass is the ask, whatever a repo's rule about not driving the dev server unprompted says.
+- **Run what you need.** A survey that requires a measurement, a screenshot or the dev server says so, and that pass is the ask, whatever a repo's rule about not driving the dev server unprompted says. Without preview tools, start the dev server yourself on a unique port (`--strictPort`) and drive Chromium with Playwright at 390×844 and 1440×900; a repo that pins its own Playwright launches with `executablePath: '/opt/pw-browsers/chromium'`. The overlay's `## Environment limits` holds the repo's part (the dev-server command, storage keys to set in an init script). Only if that fails too, say so in the coverage statement and mark the categories it affects **partially assessed**: an admitted gap beats an impression inferred from tokens or source.
+- **Expect vendor sites to be blocked.** The sandbox's egress proxy refuses many hosts. Before giving up on a claim, try `WebSearch` and the vendor's secondary hosts (its GitHub, its developer docs). A claim no source could be reached for is **could not verify** in the coverage statement, with the blocked host named, never "verified" from memory.
 
 ## Ranking findings
 
@@ -63,6 +64,15 @@ Where findings touch the same code, add a one-line **sequencing note** saying wh
 ```bash
 gh api repos/<owner/repo>/issues/<parent>/sub_issues --jq '.[] | select(.state=="open" and .issue_dependencies_summary.blocked_by==0) | .number'
 ```
+
+## Report structure
+
+The parent issue's body has four parts, in this order. A survey's skill names its verdict and adds only what is its own to each part.
+
+1. **Verdict** (~5 sentences): the plain-language headline. Name the worst one or two areas and the single biggest theme; the findings are the evidence.
+2. **Coverage statement:** what you examined closely, what you only sampled and what you skipped, each skip with its reason; each gate's result, if the survey runs them; how the overlay's environment limits shaped the run; and anything you suspect but did not investigate, flagged **unverified**. A suspicion without the evidence the survey asks of a finding (a reproduction, a measurement, a probe) goes here as unverified, not into the findings.
+3. **Category verdicts** (below).
+4. **Findings**, the survey's top N, under the summary table.
 
 ## Finding fields
 
@@ -78,13 +88,14 @@ Every report has one line per category, with exactly one verdict:
 
 - **clean**: the plan for this category was fully executed and nothing worth reporting turned up;
 - **findings: #N, #M**: pointing at the findings;
-- **partially assessed**: say what part of the plan was skipped and why.
+- **partially assessed**: say what part of the plan was skipped and why;
+- **below the cut**: the category turned up something real that lost its slot to the cap. Record it after the findings in one short paragraph, marked sub-threshold, with its evidence and impact, and don't file it.
 
-A category may only be called **clean** if its plan actually ran, never as a default for one that ran out of budget.
+A category may only be called **clean** if its plan actually ran, never as a default for one that ran out of budget or whose finding didn't survive the ranking.
 
 ## Don't pad the findings list
 
-Every survey caps its findings at a stated top-N. Include everything that makes the cut, however low its score. Do not pad the list to reach N: a short report grounded in evidence beats a long one built on speculation.
+Every survey caps its findings at a stated top-N. Include everything that makes the cut, however low its score. Do not pad the list to reach N: a short report grounded in evidence beats a long one built on speculation. One or two **below the cut** verdicts mean the cap is working; more mean the cap is wrong for this run, so say so in the verdict.
 
 ## Reporting
 

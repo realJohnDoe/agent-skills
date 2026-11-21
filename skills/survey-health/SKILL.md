@@ -42,21 +42,12 @@ Scan plan first, evaluate on merits, verify capability claims by inspection (see
 
 ## Output structure
 
-### 1. Health verdict (~5 sentences)
+The four parts of the `surveys` skill's **Report structure**, with:
 
-A plain-language summary. Name the **worst one or two areas** (by directory or subsystem, not individual findings) and the **single biggest structural theme**, weighing overengineering (abstraction, configuration or indirection outpacing the problem) as seriously as underengineering (leakage, duplication, missing boundaries). This is the headline answer; the findings are the evidence.
+- **Health verdict:** name the worst areas by directory or subsystem, not by finding, and weigh overengineering (abstraction, configuration or indirection outpacing the problem) as seriously as underengineering (leakage, duplication, missing boundaries).
+- **Coverage statement:** open with the corpus (see the overlay). Give the gates as the **gate × workspace matrix** in a multi-workspace repo: a flat list cannot express "green, but it never looked at this package". Say roughly what fraction of the codebase the report is based on.
 
-### 2. Coverage statement
-
-- The corpus (see the overlay), then which directories and files you examined closely, which you only sampled, and which you skipped, each skip with its reason.
-- Each quality gate's result, as the **gate × workspace matrix** in a multi-workspace repo: a flat list cannot express "green, but it never looked at this package". Where the overlay lists environment limits, say how they shaped the run.
-- Roughly what fraction of the codebase the report is based on, and any area you suspect but did not investigate, flagged "unverified".
-
-### 3. Category verdicts
-
-One line per category, verdicts per `surveys`.
-
-### 4. Findings
+### Findings
 
 `Title`, `Breadth`, `Tier`, `Evidence`, `Problem`, `Fix` and `Task context` are the shared finding fields (`../conventions/batch-findings.md`). This survey adds:
 
@@ -67,7 +58,7 @@ One line per category, verdicts per `surveys`.
 
 "Confirming" a fix means re-running the build, lint or tests, naming the workspace it must run in, since a root command may not cover the package the fix touched.
 
-When the ranking puts a low-impact finding above a high-impact one (a wide, cheap toolchain fix over a narrow correctness bug), say so in one line under the summary table and name which finding a reader sorting by raw impact should look at first. When a real finding falls out of the top 7 purely on effort (usually an architecture finding, the highest-weight category and the most expensive), name it in one line below the findings, so "category 1: clean" never appears when the truth is "its finding didn't survive the divisor".
+When the ranking puts a low-impact finding above a high-impact one (a wide, cheap toolchain fix over a narrow correctness bug), say so in one line under the summary table and name which finding a reader sorting by raw impact should look at first. An architecture finding is the one most often **below the cut**: the highest-weight category is also the most expensive.
 
 ---
 

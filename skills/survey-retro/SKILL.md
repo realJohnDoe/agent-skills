@@ -109,18 +109,19 @@ load the `writing-for-agents` skill from mattpocock/skills and write the edit to
 
 File the run per the `surveys` skill's **Reporting**, with `retro` as the survey-type label.
 
-1. **Verdict** (~5 sentences): what most often made sessions go wrong, and the
-   one change that would have prevented the most of it.
-2. **Coverage statement:** the `--since` date, the candidate count and signal
-   tally, the sessions read (PR → session id → signals), and `CLAUDE.md`'s byte count.
-3. **Category verdicts:** one line per category below.
-4. **Findings — top 5.** The `surveys` skill's finding fields, plus:
-   - **Sessions** — the PRs/session ids it was seen in, and what happened in each
-     (one line, with a verbatim quote from the transcript or PR).
-   - **Category** — one of the tags below, in the body only: it is not a label.
-   - **Impact** — 1–10, where 10 = it already shipped a wrong change that no
-     check caught; 5 = it costs a red CI round or a follow-up session each time
-     it fires; 1 = wasted tokens only.
+The four parts of the `surveys` skill's **Report structure**, with:
+
+- **Verdict:** what most often made sessions go wrong, and the one change that
+  would have prevented the most of it.
+- **Coverage statement:** the `--since` date, the candidate count and signal
+  tally, the sessions read (PR → session id → signals), and `CLAUDE.md`'s byte count.
+- **Findings, top 5:** the `surveys` skill's finding fields, plus:
+  - **Sessions** — the PRs/session ids it was seen in, and what happened in each
+    (one line, with a verbatim quote from the transcript or PR).
+  - **Category** — one of the tags below, in the body only: it is not a label.
+  - **Impact** — 1–10, where 10 = it already shipped a wrong change that no
+    check caught; 5 = it costs a red CI round or a follow-up session each time
+    it fires; 1 = wasted tokens only.
 
 Breadth here is **sessions affected** of those read, not files.
 
