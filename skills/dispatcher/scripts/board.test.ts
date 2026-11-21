@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { render } from "../board/render.js";
+import { busyness, scene } from "../board/components/scene.js";
 import { type BoardPlan, buildBoard, labelSync } from "./board.ts";
 import type { Item } from "./lib.ts";
 
@@ -171,6 +172,77 @@ describe("render", () => {
     const h = render({ ...board, stages: { ...stages, queue: [{ ...stages.queue[0], title: "<b>&" }] } }, now);
     assert.match(h, />&lt;b&gt;&amp;</);
   });
+});
+
+describe("scene", () => {
+  const count = (h: string, re: RegExp) => h.match(re)?.length ?? 0;
+  const quiet = { ...board, stages: { stuck: [], waiting: [], queue: [], prInProgress: [], closed: [], behind: [] } };
+
+  test("lights a station per stage that has cards", () => {
+    const h = scene(board);
+    assert.match(h, /class="warning"/); // stuck
+    assert.doesNotMatch(h, /class="healthy"/);
+    assert.match(h, /class="wait"/);
+    assert.equal(count(h, /class="sprout"/g), stages.queue.length);
+    assert.equal(count(h, /class="lock"/g), stages.behind.length);
+    assert.equal(count(h, /class="row /g), stages.prInProgress.length);
+  });
+
+  test("a quiet board: a healthy leaf, idle monitors, nothing lit", () => {
+    const h = scene(quiet);
+    assert.match(h, /class="healthy"/);
+    assert.equal(count(h, /class="ui idle"/g), 2);
+    assert.doesNotMatch(h, /class="(warning|wait|sprout|lock|row|pr)"/);
+  });
+
+  test("a PR's row takes its CI colour, and only a running one grows", () => {
+    const h = scene({ ...quiet, stages: { ...quiet.stages, prInProgress: stages.prInProgress } });
+    const rows = (check: string) => count(h, new RegExp(`class="row ${check}"`, "g"));
+    assert.equal(rows("green"), stages.prInProgress.filter((c) => c.check === "green").length);
+    assert.equal(rows("red"), 1);
+    assert.equal(count(h, /attributeName="width"/g), stages.prInProgress.filter((c) => c.check === "pending").length);
+  });
+
+  test("caps what a station can show", () => {
+    const many = <T,>(xs: T[]) => Array.from({ length: 10 }, () => xs[0]);
+    const h = scene({ ...board, stages: { ...stages, queue: many(stages.queue), behind: many(stages.behind), prInProgress: many(stages.prInProgress) } });
+    assert.equal(count(h, /class="sprout"/g), 6);
+    assert.equal(count(h, /class="lock"/g), 3);
+    assert.equal(count(h, /class="row /g), 6);
+  });
+
+  test("paused: dimmed and still, eyes shut, no ships", () => {
+    const h = scene({ ...board, state: "paused" as const });
+    assert.match(h, /class="scene paused"/);
+    assert.match(h, /class="night"/);
+    assert.doesNotMatch(h, /<animate/);
+    assert.doesNotMatch(h, /class="ship"/);
+    assert.equal(count(h, /class="lid"[^>]*ry="13"/g), 5);
+  });
+
+  test("reduced motion: nothing moves and no ships fly", () => {
+    const h = scene(board, false);
+    assert.doesNotMatch(h, /<animate/);
+    assert.doesNotMatch(h, /class="(ship|ring)"/);
+    assert.match(scene(board), /class="ship"/);
+  });
+
+  test("the city's traffic grows with the workshop's workload", () => {
+    const withWork = (n: number) => ({ ...quiet, stages: { ...quiet.stages, queue: Array.from({ length: n }, () => stages.queue[0]) } });
+    assert.deepEqual([0, 5, 10, 30].map((n) => busyness(withWork(n))), [0, 0.5, 1, 1]);
+    const traffic = (n: number) => [count(scene(withWork(n)), /class="ship"/g), count(scene(withWork(n)), /class="beacon"/g)];
+    assert.deepEqual(traffic(0), [1, 1]); // a quiet workshop still has a ship and a light
+    assert.deepEqual(traffic(5), [4, 3]);
+    assert.deepEqual(traffic(10), [6, 5]);
+  });
+
+  test("the lantern glows brighter with each waiting card, up to six", () => {
+    const glow = (n: number) => Number(scene({ ...quiet, stages: { ...quiet.stages, waiting: Array.from({ length: n }, () => stages.waiting[0]) } }).match(/class="wait"><circle[^>]*opacity="([\d.]+)"/)?.[1]);
+    assert.ok(glow(1) < glow(3) && glow(3) < glow(6));
+    assert.equal(glow(6), glow(9));
+  });
+
+  test("moves only by SVG attributes, never by a CSS transform", () => assert.doesNotMatch(scene(board), /style="[^"]*transform/));
 });
 
 describe("labelSync", () => {

@@ -15,17 +15,21 @@
 <link rel="stylesheet" href="board.css">
 </head>
 <body>
-<header class="banner"><img src="banner.jpg" alt=""></header>
+<header class="banner"><div class="art" id="art"><img src="banner.jpg" alt=""></div></header>
 <div class="banner-title"><h1>Joe's Workshop</h1></div>
 <p class="banner-sub">Every open issue and PR of the workshop, by stage. ✳ opens a Claude session.</p>
 <main id="board"></main>
 <script type="module">
 import { render } from "./render.js";
+import { scene } from "./components/scene.js";
 const main = document.getElementById("board");
 try {
   const res = await fetch("board.json", { cache: "no-store" });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  main.innerHTML = render(await res.json());
+  const board = await res.json();
+  main.innerHTML = render(board);
+  const motion = !matchMedia("(prefers-reduced-motion: reduce)").matches;
+  document.getElementById("art").insertAdjacentHTML("beforeend", scene(board, motion));
 } catch (e) {
   main.innerHTML = `<p class="notice error">Couldn't load board.json (${String(e.message ?? e).replace(/[&<>]/g, "")}).</p>`;
 }
