@@ -22,6 +22,7 @@ Claude Code skills shared across my repositories, as one plugin (`joes-workshop`
 | [`survey-health`](skills/survey-health/SKILL.md) | Surveys one repo's code health (architecture, simplicity, layout, security, testing, tooling and more), runs its quality gates, and files the ranked findings as sub-issues. A repo can narrow its scope or add categories in an overlay. |
 | [`survey-retro`](skills/survey-retro/SKILL.md) | Reviews the agent sessions that worked in one repo since its last retro and files the top changes to their environment (checks, review, steering files, tools) that would have stopped them going wrong. |
 | [`dependency-maintenance`](skills/dependency-maintenance/SKILL.md) | Finds the dependency decisions Dependabot can't make (majors, held-back pins, replacements, removals, gaps in Dependabot's own coverage) in one repository or several, in any language, files one issue per decision in the repo it belongs to, and publishes a report linking them. |
+| [`throughput`](skills/throughput/SKILL.md) | Builds an HTML report of your merged PRs and the lines they added per week, stacked by repo, over the last six months or any window. Counts PRs with GitHub search and lines from each PR's merge or squash commit on the default branch. |
 
 A skill holds only what's true for every repo. Each repo's own rules (pins and why, package manager, labels beyond the workshop's) stay in that repo's `CLAUDE.md`/docs, and the skill reads them before it decides anything.
 
