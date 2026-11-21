@@ -50,10 +50,10 @@ export const render = (board, now = new Date()) => {
     ["behind", "behind another issue", behind.length],
   ]);
   const status = [
-    `last update <b>${esc(when(board.generated))}</b>`,
-    `repos <b>${board.repos.length}</b>`,
+    `<span>last update <b>${esc(when(board.generated))}</b></span>`,
+    `<span>repos <b>${board.repos.length}</b></span>`,
     ...counts.filter(([, , n]) => n).map(([id, name, n]) => `<span class="m-${id}">${name} <b>${n}</b></span>`),
-  ].join('<span class="sep"></span>');
+  ].join("");
 
   // Closed lists every completed issue, newest first: the first CLOSED_PAGE show, and
   // each press of Show more (wired in index.html) shows CLOSED_PAGE more.
@@ -63,7 +63,7 @@ export const render = (board, now = new Date()) => {
 
   return [
     ...notices,
-    `<div class="status">${status}</div>`,
+    `<div class="status"><span class="items">${status}</span></div>`,
     `<div class="line">`,
     stuck.length ? stageModule("stuck", "Stuck", "needs a hand", stuck, "") : "",
     stageModule("waiting", "Waiting for human", "after merge, review, go ahead, decide, plan, tier, assigned", s.waiting.map(askCard), "Nothing waits on you"),

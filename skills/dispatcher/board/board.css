@@ -112,7 +112,7 @@ main { max-width: 1080px; margin: 0 auto; }
 
 /* ---------- status strip ---------- */
 .status {
-  margin: 18px 0 22px; display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center;
+  margin: 18px 0 22px;
   padding: 10px 14px; border-radius: 6px;
   background: var(--metal); border: 1px solid var(--metal-lo);
   box-shadow: inset 0 1px 0 var(--metal-hi);
@@ -120,7 +120,14 @@ main { max-width: 1080px; margin: 0 auto; }
 }
 .status b { color: var(--fg); font-weight: 600; }
 .status a { color: var(--holo); }
-.status .sep { width: 1px; height: 14px; background: var(--seam); }
+/* Each item stays on one line, with a seam in the gap before it. The seam before the first
+   item on each line falls left of the items box, which clips it. */
+.status .items { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; overflow: hidden; }
+.status .items > span { position: relative; white-space: nowrap; }
+.status .items > span::before {
+  content: ""; position: absolute; left: -10px; top: 50%; width: 1px; height: 14px;
+  margin-top: -7px; background: var(--seam);
+}
 .status [class^="m-"], .status [class^="m-"] b { color: var(--c); } /* a stage's count in its colour */
 
 /* ---------- stage modules ---------- */
