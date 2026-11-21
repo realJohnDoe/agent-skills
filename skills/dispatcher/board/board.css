@@ -1,6 +1,7 @@
 /* The workshop board: the control panel of a workshop flying from repo to repo.
    Dark only. A banner, a status strip, then one column of riveted stage modules
-   holding glass readout cards. Plants and robots live only in banner.jpg. */
+   holding glass readout cards. Plants and robots live only in banner.jpg; the scene laid
+   over it (components/scene.js) lights its stations up with the board's stages. */
 :root {
   --sky-top: #181444;       /* the banner image's own sky, so the seam above 1400px doesn't show */
   --sky-low: #5e3e80;
@@ -49,16 +50,37 @@ h1, h2 { font-family: var(--f-display); text-wrap: balance; margin: 0; }
   background: linear-gradient(180deg, var(--sky-top), var(--sky-low));
   border-bottom: 3px solid var(--metal-hi);
 }
+.banner .art { position: relative; height: 100%; max-width: 1400px; margin: 0 auto; }
 .banner img {
-  display: block; height: 100%; width: 100%; max-width: 1400px; margin: 0 auto;
+  display: block; height: 100%; width: 100%;
   object-fit: cover; object-position: center bottom;
 }
 @media (min-width: 1401px) { /* wider than the image: its sides fade into the CSS sky */
-  .banner img {
+  .banner .art {
     -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
     mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
   }
 }
+/* the scene: CSS animates only opacity (and the ring's dash); scene.js moves things with
+   SVG attributes, which stay put on phones where CSS transforms on scaled SVG drift */
+.scene { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.scene .pr { animation: flicker 3.2s infinite; }
+.scene .warning, .scene .fail { animation: pulse 1.1s ease-in-out infinite alternate; }
+.scene .wait { mix-blend-mode: screen; animation: breathe 3s ease-in-out infinite; }
+.scene .sprout { animation: breathe 2.4s ease-in-out infinite; }
+.scene .healthy { animation: breathe 4s ease-in-out infinite; }
+.scene .ui { opacity: .8; }
+.scene .ui.idle { opacity: .5; }
+.scene .wave { stroke-dasharray: 6 5; animation: dash 2.5s linear infinite; }
+.scene .beacon { animation: blink 2.2s steps(2, start) infinite; }
+.scene .ring { stroke-dasharray: 70 1500; stroke-dashoffset: 1570; opacity: .55; animation: ring 9s linear infinite; }
+.scene.paused * { animation: none; }
+@keyframes pulse { from { opacity: 1; } to { opacity: .55; } }
+@keyframes breathe { 50% { opacity: .5; } }
+@keyframes flicker { 0%, 47%, 50%, 100% { opacity: 1; } 48% { opacity: .55; } 82% { opacity: .85; } }
+@keyframes dash { to { stroke-dashoffset: -22; } }
+@keyframes ring { to { stroke-dashoffset: 0; } }
+
 .banner-title { color: #fff; }
 .banner-title h1 { font-size: clamp(26px, 4vw, 38px); letter-spacing: .03em; text-shadow: 0 2px 12px #0009; }
 .banner-sub { max-width: 1080px; margin: 14px auto 0; color: var(--muted); }
@@ -191,4 +213,4 @@ main { max-width: 1080px; margin: 0 auto; }
   .readout { right: 12px; }
   .stack { grid-template-columns: 1fr; }
 }
-@media (prefers-reduced-motion: reduce) { .m-stuck .led { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .m-stuck .led, .scene * { animation: none; } }
