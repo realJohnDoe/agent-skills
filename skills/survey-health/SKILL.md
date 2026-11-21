@@ -21,7 +21,7 @@ Read these headings in the repo's `docs/agents/survey.md` (see the `surveys` ski
 
 ## Process
 
-Scan plan first, evaluate on merits, verify capability claims by inspection (see `surveys`). Version currency comes from a registry query, never from training data. Three rules are specific to this survey:
+Scan plan first, evaluate on merits, verify capability claims by inspection (see `surveys`). Three rules are specific to this survey:
 
 - **Check the docs against the tooling, in both directions.** A doc saying "nothing enforces X" or "remember to add Y" goes stale as easily as one claiming a guard exists. Verify each against the scripts, lint config and CI; when a guard has since been written, the stale warning is its own finding, because it teaches readers to distrust a check that works. Verify a path before citing it: a check that moved leaves the old name in prose.
 - **Attribute a measured anomaly to the environment before the repo.** A uniform per-unit cost across otherwise unrelated units (every e2e test ~14s, say) is the tell: probe with a throwaway script (launch time, local request time, any render-blocking external fetch stalling against the sandbox's egress proxy) before filing a timing, network or resource finding, and say in the coverage statement whether the environment is implicated.
@@ -153,7 +153,7 @@ Examples (not exhaustive):
 
 Examples (not exhaustive):
 
-- Installed-but-unused lint capability: compare the plugin's actual rule list against the config, dry-run the candidate preset and report what it flags
+- Installed-but-unused lint capability: compare the plugin's actual rule list against the config, dry-run the candidate preset and report what it flags. A tool the repo doesn't install may be refused in the session (fetching and running it is not a gate the repo already trusts): record that as unverified in the coverage statement rather than filing the gap on inspection alone
 - Missing type-aware linting where it would catch real bug classes in async-heavy code: check whether the rules are already enabled, then dry-run the missing ones
 - Documented invariants not machine-enforced: an architecture rule in a steering file or doc (layer purity, import direction) that no lint rule or CI check guards; propose the rule
 - Missing dead-code and unused-dependency detection when unused exports accumulate; missing coverage measurement when test gaps are a finding
