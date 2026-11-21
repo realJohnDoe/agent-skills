@@ -25,7 +25,7 @@ const anim = (attr, values, dur, begin = 0, extra = "") =>
 // ---------- the painted stations ----------
 // The three holo panels: [x, y, width, height].
 const PR_A = [1307, 486, 135, 89]; // beside the third robot
-const PR_B = [1600, 477, 130, 110]; // the one the third robot is tapping
+const PR_B = [1600, 467, 130, 122]; // the one the third robot is tapping
 const HEALTH = [718, 463, 114, 77]; // beside the first robot
 const POTS = [[1317, 640], [1385, 645], [1600, 650], [1645, 652], [775, 672], [1280, 628]];
 const EYES = [[560, 530], [590, 528], [988, 493], [1014, 493], [1562, 500]]; // the robots' visible eyes
