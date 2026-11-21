@@ -80,6 +80,18 @@ describe("build", () => {
     assert.deepEqual(r.totals, { prs: 7, added: 600, deleted: 5, repos: 4 });
   });
 
+  test("bins PR sizes by lines added, leaving out missing and excluded PRs", () => {
+    const sized = (added: number) => ({ added, deleted: 0 });
+    const sizes = [0, 9, 10, 99, 100, 2500, 40000];
+    const many = sizes.map((_, i) => pr("big", i + 1, "2026-05-20T10:00:00Z"));
+    const r = build([...many, pr("big", 99, "2026-05-20T10:00:00Z"), pr("mid", 1, "2026-05-21T10:00:00Z")],
+      (p) => (p.number === 99 ? undefined : sized(p.repo === "me/mid" ? 5 : sizes[p.number - 1])),
+      { ...opts, excluded: (p) => p.repo === "me/mid" });
+    assert.deepEqual(r.sizes.bins, [0, 10, 50, 100, 250, 500, 1000, 2500]);
+    assert.deepEqual(r.sizes.prs.big, [2, 1, 1, 1, 0, 0, 0, 2]);
+    assert.deepEqual(r.sizes.prs.mid, [0, 0, 0, 0, 0, 0, 0, 0]);
+  });
+
   test("doesn't fold a single repo into Other", () => {
     assert.deepEqual(build(prs, lines, { ...opts, top: 3 }).series, ["big", "mid", "small", "tiny"]);
   });

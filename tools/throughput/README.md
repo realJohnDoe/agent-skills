@@ -1,6 +1,6 @@
 # Throughput
 
-An HTML report of your merged PRs and the lines they added, per week, stacked by repo: one chart of PR counts, one of lines added. It covers every repo GitHub search finds PRs of yours in. The seven busiest repos get their own color; the rest fold into "Other", since more than eight series can't be told apart.
+An HTML report of your merged PRs and the lines they added, per week, stacked by repo: one chart of PR counts, one of lines added, and a histogram of PR sizes (PRs per bin of lines added: under 10, 10–49, 50–99, 100–249, 250–499, 500–999, 1,000–2,499, 2,500 and up). It covers every repo GitHub search finds PRs of yours in. The seven busiest repos get their own color; the rest fold into "Other", since more than eight series can't be told apart.
 
 ```
 node tools/throughput/throughput.ts --out throughput.html
@@ -22,7 +22,7 @@ Check the lines chart before sharing it: one huge bar usually means a bulk PR (v
 
 - **PRs:** GitHub search, `is:pr author:@me is:merged`, one query per month. Search returns at most 1,000 results per query, so a busier month is split in half until each part fits. Search allows 30 requests a minute, so the script paces itself.
 - **Lines:** search doesn't return line counts, and asking the pulls API for each PR needs access to every repo, so the script reads git history instead. It fetches each repo's default branch back to the window's start into a partial bare clone (commits and trees, no file contents up front), then takes each PR's squash commit (`... (#N)`) or merge commit (`Merge pull request #N`) and counts its insertions against the first parent. For squash merges this matches GitHub's "additions".
-- **Missing lines:** a PR merged into another branch has no such commit on the default branch, and a repo `git` can't fetch has none at all. Those PRs still count in the PR chart, and the page says how many there are per repo.
+- **Missing lines:** a PR merged into another branch has no such commit on the default branch, and a repo `git` can't fetch has none at all. Those PRs still count in the PR chart (but not the size histogram, which also leaves out `--exclude`d PRs), and the page says how many there are per repo.
 
 ## Developing
 

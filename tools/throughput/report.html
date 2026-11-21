@@ -78,6 +78,14 @@ footer p{font-size:12px;color:var(--muted)}
   <details><summary>Show as table</summary><div class="tablewrap" id="t-add"></div></details>
 </section>
 
+<section class="panel" aria-labelledby="h-size">
+  <h2 id="h-size">PR size</h2>
+  <p class="note">Merged PRs by lines added, stacked by repository. Bins widen as sizes grow. PRs with no line count, and those left out above, aren’t included.</p>
+  <ul class="legend" id="lg-size"></ul>
+  <div class="chart" id="c-size"></div>
+  <details><summary>Show as table</summary><div class="tablewrap" id="t-size"></div></details>
+</section>
+
 <footer><p>Source: GitHub search (<code>is:pr author:@me is:merged</code>) for PR counts. Lines added come from the insertions in each PR’s merge or squash commit on the default branch, which matches GitHub’s “additions” for squash merges. PRs without a matching commit count in the PR chart only. Generated <span id="generated"></span>.</p></footer>
 </main>
 
@@ -120,23 +128,39 @@ document.getElementById('tiles').innerHTML = [
 function niceMax(v){ const p=Math.pow(10,Math.floor(Math.log10(v))); for(const m of [1,1.5,2,2.5,3,4,5,6,8,10]) if(m*p>=v) return m*p; }
 function ticks(max){ const p=Math.pow(10,Math.floor(Math.log10(max))); let step=p; for(const m of [.2,.25,.5,1,2]) { if(max/(m*p)<=6){step=m*p;break;} } const t=[]; for(let v=0;v<=max+1e-9;v+=step) t.push(Math.round(v)); return t; }
 
-function chart(id, values, series, unit){
+// The x-axis of a chart: how many bars, which get a label, and what to call each bar in the tooltip and table.
+const WEEKS = {
+  n: D.weeks.length, head: 'Week of', row: i => fmtD(D.weeks[i]),
+  tip: i => `Week of ${fmtD(D.weeks[i])} – ${fmtD(isoAdd(D.weeks[i],6))}`,
+  // One label per month, at its first week.
+  labels: () => { let last=-1; return D.weeks.map(w=>{ const mo=new Date(Date.parse(w+'T00:00:00Z')+3*864e5).getUTCMonth(); if(mo===last) return ''; last=mo; return MON[mo]; }); },
+};
+const B = D.sizes.bins;
+const SIZES = {
+  n: B.length, head: 'Lines added',
+  row: i => i===B.length-1 ? `${nf.format(B[i])}+` : `${nf.format(B[i])}–${nf.format(B[i+1]-1)}`,
+  tip: i => `${SIZES.row(i)} lines added`,
+  labels: () => B.map((lo,i)=> i===0 ? `<${compact(B[1])}` : i===B.length-1 ? `${compact(lo)}+` : `${compact(lo)}–${compact(B[i+1])}`),
+};
+function isoAdd(iso,days){ return new Date(Date.parse(iso+'T00:00:00Z')+days*864e5).toISOString().slice(0,10); }
+
+function chart(id, values, series, unit, X=WEEKS, empty='No merges'){
   const el=document.getElementById(id); const tip=document.createElement('div'); tip.className='tip'; tip.hidden=true;
   const lg=document.getElementById('lg-'+id.slice(2));
   lg.innerHTML=series.map(s=>`<li><i style="background:${colorOf[s]}"></i>${s}</li>`).join('');
   function draw(){
     const W=Math.max(320,el.clientWidth), narrow=W<560, H=narrow?240:300;
-    const m={l:44,r:8,t:10,b:28}, iw=W-m.l-m.r, ih=H-m.t-m.b, n=D.weeks.length;
-    const totals=D.weeks.map((_,i)=>sum(series.map(s=>values[s][i])));
+    const m={l:44,r:8,t:10,b:28}, iw=W-m.l-m.r, ih=H-m.t-m.b, n=X.n, idx=[...Array(n).keys()];
+    const totals=idx.map(i=>sum(series.map(s=>values[s][i])));
     const ymax=niceMax(Math.max(...totals)); const y=v=>m.t+ih-(v/ymax)*ih;
     const band=iw/n, bw=Math.max(3,band*0.7), gap=2;
     let g='';
     for(const t of ticks(ymax)){ g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${y(t)}" y2="${y(t)}" stroke="var(--${t===0?'axis':'grid'})" stroke-width="1"/>`;
       g+=`<text x="${m.l-8}" y="${y(t)+4}" text-anchor="end">${compact(t)}</text>`; }
-    let lastMon=-1, lastX=-99;
-    D.weeks.forEach((w,i)=>{ const d=new Date(w+'T00:00:00Z'); const mo=new Date(d.getTime()+3*864e5).getUTCMonth();
-      if(mo!==lastMon){ lastMon=mo; const x=m.l+i*band+band/2; if(x-lastX<30) return; lastX=x; g+=`<text x="${x}" y="${H-8}" text-anchor="middle">${MON[mo]}</text>`; } });
-    D.weeks.forEach((w,i)=>{
+    // Skip a label that would crowd the last one drawn, sized by its own length.
+    let lastX=-99, lastW=0;
+    X.labels().forEach((t,i)=>{ if(!t) return; const x=m.l+i*band+band/2, w=t.length*6.2; if(x-lastX<(w+lastW)/2+6) return; lastX=x; lastW=w; g+=`<text x="${x}" y="${H-8}" text-anchor="middle">${t}</text>`; });
+    idx.forEach(i=>{
       const x=m.l+i*band+(band-bw)/2; let acc=0; const segs=series.filter(s=>values[s][i]>0);
       segs.forEach((s,k)=>{ const v=values[s][i]; const y0=y(acc), y1=y(acc+v); acc+=v;
         let top=y1, h=y0-y1; if(k>0){h-=gap;} if(h<1) h=1;
@@ -146,11 +170,10 @@ function chart(id, values, series, unit){
              : `<rect x="${x}" y="${top}" width="${bw}" height="${h}" fill="${colorOf[s]}"/>`; });
       g+=`<rect class="hit" data-i="${i}" x="${m.l+i*band}" y="${m.t}" width="${band}" height="${ih}" fill="transparent"/>`;
     });
-    el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Stacked weekly bars of ${unit} by repository">${g}</svg>`; el.appendChild(tip);
+    el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Stacked bars of ${unit} by repository">${g}</svg>`; el.appendChild(tip);
     el.querySelectorAll('.hit').forEach(r=>{
       const show=ev=>{ const i=+r.dataset.i; const rows=series.filter(s=>values[s][i]>0).reverse();
-        const end=new Date(new Date(D.weeks[i]+'T00:00:00Z').getTime()+6*864e5).toISOString().slice(0,10);
-        tip.innerHTML=`<b>Week of ${fmtD(D.weeks[i])} – ${fmtD(end)}</b>`+(rows.length?rows.map(s=>`<div class="row"><span><i style="background:${colorOf[s]}"></i>${s}</span><span>${nf.format(values[s][i])}</span></div>`).join(''):'<div class="row"><span>No merges</span></div>')+`<div class="row tot"><span>Total ${unit}</span><span>${nf.format(totals[i])}</span></div>`;
+        tip.innerHTML=`<b>${X.tip(i)}</b>`+(rows.length?rows.map(s=>`<div class="row"><span><i style="background:${colorOf[s]}"></i>${s}</span><span>${nf.format(values[s][i])}</span></div>`).join(''):`<div class="row"><span>${empty}</span></div>`)+`<div class="row tot"><span>Total ${unit}</span><span>${nf.format(totals[i])}</span></div>`;
         tip.hidden=false; const bx=el.getBoundingClientRect(); const px=(m.l+i*band+band/2)*(bx.width/W);
         const tw=tip.offsetWidth; let left=px+12; if(left+tw>bx.width) left=px-tw-12; if(left<0) left=0; tip.style.left=left+'px'; tip.style.top='8px';
         r.setAttribute('fill','var(--ring)'); };
@@ -160,10 +183,11 @@ function chart(id, values, series, unit){
   }
   draw(); let t; addEventListener('resize',()=>{clearTimeout(t);t=setTimeout(draw,100);});
   const tw=document.getElementById('t-'+id.slice(2));
-  tw.innerHTML=`<table><thead><tr><th>Week of</th>${series.map(s=>`<th>${s}</th>`).join('')}<th>Total</th></tr></thead><tbody>`+
-    D.weeks.map((w,i)=>`<tr><td>${fmtD(w)}</td>${series.map(s=>`<td>${values[s][i]?nf.format(values[s][i]):'–'}</td>`).join('')}<td>${nf.format(sum(series.map(s=>values[s][i])))}</td></tr>`).join('')+
+  tw.innerHTML=`<table><thead><tr><th>${X.head}</th>${series.map(s=>`<th>${s}</th>`).join('')}<th>Total</th></tr></thead><tbody>`+
+    [...Array(X.n).keys()].map(i=>`<tr><td>${X.row(i)}</td>${series.map(s=>`<td>${values[s][i]?nf.format(values[s][i]):'–'}</td>`).join('')}<td>${nf.format(sum(series.map(s=>values[s][i])))}</td></tr>`).join('')+
     `</tbody><tfoot><tr><th>Total</th>${series.map(s=>`<th>${nf.format(sum(values[s]))}</th>`).join('')}<th>${nf.format(sum(series.map(s=>sum(values[s]))))}</th></tr></tfoot></table>`;
 }
 chart('c-prs', D.prs, D.series, 'PRs');
 chart('c-add', D.adds, D.series, 'lines added');
+chart('c-size', D.sizes.prs, D.series, 'PRs', SIZES, 'No PRs this size');
 </script>
