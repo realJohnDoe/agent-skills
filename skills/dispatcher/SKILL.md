@@ -54,6 +54,37 @@ jobs:
 
 Don't also turn on GitHub's native auto-merge there (see **Auto-merge** below).
 
+A repo that serves a site from a Pages branch, with per-PR previews, builds it and uploads it as an artifact, then calls the shared `.github/workflows/pages.yml` to deploy it: production on the default branch, a preview under `pr-preview/pr-<N>/` for same-repo PRs labelled `preview` (`previews: all` for every one, `off` for none), and its removal when the PR closes or loses the label. The called workflow can't raise permissions, so the caller grants `contents: write` and `pull-requests: write`. `.github/workflows/pages-selftest.yml` runs every path on this repo's PRs.
+
+```yaml
+on:
+  push: { branches: [main] }
+  pull_request: { types: [opened, reopened, synchronize, labeled, unlabeled, closed] }
+  workflow_dispatch:
+permissions: { contents: read }
+jobs:
+  build:
+    if: >-
+      github.event.action != 'closed' && github.event.action != 'unlabeled' &&
+      (github.event.action != 'labeled' || github.event.label.name == 'preview')
+    runs-on: ubuntu-latest
+    steps:
+      # checkout, install, checks, then build with the base path:
+      - run: pnpm run build
+        env:
+          BASE_PATH: ${{ github.event_name == 'pull_request' && format('/{0}/pr-preview/pr-{1}/', github.event.repository.name, github.event.number) || format('/{0}/', github.event.repository.name) }}
+      - uses: actions/upload-artifact@v7
+        with: { name: site, path: dist, include-hidden-files: true }
+  pages:
+    needs: build
+    if: ${{ !cancelled() && (needs.build.result == 'success' || needs.build.result == 'skipped') }}
+    uses: realJohnDoe/agent-skills/.github/workflows/pages.yml@main
+    with: { artifact: site }
+    permissions: { contents: write, pull-requests: write }
+```
+
+`needs.build.result == 'skipped'` lets `closed` and `unlabeled` reach the removal; the workflow decides `none` for any other skipped event, so no download is attempted.
+
 To move the home repo, change the repo named at the top of this file, `BOARD_REPO` in `scripts/dispatch.ts`, and the board workflow's Pages site.
 
 ## What the script decides

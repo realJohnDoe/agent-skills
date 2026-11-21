@@ -1,0 +1,145 @@
+name: Pages self-test
+
+# Runs every path of pages.yml against a scratch branch. This repo's own Pages
+# site is deployed by board.yml from an Actions artifact, not from a branch, so
+# the scratch branch never touches the served board. What the self-test can't
+# reach is the mapping from real events to a mode (`decide`).
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/pages.yml
+      - .github/workflows/pages-selftest.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  BRANCH: pages-selftest-${{ github.run_id }}
+
+jobs:
+  fixture:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          mkdir a b
+          echo marker-a > a/index.html
+          echo marker-b > b/index.html
+      - uses: actions/upload-artifact@v7
+        with: { name: a, path: a }
+      - uses: actions/upload-artifact@v7
+        with: { name: b, path: b }
+
+  production:
+    needs: fixture
+    uses: ./.github/workflows/pages.yml
+    with: { artifact: a, branch: "pages-selftest-${{ github.run_id }}", mode: production }
+    permissions: { contents: write, pull-requests: write }
+  verify-production:
+    needs: production
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with: { ref: "${{ env.BRANCH }}" }
+      - run: |
+          for c in $CHECKS; do
+            case $c in
+              +*) f=${c#+}; grep -qx "${f#*=}" "${f%%=*}" || { echo "FAIL $c"; exit 1; } ;;
+              -*) [ ! -e "${c#-}" ] || { echo "FAIL $c"; exit 1; } ;;
+            esac
+            echo "ok $c"
+          done
+        env:
+          CHECKS: >-
+            +index.html=marker-a
+            -pr-preview/pr-9999
+
+  preview:
+    needs: verify-production
+    uses: ./.github/workflows/pages.yml
+    with: { artifact: b, branch: "pages-selftest-${{ github.run_id }}", mode: preview, pr-number: "9999" }
+    permissions: { contents: write, pull-requests: write }
+  verify-preview:
+    needs: preview
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with: { ref: "${{ env.BRANCH }}" }
+      - run: |
+          for c in $CHECKS; do
+            case $c in
+              +*) f=${c#+}; grep -qx "${f#*=}" "${f%%=*}" || { echo "FAIL $c"; exit 1; } ;;
+              -*) [ ! -e "${c#-}" ] || { echo "FAIL $c"; exit 1; } ;;
+            esac
+            echo "ok $c"
+          done
+        env:
+          CHECKS: >-
+            +index.html=marker-a
+            +pr-preview/pr-9999/index.html=marker-b
+
+  production-again:
+    needs: verify-preview
+    uses: ./.github/workflows/pages.yml
+    with: { artifact: a, branch: "pages-selftest-${{ github.run_id }}", mode: production }
+    permissions: { contents: write, pull-requests: write }
+  verify-production-again:
+    needs: production-again
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with: { ref: "${{ env.BRANCH }}" }
+      - run: |
+          for c in $CHECKS; do
+            case $c in
+              +*) f=${c#+}; grep -qx "${f#*=}" "${f%%=*}" || { echo "FAIL $c"; exit 1; } ;;
+              -*) [ ! -e "${c#-}" ] || { echo "FAIL $c"; exit 1; } ;;
+            esac
+            echo "ok $c"
+          done
+        env:
+          CHECKS: >-
+            +index.html=marker-a
+            +pr-preview/pr-9999/index.html=marker-b
+
+  remove:
+    needs: verify-production-again
+    uses: ./.github/workflows/pages.yml
+    with: { artifact: a, branch: "pages-selftest-${{ github.run_id }}", mode: remove, pr-number: "9999" }
+    permissions: { contents: write, pull-requests: write }
+  verify-remove:
+    needs: remove
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with: { ref: "${{ env.BRANCH }}" }
+      - run: |
+          for c in $CHECKS; do
+            case $c in
+              +*) f=${c#+}; grep -qx "${f#*=}" "${f%%=*}" || { echo "FAIL $c"; exit 1; } ;;
+              -*) [ ! -e "${c#-}" ] || { echo "FAIL $c"; exit 1; } ;;
+            esac
+            echo "ok $c"
+          done
+        env:
+          CHECKS: >-
+            +index.html=marker-a
+            -pr-preview/pr-9999
+
+  # A preview that never existed: must pass.
+  remove-missing:
+    needs: verify-remove
+    uses: ./.github/workflows/pages.yml
+    with: { artifact: a, branch: "pages-selftest-${{ github.run_id }}", mode: remove, pr-number: "9998" }
+    permissions: { contents: write, pull-requests: write }
+
+  cleanup:
+    if: always()
+    needs: [fixture, remove-missing]
+    runs-on: ubuntu-latest
+    permissions: { contents: write }
+    steps:
+      - run: gh api -X DELETE "repos/$GITHUB_REPOSITORY/git/refs/heads/$BRANCH" || true
+        env:
+          GH_TOKEN: ${{ github.token }}
