@@ -51,9 +51,11 @@ const leaf = (x, y, s, col, cls = "") =>
 /** A clean pane over a painted panel, hiding its painted icons. @param {number[]} r */
 const pane = ([x, y, w, h]) =>
   `<rect x="${x + 3}" y="${y + 3}" width="${w - 6}" height="${h - 6}" rx="5" fill="#0d2a3c" opacity=".9" stroke="${C.holo}" stroke-opacity=".6" stroke-width="2"/>`;
+// The margin, in the image's units, between a screen's content and its pane's edge.
+const PAD = 12;
 /** Three status lights along a panel's foot. @param {number[]} r @param {string} col */
 const lights = ([x, y, w, h], col) =>
-  [-1, 0, 1].map((d) => `<circle cx="${x + w / 2 + d * 16}" cy="${y + h - 12}" r="4.5" fill="${col}" opacity=".8"/>`).join("");
+  [-1, 0, 1].map((d) => `<circle cx="${x + w / 2 + d * 16}" cy="${y + h - 3 - PAD - 4.5}" r="4.5" fill="${col}" opacity=".8"/>`).join("");
 
 /**
  * A growth monitor: a row per PR in progress (a leaf, a growth bar, a light), coloured by its
@@ -63,18 +65,22 @@ const lights = ([x, y, w, h], col) =>
  */
 const monitor = ([x, y, w, h], checks, motion) => {
   if (!checks.length)
-    return `<g class="ui idle">${leaf(x + w / 2, y + h / 2 - 6, 1.8, C.holo)}<path class="wave" d="M${x + 14} ${y + h - 16} q 12 -9 24 0 t 24 0 t 24 0 t 24 0" stroke="${C.holo}" stroke-width="3" fill="none"/></g>`;
+    return `<g class="ui idle">${leaf(x + w / 2, y + h / 2 - 8, 1.4, C.holo)}<path class="wave" d="M${x + w / 2 - 48} ${y + h - 3 - PAD - 6} q 12 -9 24 0 t 24 0 t 24 0 t 24 0" stroke="${C.holo}" stroke-width="3" fill="none"/></g>`;
+  // Rows close up to keep three clear of a short pane's top and foot.
+  const step = Math.min(26, (h - 48) / Math.max(1, checks.length - 1));
   const rows = checks.map((check, i) => {
     const col = CHECK[/** @type {keyof typeof CHECK} */ (check)] ?? CHECK.pending;
-    const cy = y + h / 2 + 26 * (i - (checks.length - 1) / 2);
-    const bx = x + 32, bw = w - 60; // the leaf spans x+10 to x+26, clear of the pane edge
+    const cy = y + h / 2 + 2 + step * (i - (checks.length - 1) / 2);
+    // The leaf spans x+3+PAD to x+19+PAD, the light ends at x+w-3-PAD: PAD in from the pane.
+    const lx = x + 11 + PAD, ox = x + w - 3 - PAD - 5;
+    const bx = lx + 14, bw = ox - 13 - bx;
     const bar =
       check === "red"
         ? `<rect class="fail" x="${bx}" y="${cy - 3}" width="${bw * 0.4}" height="6" rx="3" fill="${col}"/>`
         : check === "green" || !motion
           ? `<rect x="${bx}" y="${cy - 3}" width="${bw}" height="6" rx="3" fill="${col}"/>`
           : `<rect x="${bx}" y="${cy - 3}" width="${bw * 0.12}" height="6" rx="3" fill="${col}">${anim("width", `${bw * 0.12};${bw};${bw}`, 7, -i * 2.1, ' keyTimes="0;.85;1"')}</rect>`;
-    return `<g class="row ${check}">${leaf(x + 18, cy + 3, 0.8, col)}<rect x="${bx}" y="${cy - 3}" width="${bw}" height="6" rx="3" fill="${C.holo}" opacity=".25"/>${bar}<circle class="${check === "red" ? "fail" : ""}" cx="${x + w - 14}" cy="${cy}" r="5" fill="${col}"/></g>`;
+    return `<g class="row ${check}">${leaf(lx, cy + 3, Math.min(0.8, step / 32), col)}<rect x="${bx}" y="${cy - 3}" width="${bw}" height="6" rx="3" fill="${C.holo}" opacity=".25"/>${bar}<circle class="${check === "red" ? "fail" : ""}" cx="${ox}" cy="${cy}" r="5" fill="${col}"/></g>`;
   });
   return `<g class="ui">${rows.join("")}</g>`;
 };
@@ -203,11 +209,11 @@ export const scene = (board, motion = true) => {
         "stuck",
         `Stuck: ${s.stuck.length}`,
         `<g class="warning"><rect x="712" y="457" width="126" height="89" rx="8" fill="${C.bad}" opacity=".45" filter="url(#glow)"/>
-<path d="M775 470 L800 512 L750 512 Z" fill="none" stroke="#fff" stroke-opacity=".8" stroke-width="5" stroke-linejoin="round"/><rect x="772.5" y="483" width="5" height="16" fill="#fff" fill-opacity=".8"/><circle cx="775" cy="506" r="3" fill="#fff" fill-opacity=".8"/>${lights(HEALTH, C.bad)}</g>${cornerPlate(HEALTH, s.stuck.length, STAGE.stuck)}`,
+<path d="M775 479 L794 509 L756 509 Z" fill="none" stroke="#fff" stroke-opacity=".8" stroke-width="4" stroke-linejoin="round"/><rect x="773" y="488" width="4" height="10" fill="#fff" fill-opacity=".8"/><circle cx="775" cy="503.5" r="2.5" fill="#fff" fill-opacity=".8"/>${lights(HEALTH, C.bad)}</g>${cornerPlate(HEALTH, s.stuck.length, STAGE.stuck)}`,
         [[706, HEALTH[1] - 24, HEALTH[2] + 34, HEALTH[3] + 36]], // the screen and its plate
       ),
     );
-  else g.push(`<g class="ui">${leaf(775, 505, 2, C.ok, "healthy")}${lights(HEALTH, C.ok)}</g>`);
+  else g.push(`<g class="ui">${leaf(775, 501, 1.4, C.ok, "healthy")}${lights(HEALTH, C.ok)}</g>`);
 
   if (s.waiting.length) {
     // brighter and wider with each waiting card, up to 6
