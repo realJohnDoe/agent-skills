@@ -1,8 +1,5 @@
 /* PROTOTYPE, throwaway: the animated banner variants (prototype-banner.js). Never on main. */
 
-/* the new banner's own sky, so the seam above 1400px doesn't show */
-.banner { --sky-top: #181550; }
-
 /* The image and its overlay share one box, so the SVG crops exactly like the <img>. */
 .pb-art { position: relative; height: 100%; max-width: 1400px; margin: 0 auto; }
 .pb-art img { max-width: none; }
@@ -40,6 +37,14 @@
 .pb-healthy { animation: pb-breathe 4s ease-in-out infinite; }
 @keyframes pb-grow { from { transform: scaleX(.12); } 85%, to { transform: scaleX(1); } }
 @keyframes pb-dash { to { stroke-dashoffset: -22; } }
+/* the city */
+.pb-ship { animation: pb-fly linear infinite; }
+.pb-beacon { animation: pb-flash 2.2s steps(2, start) infinite; }
+.pb-ring { stroke-dasharray: 70 1500; stroke-dashoffset: 1570; opacity: .55; animation: pb-ring 9s linear infinite; }
+.pb-svg.paused .pb-city, .pb-svg.paused .pb-ship { display: none; }
+@keyframes pb-fly { from { transform: translate(var(--x0), var(--y0)); } to { transform: translate(var(--x1), var(--y1)); } }
+@keyframes pb-ring { to { stroke-dashoffset: 0; } }
+@media (prefers-reduced-motion: reduce) { .pb-ship, .pb-ring { display: none; } }
 .pb-closed, .pb-behind { animation: pb-breathe 6s ease-in-out infinite; }
 
 /* ---- B: holo readouts ---- */
