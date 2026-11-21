@@ -29,6 +29,7 @@ const PR_B = [1600, 467, 130, 122]; // the one the third robot is tapping
 const HEALTH = [718, 463, 114, 77]; // beside the first robot
 const POTS = [[1317, 640], [1385, 645], [1600, 650], [1645, 652], [775, 672], [1280, 628]];
 const EYES = [[560, 530], [590, 528], [988, 493], [1014, 493], [1562, 500]]; // the robots' visible eyes
+// A leaf reaches from 16 above its origin to 6 below it, times its scale: mind its tip near a pane top.
 const LEAF = "M0 6 v-14 m0 4 q-9 -2 -10 -10 q9 1 10 10 m0 -2 q9 -2 10 -10 q-9 1 -10 10";
 
 /** @param {number} x @param {number} y @param {number} s @param {string} col @param {string} [cls] */
@@ -53,14 +54,14 @@ const monitor = ([x, y, w, h], checks, motion) => {
   const rows = checks.map((check, i) => {
     const col = CHECK[/** @type {keyof typeof CHECK} */ (check)] ?? C.holo;
     const cy = y + h / 2 + 26 * (i - (checks.length - 1) / 2);
-    const bx = x + 30, bw = w - 58;
+    const bx = x + 32, bw = w - 60; // the leaf spans x+10 to x+26, clear of the pane edge
     const bar =
       check === "red"
         ? `<rect class="fail" x="${bx}" y="${cy - 3}" width="${bw * 0.4}" height="6" rx="3" fill="${col}"/>`
         : check === "green" || !motion
           ? `<rect x="${bx}" y="${cy - 3}" width="${bw}" height="6" rx="3" fill="${col}"/>`
           : `<rect x="${bx}" y="${cy - 3}" width="${bw * 0.12}" height="6" rx="3" fill="${col}">${anim("width", `${bw * 0.12};${bw};${bw}`, 7, -i * 2.1, ' keyTimes="0;.85;1"')}</rect>`;
-    return `<g class="row ${check}">${leaf(x + 15, cy + 3, 0.8, col)}<rect x="${bx}" y="${cy - 3}" width="${bw}" height="6" rx="3" fill="${C.holo}" opacity=".25"/>${bar}<circle class="${check === "red" ? "fail" : ""}" cx="${x + w - 14}" cy="${cy}" r="5" fill="${col}"/></g>`;
+    return `<g class="row ${check}">${leaf(x + 18, cy + 3, 0.8, col)}<rect x="${bx}" y="${cy - 3}" width="${bw}" height="6" rx="3" fill="${C.holo}" opacity=".25"/>${bar}<circle class="${check === "red" ? "fail" : ""}" cx="${x + w - 14}" cy="${cy}" r="5" fill="${col}"/></g>`;
   });
   return `<g class="ui">${rows.join("")}</g>`;
 };
@@ -143,7 +144,7 @@ export const scene = (board, motion = true) => {
   if (s.stuck.length)
     g.push(`<g class="warning"><rect x="712" y="457" width="126" height="89" rx="8" fill="${C.bad}" opacity=".45" filter="url(#glow)"/>
 <path d="M775 470 L800 512 L750 512 Z" fill="none" stroke="#fff" stroke-opacity=".8" stroke-width="5" stroke-linejoin="round"/><rect x="772.5" y="483" width="5" height="16" fill="#fff" fill-opacity=".8"/><circle cx="775" cy="506" r="3" fill="#fff" fill-opacity=".8"/>${lights(HEALTH, C.bad)}</g>`);
-  else g.push(`<g class="ui">${leaf(775, 494, 2, C.ok, "healthy")}${lights(HEALTH, C.ok)}</g>`);
+  else g.push(`<g class="ui">${leaf(775, 505, 2, C.ok, "healthy")}${lights(HEALTH, C.ok)}</g>`);
 
   if (s.waiting.length) {
     // brighter and wider with each waiting card, up to 6
