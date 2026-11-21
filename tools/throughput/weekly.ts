@@ -58,6 +58,10 @@ export const parseLog = (log: string): Map<number, Lines> => {
   return out;
 };
 
+// Lower edges of the PR size histogram's bins, in lines added; the last bin is open-ended.
+// They widen as sizes grow, since PR sizes span several orders of magnitude.
+export const SIZE_BINS = [0, 10, 50, 100, 250, 500, 1000, 2500];
+
 export type Report = {
   since: string;
   until: string;
@@ -69,6 +73,9 @@ export type Report = {
   totals: { prs: number; added: number; deleted: number; repos: number };
   missing: Record<string, number>; // PRs with no matching commit, per repo
   excluded: { repo: string; number: number; title: string; added: number }[];
+  // PRs per size bin (lines added), stacked by series like the weekly charts. Only PRs
+  // with lines and not excluded count, so it sums to the PRs the lines chart covers.
+  sizes: { bins: number[]; prs: Record<string, number[]> };
 };
 
 // Bins PRs into Monday weeks and folds every repo past the `top` busiest into "Other",
@@ -101,6 +108,7 @@ export const build = (
     totals: { prs: 0, added: 0, deleted: 0, repos: ranked.length },
     missing: {},
     excluded: [],
+    sizes: { bins: SIZE_BINS, prs: Object.fromEntries(series.map((s) => [s, SIZE_BINS.map(() => 0)])) },
   };
   for (const pr of prs) {
     const s = keep.includes(name(pr)) ? name(pr) : "Other";
@@ -117,6 +125,7 @@ export const build = (
       r.adds[s][w] += l.added;
       r.totals.added += l.added;
       r.totals.deleted += l.deleted;
+      r.sizes.prs[s][SIZE_BINS.findLastIndex((lo) => l.added >= lo)]++;
     }
   }
   return r;
