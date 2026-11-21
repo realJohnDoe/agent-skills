@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { describe, test } from "node:test";
 import { moreLabel, render } from "../board/render.js";
-import { busyness, scene } from "../board/components/scene.js";
+import { CHECK, STAGE, busyness, scene } from "../board/components/scene.js";
 import { type BoardPlan, buildBoard, labelSync } from "./board.ts";
 import type { Item } from "./lib.ts";
 
@@ -226,7 +227,31 @@ describe("scene", () => {
     const h = scene(quiet);
     assert.match(h, /class="healthy"/);
     assert.equal(count(h, /class="ui idle"/g), 2);
-    assert.doesNotMatch(h, /class="(warning|wait|sprout|lock|row|pr)"/);
+    assert.doesNotMatch(h, /class="(warning|wait|sprout|lock|row|pr|plate|bubble)"/);
+  });
+
+  test("each lit station carries its stage's count, in its stage's colour", () => {
+    const h = scene(board);
+    const plates = [...h.matchAll(/<g class="plate">.*?stroke="(#\w+)".*?>(\d+)<\/text><\/g>/g)].map(([, col, n]) => [col, Number(n)]);
+    const lit = (["stuck", "waiting", "pr", "queue", "behind"] as const)
+      .map((id) => [STAGE[id], { stuck: stages.stuck, waiting: stages.waiting, pr: stages.prInProgress, queue: stages.queue, behind: stages.behind }[id].length] as const)
+      .filter(([, n]) => n);
+    assert.deepEqual(plates.sort(), lit.map(([col, n]) => [col, n]).sort());
+    assert.match(h, /class="bubble"/); // the waiting robot asks
+    // the plate counts past the station's cap: ten queued cards light six sprouts and read 10
+    const many = scene({ ...board, stages: { ...stages, queue: Array.from({ length: 10 }, () => stages.queue[0]) } });
+    assert.match(many, new RegExp(`stroke="${STAGE.queue}"[^>]*/><text[^>]*>10<`));
+  });
+
+  test("a station's colour is its module's, and a PR row's is its badge's CI colour", () => {
+    // board.css: the tokens, and each module's --c
+    const css = readFileSync(new URL("../board/board.css", import.meta.url), "utf8");
+    const token = (name: string) => css.match(new RegExp(`--${name}:\\s*(#[0-9a-f]{6})`))?.[1];
+    const via = (sel: string, prop: string) => token(css.match(new RegExp(`${sel}\\s*\\{[^}]*${prop}:\\s*var\\(--([\\w-]+)\\)`))![1]);
+    for (const id of Object.keys(STAGE) as (keyof typeof STAGE)[]) assert.equal(STAGE[id], via(`\\.m-${id}`, "--c"), id);
+    for (const check of Object.keys(CHECK) as (keyof typeof CHECK)[]) assert.equal(CHECK[check], via(`\\.check\\.${check}`, "color"), check);
+    const h = scene({ ...quiet, stages: { ...quiet.stages, prInProgress: [{ ...stages.prInProgress[0], check: "pending" as const }] } });
+    assert.match(h, new RegExp(`class="row pending">.*?fill="${CHECK.pending}"`));
   });
 
   test("a PR's row takes its CI colour, and only a running one grows", () => {

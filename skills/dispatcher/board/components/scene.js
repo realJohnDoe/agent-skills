@@ -3,15 +3,20 @@
 // object-position: center bottom). The image is inside the SVG, not an <img> underneath it,
 // so the two can never be cropped differently: in Firefox's installed app (no URL bar) the
 // <img> and an SVG laid over it got different boxes, and the scene drifted off the picture.
-// The painted stations light up with the board's stages, and the city in the background moves.
+// The painted stations light up with the board's stages, each in its module's colour and with a
+// count plate like the module's readout, and the city in the background moves.
 // Everything that moves is an SVG animation of an attribute (a bar's width, a ship's
 // position), never a CSS transform: mobile Chrome places CSS transforms on scaled SVG in page
 // pixels, which shifted them off the screens on phones. CSS animates opacity only.
 /** @import { Board } from "../../scripts/board.ts" */
 
 // The board.css tokens, for SVG attributes.
-const C = { bad: "#ff5d76", warn: "#ffd34d", ok: "#6fd38a", holo: "#5ee7f2", muted: "#9a93c8", lamp: "#ffc36b" };
-const CHECK = { green: C.ok, pending: C.holo, red: C.bad };
+const C = { bad: "#ff5d76", warn: "#ffd34d", ok: "#6fd38a", holo: "#5ee7f2", muted: "#9a93c8", lamp: "#ffc36b", blue: "#7fb2ff" };
+// Each stage's colour, as its module's --c in board.css, so a station reads as its module.
+export const STAGE = { stuck: C.bad, waiting: C.warn, pr: C.ok, queue: C.blue, behind: C.muted };
+// A PR row's CI, coloured as the check in the card's badge (board.css .check.*).
+export const CHECK = { green: C.ok, pending: C.lamp, red: C.bad };
+const MONO = `"JetBrains Mono", ui-monospace, monospace`;
 
 const DEFS = `<defs>
 <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
@@ -58,7 +63,7 @@ const monitor = ([x, y, w, h], checks, motion) => {
   if (!checks.length)
     return `<g class="ui idle">${leaf(x + w / 2, y + h / 2 - 6, 1.8, C.holo)}<path class="wave" d="M${x + 14} ${y + h - 16} q 12 -9 24 0 t 24 0 t 24 0 t 24 0" stroke="${C.holo}" stroke-width="3" fill="none"/></g>`;
   const rows = checks.map((check, i) => {
-    const col = CHECK[/** @type {keyof typeof CHECK} */ (check)] ?? C.holo;
+    const col = CHECK[/** @type {keyof typeof CHECK} */ (check)] ?? CHECK.pending;
     const cy = y + h / 2 + 26 * (i - (checks.length - 1) / 2);
     const bx = x + 32, bw = w - 60; // the leaf spans x+10 to x+26, clear of the pane edge
     const bar =
@@ -70,6 +75,26 @@ const monitor = ([x, y, w, h], checks, motion) => {
     return `<g class="row ${check}">${leaf(x + 18, cy + 3, 0.8, col)}<rect x="${bx}" y="${cy - 3}" width="${bw}" height="6" rx="3" fill="${C.holo}" opacity=".25"/>${bar}<circle class="${check === "red" ? "fail" : ""}" cx="${x + w - 14}" cy="${cy}" r="5" fill="${col}"/></g>`;
   });
   return `<g class="ui">${rows.join("")}</g>`;
+};
+
+/**
+ * A count plate, like a module's readout: the stage's count in its colour on dark glass,
+ * 52x32 in the image's units (about 18px tall at desktop width).
+ * @param {number} x left @param {number} y top @param {number} n @param {string} col
+ */
+const plate = (x, y, n, col) =>
+  `<g class="plate"><rect x="${x}" y="${y}" width="52" height="32" rx="4" fill="#0c1424" fill-opacity=".9" stroke="${col}" stroke-opacity=".8" stroke-width="2"/><text x="${x + 26}" y="${y + 23}" text-anchor="middle" font-family='${MONO}' font-weight="600" font-size="23" fill="${col}">${String(n).padStart(2, "0")}</text></g>`;
+/** A plate on a station's top-right corner, sticking out past its edge like a tab. @param {number[]} r @param {number} n @param {string} col */
+const cornerPlate = ([x, y, w], n, col) => plate(x + w - 42, y - 18, n, col);
+
+// The second robot's head, and the speech bubble over it: [x, y, width, height].
+const HEAD = [1022, 452];
+const BUBBLE = [HEAD[0] + 4, HEAD[1] - 74, 46, 42];
+/** A see-through speech bubble with a "!", its body and tail one outline. */
+const bubble = () => {
+  const [hx, hy] = HEAD, [x, y, w, h] = BUBBLE, r = 12;
+  const d = `M${x + r} ${y} H${x + w - r} Q${x + w} ${y} ${x + w} ${y + r} V${y + h - r} Q${x + w} ${y + h} ${x + w - r} ${y + h} H${x + 30} L${hx} ${hy} L${x + 14} ${y + h} H${x + r} Q${x} ${y + h} ${x} ${y + h - r} V${y + r} Q${x} ${y} ${x + r} ${y} Z`;
+  return `<g class="bubble"><path d="${d}" fill="#0c1424" fill-opacity=".55" stroke="${STAGE.waiting}" stroke-width="2.5" stroke-linejoin="round"/><text x="${x + w / 2}" y="${y + 31}" text-anchor="middle" font-family='${MONO}' font-weight="700" font-size="28" fill="${STAGE.waiting}" filter="url(#glow)">!</text></g>`;
 };
 
 /** A scan line sweeping down a panel. @param {number[]} r @param {number} begin */
@@ -121,12 +146,14 @@ const city = (busy, motion) =>
   ].join("");
 
 /**
- * The banner's scene for a board.
- * - PR in progress: the two right panels glow cyan, brighter with more PRs, and show a growth
- *   row per PR (up to 6), split between them.
+ * The banner's scene for a board. Each lit station is in its stage's colour (`STAGE`) and
+ * carries a plate with the stage's count, as the module below does.
+ * - PR in progress: the two right panels glow green, brighter with more PRs, and show a growth
+ *   row per PR (up to 6), split between them and coloured by CI as the cards' badges are.
  * - Stuck: the left panel turns red with a warning; otherwise it shows a healthy leaf.
- * - Waiting for human: the floor lantern and its lamp post glow amber, brighter with more cards.
- * - Queue: a sprout lights up over a pot per queued card (up to 6).
+ * - Waiting for human: the second robot asks with a "!" bubble, and the floor lantern and its
+ *   lamp post glow, brighter with more cards.
+ * - Queue: a blue sprout lights up over a pot per queued card (up to 6).
  * - Behind another issue: a padlock over the green tool box per blocked issue (up to 3).
  * - The city's traffic follows how busy the workshop is (`busyness`).
  * - Paused: the scene dims and stands still, the robots' eyes shut, and the ships are gone.
@@ -138,35 +165,42 @@ export const scene = (board, motion = true) => {
   const paused = board.state === "paused";
   const move = motion && !paused;
   const checks = s.prInProgress.slice(0, 6).map((c) => c.check ?? "pending");
+  const behind = s.behind ?? [];
   const g = [`<image href="banner.jpg" width="2400" height="800"/>`, city(busyness(board), move), pane(PR_A), pane(PR_B), pane(HEALTH)];
 
   if (checks.length) {
     const level = Math.min(1, 0.25 + checks.length * 0.15) * 0.3;
-    const glass = (/** @type {number[]} */ [x, y, w, h]) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" fill="${C.holo}" opacity="${level}" filter="url(#glow)"/>`;
+    const glass = (/** @type {number[]} */ [x, y, w, h]) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" fill="${STAGE.pr}" opacity="${level}" filter="url(#glow)"/>`;
     g.push(`<g class="pr">${glass(PR_A)}${glass(PR_B)}${move ? scan(PR_A, 0) + scan(PR_B, -1.3) : ""}</g>`);
   }
   g.push(monitor(PR_A, checks.filter((_, i) => i % 2 === 0), move), monitor(PR_B, checks.filter((_, i) => i % 2 === 1), move));
+  if (s.prInProgress.length) g.push(cornerPlate(PR_B, s.prInProgress.length, STAGE.pr));
 
   if (s.stuck.length)
     g.push(`<g class="warning"><rect x="712" y="457" width="126" height="89" rx="8" fill="${C.bad}" opacity=".45" filter="url(#glow)"/>
-<path d="M775 470 L800 512 L750 512 Z" fill="none" stroke="#fff" stroke-opacity=".8" stroke-width="5" stroke-linejoin="round"/><rect x="772.5" y="483" width="5" height="16" fill="#fff" fill-opacity=".8"/><circle cx="775" cy="506" r="3" fill="#fff" fill-opacity=".8"/>${lights(HEALTH, C.bad)}</g>`);
+<path d="M775 470 L800 512 L750 512 Z" fill="none" stroke="#fff" stroke-opacity=".8" stroke-width="5" stroke-linejoin="round"/><rect x="772.5" y="483" width="5" height="16" fill="#fff" fill-opacity=".8"/><circle cx="775" cy="506" r="3" fill="#fff" fill-opacity=".8"/>${lights(HEALTH, C.bad)}</g>${cornerPlate(HEALTH, s.stuck.length, STAGE.stuck)}`);
   else g.push(`<g class="ui">${leaf(775, 505, 2, C.ok, "healthy")}${lights(HEALTH, C.ok)}</g>`);
 
   if (s.waiting.length) {
     // brighter and wider with each waiting card, up to 6
     const k = Math.min(s.waiting.length, 6) / 6;
     const o = (0.2 + 0.3 * k).toFixed(2);
-    g.push(`<g class="wait"><circle cx="1257" cy="625" r="${Math.round(45 + 48 * k)}" fill="${C.warn}" opacity="${o}" filter="url(#soft)"/><circle cx="1227" cy="425" r="${Math.round(30 + 15 * k)}" fill="${C.warn}" opacity="${o}" filter="url(#soft)"/></g>`);
+    g.push(`<g class="wait"><circle cx="1257" cy="625" r="${Math.round(45 + 48 * k)}" fill="${STAGE.waiting}" opacity="${o}" filter="url(#soft)"/><circle cx="1227" cy="425" r="${Math.round(30 + 15 * k)}" fill="${STAGE.waiting}" opacity="${o}" filter="url(#soft)"/></g>`);
+    // The bubble asks; its count sits beside it, apart from the "!".
+    g.push(bubble(), plate(BUBBLE[0] + BUBBLE[2] + 8, BUBBLE[1] + 5, s.waiting.length, STAGE.waiting));
   }
 
   POTS.slice(0, s.queue.length).forEach(([x, y], i) =>
-    g.push(`<g class="sprout" style="animation-delay:${i * 0.4}s"><circle cx="${x}" cy="${y}" r="16" fill="${C.ok}" opacity=".5" filter="url(#soft)"/><path d="M${x} ${y + 6}${LEAF.slice(4)}" stroke="#d8ffd9" stroke-opacity=".7" stroke-width="2.5" fill="none" filter="url(#glow)"/></g>`),
+    g.push(`<g class="sprout" style="animation-delay:${i * 0.4}s"><circle cx="${x}" cy="${y}" r="16" fill="${STAGE.queue}" opacity=".55" filter="url(#soft)"/><path d="M${x} ${y + 6}${LEAF.slice(4)}" stroke="#dce8ff" stroke-opacity=".8" stroke-width="2.5" fill="none" filter="url(#glow)"/></g>`),
   );
+  // The queue's count sits on the deck under the first pot, clear of the PR screens above it.
+  if (s.queue.length) g.push(plate(POTS[0][0] - 26, POTS[0][1] + 26, s.queue.length, STAGE.queue));
 
-  (s.behind ?? []).slice(0, 3).forEach((_, i) => {
+  behind.slice(0, 3).forEach((_, i) => {
     const x = 1440 + i * 22, y = 660;
-    g.push(`<g class="lock" opacity=".55"><rect x="${x - 8}" y="${y}" width="16" height="13" rx="2" fill="${C.muted}"/><path d="M${x - 5} ${y} v-5 a5 5 0 0 1 10 0 v5" stroke="${C.muted}" stroke-width="3" fill="none"/></g>`);
+    g.push(`<g class="lock" opacity=".75"><rect x="${x - 8}" y="${y}" width="16" height="13" rx="2" fill="${STAGE.behind}"/><path d="M${x - 5} ${y} v-5 a5 5 0 0 1 10 0 v5" stroke="${STAGE.behind}" stroke-width="3" fill="none"/></g>`);
   });
+  if (behind.length) g.push(plate(1440 + Math.min(behind.length, 3) * 22, 634, behind.length, STAGE.behind));
 
   // Eyelids: a blink now and then, shut when paused.
   EYES.forEach(([x, y, rx, ry, phase]) =>
