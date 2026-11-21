@@ -20,7 +20,7 @@
 <p class="banner-sub">Every open issue and PR of the workshop, by stage. ✳ opens a Claude session.</p>
 <main id="board"></main>
 <script type="module">
-import { render } from "./render.js";
+import { moreLabel, render } from "./render.js";
 import { scene } from "./components/scene.js";
 const main = document.getElementById("board");
 try {
@@ -28,13 +28,20 @@ try {
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const board = await res.json();
   main.innerHTML = render(board);
-  // Show more: reveal the next cards of its module, and go once none are left hidden.
+  // Show more: reveal the next cards of its module and move focus to the first of them,
+  // so keyboard and screen-reader users land on what appeared. The button goes once none are hidden.
   main.addEventListener("click", (e) => {
     const btn = e.target.closest("button.more");
     if (!btn) return;
-    const hidden = btn.closest(".module").querySelectorAll(".card[hidden]");
-    [...hidden].slice(0, Number(btn.dataset.step)).forEach((c) => c.removeAttribute("hidden"));
-    if (hidden.length <= Number(btn.dataset.step)) btn.remove();
+    const step = Number(btn.dataset.step);
+    const hidden = [...btn.closest(".module").querySelectorAll(".card[hidden]")];
+    const shown = hidden.slice(0, step);
+    shown.forEach((c) => c.removeAttribute("hidden"));
+    const left = hidden.length - shown.length;
+    if (left) btn.textContent = moreLabel(left, step);
+    else btn.remove();
+    shown[0]?.setAttribute("tabindex", "-1");
+    shown[0]?.focus();
   });
   const motion = !matchMedia("(prefers-reduced-motion: reduce)").matches;
   const art = document.getElementById("art");

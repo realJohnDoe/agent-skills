@@ -10,6 +10,12 @@ const DAY = 864e5;
 /** How many Closed cards show at first, and how many more each Show more press reveals. */
 export const CLOSED_PAGE = 10;
 
+/**
+ * A Show more button's label: how many one press shows and how many are hidden.
+ * @param {number} hidden @param {number} step
+ */
+export const moreLabel = (hidden, step) => (hidden <= step ? `Show the last ${hidden}` : `Show ${step} more · ${hidden} left`);
+
 /** @param {string} iso */
 const when = (iso) => `${iso.slice(0, 16).replace("T", " ")} UTC`;
 
@@ -52,7 +58,8 @@ export const render = (board, now = new Date()) => {
   // Closed lists every completed issue, newest first: the first CLOSED_PAGE show, and
   // each press of Show more (wired in index.html) shows CLOSED_PAGE more.
   const closed = s.closed.map((c, i) => cardWith(c, false, true, i >= CLOSED_PAGE));
-  const more = closed.length > CLOSED_PAGE ? `<button class="more" type="button" data-step="${CLOSED_PAGE}">Show more</button>` : "";
+  const hidden = closed.length - CLOSED_PAGE;
+  const more = hidden > 0 ? `<button class="more" type="button" data-step="${CLOSED_PAGE}">${moreLabel(hidden, CLOSED_PAGE)}</button>` : "";
 
   return [
     ...notices,

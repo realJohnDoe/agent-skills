@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { render } from "../board/render.js";
+import { moreLabel, render } from "../board/render.js";
 import { busyness, scene } from "../board/components/scene.js";
 import { type BoardPlan, buildBoard, labelSync } from "./board.ts";
 import type { Item } from "./lib.ts";
@@ -122,13 +122,19 @@ describe("render", () => {
     assert.deepEqual([...strip.matchAll(/<span class="m-(\w+)">/g)].map((m) => m[1]), ["waiting", "pr", "behind"]);
   });
 
+  test("Show more says how many a press shows and how many are hidden", () => {
+    assert.equal(moreLabel(13, 10), "Show 10 more · 13 left");
+    assert.equal(moreLabel(10, 10), "Show the last 10");
+    assert.equal(moreLabel(3, 10), "Show the last 3");
+  });
+
   test("Closed lists every card, the first 10 shown, with Show more while any are hidden", () => {
     const many = Array.from({ length: 23 }, (_, i) => ({ ...closed[0], number: 100 + i, title: `C${i}` }));
     const sec = section(render({ ...board, stages: { ...stages, closed: many } }, now), "closed");
     assert.equal(sec.match(/<article /g)?.length, 23);
     assert.equal(sec.match(/<article [^>]*hidden>/g)?.length, 13);
     assert.doesNotMatch(sec.match(/<article [^>]*>[\s\S]*?C9</)?.[0] ?? "", /hidden>[\s\S]*C9</); // C9 is the 10th, shown
-    assert.match(sec, /<button class="more" type="button" data-step="10">Show more<\/button>/);
+    assert.match(sec, /<button class="more" type="button" data-step="10">Show 10 more · 13 left<\/button>/);
     assert.match(sec, /class="readout">23</);
     assert.doesNotMatch(section(html, "closed"), /class="more"|hidden>/);
   });

@@ -207,8 +207,8 @@ main { max-width: 1080px; margin: 0 auto; }
 .check.pending { color: var(--lamp); }
 
 .card[hidden] { display: none; }
-.more { /* below a module's cards: reveals the next ones */
-  display: block; margin: 12px 22px 0; padding: 6px 14px; cursor: pointer;
+.more { /* below a module's cards, as wide as their grid: reveals the next ones */
+  display: block; width: calc(100% - 44px); min-height: 44px; margin: 12px 22px 0; padding: 8px 14px; cursor: pointer;
   font: 600 12px var(--f-mono); letter-spacing: .04em; text-transform: uppercase;
   color: var(--c); background: var(--glass); border: 1px solid currentColor; border-radius: var(--r);
 }
@@ -221,7 +221,7 @@ main { max-width: 1080px; margin: 0 auto; }
   .module-head { padding-inline: 12px 74px; }
   .stack { padding-inline: 12px; }
   .readout { right: 12px; }
-  .more { margin-inline: 12px; }
+  .more { width: calc(100% - 24px); margin-inline: 12px; }
   .stack { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce) { .m-stuck .led, .scene * { animation: none; } }
