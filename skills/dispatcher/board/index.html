@@ -13,6 +13,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
 <link rel="stylesheet" href="board.css">
+<link rel="stylesheet" href="prototype-banner.css"><!-- PROTOTYPE -->
 </head>
 <body>
 <header class="banner"><img src="banner.jpg" alt=""></header>
@@ -21,14 +22,15 @@
 <main id="board"></main>
 <script type="module">
 import { render } from "./render.js";
+import { loadBoard, mountBanner, mountSwitcher } from "./prototype-banner.js"; // PROTOTYPE
 const main = document.getElementById("board");
-try {
-  const res = await fetch("board.json", { cache: "no-store" });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  main.innerHTML = render(await res.json());
-} catch (e) {
-  main.innerHTML = `<p class="notice error">Couldn't load board.json (${String(e.message ?? e).replace(/[&<>]/g, "")}).</p>`;
-}
+const draw = async () => {
+  const board = await loadBoard();
+  main.innerHTML = render(board);
+  mountBanner(board);
+};
+await draw();
+mountSwitcher(draw);
 </script>
 </body>
 </html>
