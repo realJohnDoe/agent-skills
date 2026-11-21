@@ -158,30 +158,35 @@ export function mergedSince(repo: string, since: string) {
   return api<GhSearch>("search/issues", "-X", "GET", "-f", `q=repo:${repo} is:pr is:merged merged:>=${since}`, "-f", "per_page=100");
 }
 
-// The latest 5 issues closed as completed across the repos, each with the merged PR
-// that cross-references it: one search, then one timeline read per issue. The
-// search can't sort by closing time, so it sorts by update and this takes the
-// newest `closed_at` of a page.
-export function fetchClosed(repos: Repo[]): Card[] {
+// Every issue closed as completed across the repos (up to the search's 1000), newest
+// first, each with the merged PRs that cross-reference it. One paged search, then one
+// timeline read per issue that `known` (the live board's Closed cards) doesn't already
+// hold: a closed issue's merged PRs don't change, so each board build reads only the
+// newly closed ones. The search can't sort by closing time, so it sorts by update and
+// this re-sorts by `closed_at`.
+export function fetchClosed(repos: Repo[], known: Card[] = []): Card[] {
   const q = `${repos.map((r) => `repo:${r.repo}`).join(" ")} is:issue is:closed reason:completed`;
-  const found = api<{ items: (GhIssue & { closed_at: string })[] }>(
-    "search/issues", "-X", "GET", "-f", `q=${q}`, "-f", "sort=updated", "-f", "per_page=30",
-  ).items;
+  const found = api<{ items: (GhIssue & { closed_at: string })[] }[]>(
+    "search/issues", "-X", "GET", "-f", `q=${q}`, "-f", "sort=updated", "-f", "per_page=100", "--paginate", "--slurp",
+  ).flatMap((page) => page.items);
+  const seen = new Map(known.map((c) => [`${c.repo.toLowerCase()}#${c.number}`, c]));
   return found
     .sort((a, b) => b.closed_at.localeCompare(a.closed_at))
-    .slice(0, 5)
     .map((i): Card => {
       const repo = i.repository_url!.replace(/^.*\/repos\//, "");
-      const events = all<{ event: string; source?: { issue?: { number: number; pull_request?: { merged_at: string | null } } } }>(
-        `repos/${repo}/issues/${i.number}/timeline?per_page=100`,
-      );
-      const prs = [
-        ...new Set(
-          events
-            .filter((e) => e.event === "cross-referenced" && e.source?.issue?.pull_request?.merged_at)
-            .map((e) => e.source!.issue!.number),
-        ),
-      ];
+      // Same closing day as the cached card, so a reopened and closed-again issue is read afresh.
+      const cached = seen.get(`${repo.toLowerCase()}#${i.number}`);
+      const prs = cached?.reason.startsWith(`closed ${i.closed_at.slice(0, 10)}`)
+        ? (cached.prs ?? [])
+        : [
+            ...new Set(
+              all<{ event: string; source?: { issue?: { number: number; pull_request?: { merged_at: string | null } } } }>(
+                `repos/${repo}/issues/${i.number}/timeline?per_page=100`,
+              )
+                .filter((e) => e.event === "cross-referenced" && e.source?.issue?.pull_request?.merged_at)
+                .map((e) => e.source!.issue!.number),
+            ),
+          ];
       return {
         repo,
         kind: "issue",

@@ -7,8 +7,9 @@ import { SUB, claudeChip, refBadge, repoChip } from "./chips.js";
  * @param {Card} c
  * @param {boolean} claude show the Claude chip whether or not it is unready
  * @param {boolean} [closed] the Closed stage's issues, which get the closed-issue icon
+ * @param {boolean} [hidden] rendered hidden, for Show more to reveal
  */
-export const cardWith = (c, claude, closed = false) => {
+export const cardWith = (c, claude, closed = false, hidden = false) => {
   // A card leads with where it is (repo), then what it is (a badge: issue or PR, its number, a PR's CI). A PR card (a PR's stage is about the PR: its CI, its review) names its
   // open issue in a badge; an issue card names its merged PRs in badges.
   const pr = c.kind === "pr";
@@ -26,7 +27,7 @@ export const cardWith = (c, claude, closed = false) => {
       ? `<a class="badge issue open wide" href="${esc(c.parent.url)}" target="_blank" rel="noopener">${icon("issue")}#${c.parent.number} <span class="tt">${esc(c.parent.title)}</span></a>`
       : `<div class="noissue">no issue</div>`
     : "";
-  return `<article class="card ${c.kind}">
+  return `<article class="card ${c.kind}"${hidden ? " hidden" : ""}>
 <div class="row">${chips.join("")}</div>
 <div class="title">${link(c.url, c.title)}</div>
 ${parent}

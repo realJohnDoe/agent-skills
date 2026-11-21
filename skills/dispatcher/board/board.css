@@ -119,9 +119,9 @@ main { max-width: 1080px; margin: 0 auto; }
   font: 12px var(--f-mono); color: var(--muted); letter-spacing: .04em; text-transform: uppercase;
 }
 .status b { color: var(--fg); font-weight: 600; }
-.status b.bad { color: var(--bad); }
 .status a { color: var(--holo); }
 .status .sep { width: 1px; height: 14px; background: var(--seam); }
+.status [class^="m-"], .status [class^="m-"] b { color: var(--c); } /* a stage's count in its colour */
 
 /* ---------- stage modules ---------- */
 .line { display: grid; gap: 22px; }
@@ -152,7 +152,8 @@ main { max-width: 1080px; margin: 0 auto; }
 }
 .stack { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; padding: 14px 22px 0; }
 
-.m-stuck { --c: var(--bad); border-color: var(--bad); }
+.m-stuck { --c: var(--bad); }
+.module.m-stuck { border-color: var(--bad); }
 .m-stuck .module-head { background: repeating-linear-gradient(135deg, var(--bad-dim) 0 10px, transparent 10px 20px); }
 .m-stuck .led { animation: blink 1.2s steps(2, start) infinite; }
 @keyframes blink { 50% { opacity: .25; } }
@@ -205,6 +206,14 @@ main { max-width: 1080px; margin: 0 auto; }
 .check.red { color: var(--bad); }
 .check.pending { color: var(--lamp); }
 
+.card[hidden] { display: none; }
+.more { /* below a module's cards, as wide as their grid: reveals the next ones */
+  display: block; width: calc(100% - 44px); min-height: 44px; margin: 12px 22px 0; padding: 8px 14px; cursor: pointer;
+  font: 600 12px var(--f-mono); letter-spacing: .04em; text-transform: uppercase;
+  color: var(--c); background: var(--glass); border: 1px solid currentColor; border-radius: var(--r);
+}
+.more:hover { background: rgba(255, 255, 255, .06); }
+
 .empty { grid-column: 1 / -1; font: 12px var(--f-mono); color: var(--muted); padding: 4px 0; letter-spacing: .04em; text-transform: uppercase; }
 .empty::before { content: "◦ "; color: var(--c); }
 
@@ -212,6 +221,7 @@ main { max-width: 1080px; margin: 0 auto; }
   .module-head { padding-inline: 12px 74px; }
   .stack { padding-inline: 12px; }
   .readout { right: 12px; }
+  .more { width: calc(100% - 24px); margin-inline: 12px; }
   .stack { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce) { .m-stuck .led, .scene * { animation: none; } }

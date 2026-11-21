@@ -7,12 +7,20 @@ import { askCard, card, cardWith } from "./components/card.js";
 import { stageModule } from "./components/stage.js";
 
 const DAY = 864e5;
+/** How many Closed cards show at first, and how many more each Show more press reveals. */
+export const CLOSED_PAGE = 10;
+
+/**
+ * A Show more button's label: how many one press shows and how many are hidden.
+ * @param {number} hidden @param {number} step
+ */
+export const moreLabel = (hidden, step) => (hidden <= step ? `Show the last ${hidden}` : `Show ${step} more · ${hidden} left`);
 
 /** @param {string} iso */
 const when = (iso) => `${iso.slice(0, 16).replace("T", " ")} UTC`;
 
 /**
- * The board below the banner: notices, the status strip and the stage modules.
+ * The board below the banner: notices, the status strip and the stage modules, Closed last.
  * @param {Board} board
  * @param {Date} [now] the viewer's clock, for the stale warnings
  */
@@ -33,15 +41,25 @@ export const render = (board, now = new Date()) => {
 
   const stuck = s.stuck.map(askCard);
   const behind = s.behind ?? []; // a board.json from before this stage has none
+  // The open stages that hold cards, in the modules' order and each in its stage's colour.
+  const counts = /** @type {[string, string, number][]} */ ([
+    ["stuck", "stuck", stuck.length],
+    ["waiting", "waiting for human", s.waiting.length],
+    ["pr", "PR in progress", s.prInProgress.length],
+    ["queue", "queue", s.queue.length],
+    ["behind", "behind another issue", behind.length],
+  ]);
   const status = [
-    `as of <b>${esc(when(board.generated))}</b>`,
-    ...(board.lastRun ? [`last run <b>${esc(when(board.lastRun))}</b>`] : []),
+    `last update <b>${esc(when(board.generated))}</b>`,
     `repos <b>${board.repos.length}</b>`,
-    `stuck <b class="bad">${stuck.length}</b>`,
-    `waiting for human <b>${s.waiting.length}</b>`,
-    `queue <b>${s.queue.length}</b>`,
-    `behind another issue <b>${behind.length}</b>`,
+    ...counts.filter(([, , n]) => n).map(([id, name, n]) => `<span class="m-${id}">${name} <b>${n}</b></span>`),
   ].join('<span class="sep"></span>');
+
+  // Closed lists every completed issue, newest first: the first CLOSED_PAGE show, and
+  // each press of Show more (wired in index.html) shows CLOSED_PAGE more.
+  const closed = s.closed.map((c, i) => cardWith(c, false, true, i >= CLOSED_PAGE));
+  const hidden = closed.length - CLOSED_PAGE;
+  const more = hidden > 0 ? `<button class="more" type="button" data-step="${CLOSED_PAGE}">${moreLabel(hidden, CLOSED_PAGE)}</button>` : "";
 
   return [
     ...notices,
@@ -49,10 +67,10 @@ export const render = (board, now = new Date()) => {
     `<div class="line">`,
     stuck.length ? stageModule("stuck", "Stuck", "needs a hand", stuck, "") : "",
     stageModule("waiting", "Waiting for human", "after merge, review, go ahead, decide, plan, tier, assigned", s.waiting.map(askCard), "Nothing waits on you"),
-    stageModule("closed", "Closed", "latest 5", s.closed.map((c) => cardWith(c, false, true)), "Nothing closed yet"),
     stageModule("pr", "PR in progress", "red first", s.prInProgress.map(card), "No open PRs"),
     stageModule("queue", "Queue", "in pickup order", s.queue.map(card), "Queue empty"),
     stageModule("behind", "Behind another issue", "moves on once its blocker closes", behind.map(card), "Nothing waits on another issue"),
+    stageModule("closed", "Closed", "newest first", closed, "Nothing closed yet", more),
     `</div>`,
   ].join("\n");
 };
