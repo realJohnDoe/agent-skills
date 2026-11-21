@@ -77,71 +77,87 @@ const DEFS = `<defs>
 <filter id="pb-glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
 <filter id="pb-soft" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="18"/></filter>
 </defs>`;
-// The robots' visible eyes, for a blink now and then (and "asleep" when paused).
-const EYES = [[560, 530, 1], [590, 528, 1], [988, 493, 2], [1014, 493, 2], [1562, 500, 3]];
+// The robots' visible eyes [x, y, robot, rx, ry], for a blink now and then (and "asleep" when paused).
+const EYES = [[1060, 475, 1, 9, 14], [1094, 475, 1, 9, 14], [1222, 466, 2, 5, 11], [1236, 466, 2, 5, 11]];
 /** @param {boolean} paused */
 const eyes = (paused) =>
-  EYES.map(([x, y, r]) => `<ellipse class="pb-lid ${paused ? "shut" : `r${r}`}" cx="${x}" cy="${y}" rx="12" ry="13" fill="#0b0b18" style="transform-origin:${x}px ${y - 13}px"/>`).join("");
+  EYES.map(([x, y, r, rx, ry]) => `<ellipse class="pb-lid ${paused ? "shut" : `r${r}`}" cx="${x}" cy="${y}" rx="${rx}" ry="${ry}" fill="#0b0b18" style="transform-origin:${x}px ${y - ry}px"/>`).join("");
 /** Darkens the scene and stops it; every variant adds it when paused. @param {Counts} n */
 const pausedLayer = (n) => (n.paused ? `<rect class="pb-night" x="0" y="0" width="2400" height="800" fill="#07051a" opacity=".3"/>` : "");
 
+// The banner's three blank holo screens: [x, y, width, height].
+const S1 = [851, 414, 119, 103]; // beside the robots
+const S2 = [1328, 420, 124, 109]; // beside the robots
+const S3 = [1500, 399, 140, 110]; // alone on its post
+
 // ---------- A: glow stations ----------
-// Stuck = left holo panel turns red and flashes a warning. PR in progress = the two right
-// panels flicker cyan, brighter with more PRs; a red PR adds a red light. Waiting = the floor
-// lantern pulses amber. Queue = a green sprout light over a pot per queued card (up to 6).
-// Behind = small padlocks over the green tool box. Closed has no station.
-const POTS = [[1317, 640], [1385, 645], [1600, 650], [1645, 652], [775, 672], [1280, 628]];
+// Left to right along the deck, in the order work flows:
+// Behind = the cold frame glows faintly, with a padlock per blocked issue (up to 3).
+// Queue = a sprout light over a pot per queued card (up to 5).
+// PR in progress = the two screens beside the robots flicker cyan, brighter with more PRs;
+//   a red PR adds a red light. Stuck = the lone screen turns red with a warning.
+// Waiting = the lantern pulses amber and the bell glints. Closed = a warm glow over the baskets.
+const POTS = [[695, 540], [742, 540], [790, 540], [847, 540], [907, 540]];
+/** @param {number[]} r @param {string} fill @param {string} [cls] */
+const glass = ([x, y, w, h], fill, cls = "") => `<rect class="${cls}" x="${x}" y="${y}" width="${w}" height="${h}" rx="6" fill="${fill}" filter="url(#pb-glow)"/>`;
 /** @param {Counts} n */
 const variantA = (n) => {
   const g = [];
-  // Stuck
-  if (n.stuck)
-    g.push(`<g class="pb-stuck"><rect x="712" y="457" width="126" height="89" rx="8" fill="${COL.stuck}" opacity=".45" filter="url(#pb-glow)"/>
-<path d="M775 474 L800 518 L750 518 Z" fill="none" stroke="#fff" stroke-opacity=".8" stroke-width="5" stroke-linejoin="round"/><rect x="772.5" y="487" width="5" height="17" fill="#fff"/><circle cx="775" cy="511" r="3" fill="#fff"/></g>`);
-  // PR in progress
-  if (n.pr) {
-    const lvl = Math.min(1, 0.25 + n.pr * 0.15);
-    g.push(`<g class="pb-pr" style="--lvl:${lvl}">
-<rect x="1307" y="486" width="135" height="89" rx="6" fill="${COL.holo}" filter="url(#pb-glow)"/>
-<rect x="1600" y="477" width="130" height="110" rx="6" fill="${COL.holo}" filter="url(#pb-glow)"/>
-<rect class="pb-scan" x="1307" y="486" width="135" height="6" fill="#fff"/>
-<rect class="pb-scan d2" x="1600" y="477" width="130" height="6" fill="#fff"/></g>`);
-    if (n.red) g.push(`<circle class="pb-alarm" cx="1712" cy="566" r="14" fill="${COL.stuck}" opacity=".6" filter="url(#pb-glow)"/>`);
+  // Behind another issue
+  if (n.behind) {
+    g.push(`<rect class="pb-behind" x="455" y="475" width="185" height="118" rx="30" fill="${COL.behind}" opacity=".45" filter="url(#pb-soft)"/>`);
+    for (let i = 0; i < Math.min(n.behind, 3); i++) {
+      const x = 500 + i * 26, y = 628;
+      g.push(`<g class="pb-lock" opacity=".55"><rect x="${x - 8}" y="${y}" width="16" height="13" rx="2" fill="${COL.behind}"/><path d="M${x - 5} ${y} v-5 a5 5 0 0 1 10 0 v5" stroke="${COL.behind}" stroke-width="3" fill="none"/></g>`);
+    }
   }
-  // Waiting for human
-  if (n.waiting)
-    g.push(`<g class="pb-wait"><circle cx="1257" cy="625" r="${45 + Math.min(n.waiting, 6) * 8}" fill="${COL.waiting}" opacity=".4" filter="url(#pb-soft)"/><circle cx="1227" cy="425" r="45" fill="${COL.waiting}" opacity=".4" filter="url(#pb-soft)"/></g>`);
   // Queue
   POTS.slice(0, Math.min(n.queue, POTS.length)).forEach(([x, y], i) =>
     g.push(`<g class="pb-sprout" style="animation-delay:${i * 0.4}s"><circle cx="${x}" cy="${y}" r="16" fill="${COL.pr}" opacity=".5" filter="url(#pb-soft)"/><path d="M${x} ${y + 6} v-14 m0 4 q-9 -2 -10 -10 q9 1 10 10 m0 -2 q9 -2 10 -10 q-9 1 -10 10" stroke="#d8ffd9" stroke-opacity=".7" stroke-width="2.5" fill="none" filter="url(#pb-glow)"/></g>`),
   );
-  // Behind another issue
-  for (let i = 0; i < Math.min(n.behind, 3); i++) {
-    const x = 1440 + i * 22, y = 660;
-    g.push(`<g class="pb-lock" opacity=".55"><rect x="${x - 8}" y="${y}" width="16" height="13" rx="2" fill="${COL.behind}"/><path d="M${x - 5} ${y} v-5 a5 5 0 0 1 10 0 v5" stroke="${COL.behind}" stroke-width="3" fill="none"/></g>`);
+  // PR in progress
+  if (n.pr) {
+    const lvl = Math.min(1, 0.25 + n.pr * 0.15);
+    g.push(`<g class="pb-pr" style="--lvl:${lvl}">${glass(S1, COL.holo)}${glass(S2, COL.holo)}
+<rect class="pb-scan" x="${S1[0]}" y="${S1[1]}" width="${S1[2]}" height="6" fill="#fff"/>
+<rect class="pb-scan d2" x="${S2[0]}" y="${S2[1]}" width="${S2[2]}" height="6" fill="#fff"/></g>`);
+    if (n.red) g.push(`<circle class="pb-alarm" cx="1436" cy="514" r="12" fill="${COL.stuck}" opacity=".6" filter="url(#pb-glow)"/>`);
   }
+  // Stuck
+  if (n.stuck)
+    g.push(`<g class="pb-stuck"><rect x="1494" y="393" width="152" height="122" rx="8" fill="${COL.stuck}" opacity=".45" filter="url(#pb-glow)"/>
+<path d="M1570 426 L1599 478 L1541 478 Z" fill="none" stroke="#fff" stroke-opacity=".8" stroke-width="5" stroke-linejoin="round"/><rect x="1567.5" y="442" width="5" height="19" fill="#fff" fill-opacity=".8"/><circle cx="1570" cy="469" r="3.5" fill="#fff" fill-opacity=".8"/></g>`);
+  // Waiting for human
+  if (n.waiting)
+    g.push(`<g class="pb-wait"><circle cx="1492" cy="605" r="${40 + Math.min(n.waiting, 6) * 7}" fill="${COL.waiting}" opacity=".4" filter="url(#pb-soft)"/><circle cx="1665" cy="640" r="20" fill="${COL.waiting}" opacity=".4" filter="url(#pb-soft)"/></g>`);
+  // Closed
+  if (n.closed)
+    g.push(`<g class="pb-closed"><ellipse cx="1757" cy="545" rx="70" ry="38" fill="#ffd98a" opacity=".4" filter="url(#pb-soft)"/><ellipse cx="1920" cy="540" rx="70" ry="38" fill="#ffd98a" opacity=".4" filter="url(#pb-soft)"/></g>`);
   return g.join("\n");
 };
 
 // ---------- B: holo readouts ----------
-// Each holo screen is redrawn, a little larger, as a readout: the left panel shows Stuck and
-// Waiting, the middle one Queue and Behind, the right one PR in progress and Closed.
+// The three holo screens show the counts: the first Queue and Behind, the second PR in
+// progress and Closed, the lone one Stuck and Waiting (red-framed when anything is stuck).
 /** @param {number} x @param {number} y @param {number} w @param {number} h @param {string} label @param {number} v @param {string} col @param {number} i */
 const cell = (x, y, w, h, label, v, col, i) => `<g class="pb-cell${v ? "" : " zero"}" style="--c:${col}; animation-delay:${i * 0.15}s">
 <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="5" fill="#081626" fill-opacity=".9" stroke="${col}" stroke-width="2"/>
 <text x="${x + w / 2}" y="${y + h * 0.62}" text-anchor="middle" class="pb-num" fill="${col}" font-size="${h * 0.62}">${v}</text>
 <text x="${x + w / 2}" y="${y + h - 6}" text-anchor="middle" class="pb-lbl" fill="${col}" font-size="12">${label}</text></g>`;
-/** @param {number} x @param {number} y @param {number} w @param {number} h @param {string} cells @param {boolean} alarm @param {number} i */
-const screen = (x, y, w, h, cells, alarm, i) => `<g class="pb-screen" style="animation-delay:${i * 0.7}s">
-<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="8" fill="#0c2a3a" fill-opacity=".55" stroke="${alarm ? COL.stuck : COL.holo}" stroke-width="3" filter="url(#pb-glow)"/>
-${cells}
-<rect class="pb-scan" x="${x}" y="${y}" width="${w}" height="5" fill="#fff"/></g>`;
+/** @param {number[]} r @param {[string, number, string]} a @param {[string, number, string]} b @param {boolean} alarm @param {number} i */
+const screen = ([x, y, w, h], a, b, alarm, i) => {
+  const cw = (w - 6) / 2;
+  return `<g class="pb-screen" style="animation-delay:${i * 0.7}s">
+<rect x="${x - 8}" y="${y - 8}" width="${w + 16}" height="${h + 16}" rx="8" fill="#0c2a3a" fill-opacity=".55" stroke="${alarm ? COL.stuck : COL.holo}" stroke-width="3" filter="url(#pb-glow)"/>
+${cell(x, y, cw, h, a[0], a[1], a[2], 2 * i)}${cell(x + cw + 6, y, cw, h, b[0], b[1], b[2], 2 * i + 1)}
+<rect class="pb-scan" x="${x - 8}" y="${y - 8}" width="${w + 16}" height="5" fill="#fff"/></g>`;
+};
 /** @param {Counts} n */
 const variantB = (n) =>
   [
-    screen(706, 446, 140, 104, cell(714, 454, 60, 88, "STUCK", n.stuck, COL.stuck, 0) + cell(778, 454, 60, 88, "WAIT", n.waiting, COL.waiting, 1), n.stuck > 0, 0),
-    screen(1296, 470, 160, 112, cell(1304, 478, 70, 96, "QUEUE", n.queue, COL.queue, 2) + cell(1378, 478, 70, 96, "BEHIND", n.behind, COL.behind, 3), false, 1),
-    screen(1592, 462, 150, 130, cell(1600, 470, 64, 114, "PR", n.pr, COL.pr, 4) + cell(1670, 470, 64, 114, "CLOSED", n.closed, COL.closed, 5), n.red > 0, 2),
+    screen(S1, ["QUEUE", n.queue, COL.queue], ["BEHIND", n.behind, COL.behind], false, 0),
+    screen(S2, ["PR", n.pr, COL.pr], ["CLOSED", n.closed, COL.closed], n.red > 0, 1),
+    screen(S3, ["STUCK", n.stuck, COL.stuck], ["WAIT", n.waiting, COL.waiting], n.stuck > 0, 2),
   ].join("\n");
 
 // ---------- C: conveyor ----------

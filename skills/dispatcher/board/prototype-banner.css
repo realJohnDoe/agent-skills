@@ -1,5 +1,8 @@
 /* PROTOTYPE, throwaway: the animated banner variants (prototype-banner.js). Never on main. */
 
+/* the new banner's own sky, so the seam above 1400px doesn't show */
+.banner { --sky-top: #181550; }
+
 /* The image and its overlay share one box, so the SVG crops exactly like the <img>. */
 .pb-art { position: relative; height: 100%; max-width: 1400px; margin: 0 auto; }
 .pb-art img { max-width: none; }
@@ -29,6 +32,7 @@
 .pb-alarm { animation: pb-flash 1s steps(2, start) infinite; }
 .pb-wait { mix-blend-mode: screen; animation: pb-breathe 3s ease-in-out infinite; }
 .pb-sprout { animation: pb-breathe 2.4s ease-in-out infinite; }
+.pb-closed, .pb-behind { animation: pb-breathe 6s ease-in-out infinite; }
 
 /* ---- B: holo readouts ---- */
 .pb-screen { animation: pb-flicker 4s infinite; }
