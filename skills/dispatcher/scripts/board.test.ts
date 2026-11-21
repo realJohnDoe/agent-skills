@@ -308,6 +308,38 @@ describe("scene", () => {
     assert.equal(glow(6), glow(9));
   });
 
+  test("every lit station is a link to an existing stage module", () => {
+    const stations = (h: string) => [...h.matchAll(/<a class="station" href="#(stage-\w+)"/g)].map((m) => m[1]);
+    const modules = [...render(board).matchAll(/<section class="module [^"]*" id="(stage-\w+)"/g)].map((m) => m[1]);
+    assert.deepEqual(stations(scene(board)).sort(), ["stage-behind", "stage-pr", "stage-queue", "stage-stuck", "stage-waiting"]);
+    for (const id of stations(scene(board))) assert.ok(modules.includes(id), id);
+    assert.ok(scene(board).includes(`<a class="station" href="#stage-pr" aria-label="PR in progress: ${stages.prInProgress.length}"><title>PR in progress: ${stages.prInProgress.length}</title>`));
+  });
+
+  test("a quiet board has no links", () => assert.doesNotMatch(scene(quiet), /<a /));
+
+  test("no two stations' click boxes overlap", () => {
+    const many = (cards: unknown[]) => Array.from({ length: 10 }, () => cards[0]);
+    const full = { ...board, stages: { ...stages, queue: many(stages.queue), behind: many(stages.behind), prInProgress: many(stages.prInProgress) } };
+    for (const b of [board, full]) {
+      const boxes = [...scene(b as typeof board).matchAll(/<a class="station" href="#(stage-\w+)".*?<\/a>/gs)].flatMap(([a, id]) =>
+        [...a.matchAll(/<rect class="hit" x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)"/g)].map(([, x, y, w, h]) => ({ id, x: +x, y: +y, w: +w, h: +h })),
+      );
+      assert.equal(new Set(boxes.map((b) => b.id)).size, 5);
+      for (const [i, a] of boxes.entries())
+        for (const c of boxes.slice(i + 1))
+          if (a.id !== c.id) assert.ok(a.x + a.w <= c.x || c.x + c.w <= a.x || a.y + a.h <= c.y || c.y + c.h <= a.y, `${a.id} overlaps ${c.id}`);
+    }
+  });
+
+  test("a station's jump scrolls with scrollTo, never scrollIntoView or CSS smooth scrolling", () => {
+    // Either one stalls smooth scrolling in the Claude app's Android WebView, which no Chromium test catches.
+    const read = (f: string) => readFileSync(new URL(`../board/${f}`, import.meta.url), "utf8");
+    assert.match(read("index.html"), /\bscrollTo\(/);
+    for (const f of ["index.html", "render.js", "components/scene.js", "components/stage.js"]) assert.doesNotMatch(read(f), /scrollIntoView\(/, f);
+    assert.doesNotMatch(read("board.css"), /scroll-behavior\s*:\s*smooth/);
+  });
+
   test("moves only by SVG attributes, never by a CSS transform", () => assert.doesNotMatch(scene(board), /style="[^"]*transform/));
 });
 

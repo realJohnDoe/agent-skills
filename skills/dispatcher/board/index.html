@@ -42,9 +42,37 @@ try {
     else btn.remove();
     shown[0]?.setAttribute("tabindex", "-1");
     shown[0]?.focus();
+    room();
   });
   const motion = !matchMedia("(prefers-reduced-motion: reduce)").matches;
   const art = document.getElementById("art");
+  // The jump target: the module's top, less its scroll-margin-top (16px, board.css).
+  const topOf = (el) => el.getBoundingClientRect().top + scrollY - parseFloat(getComputedStyle(el).scrollMarginTop);
+  // Room to scroll: below the board, just enough space that the lowest stage a station links to
+  // (the last one before Closed) can reach the top of the window. A short board in a tall
+  // window would otherwise run out of page.
+  const room = () => {
+    main.style.paddingBottom = "";
+    const lowest = [...main.querySelectorAll(".module:not(.m-closed)")].pop();
+    if (!lowest) return;
+    const short = innerHeight - (document.documentElement.scrollHeight - topOf(lowest));
+    if (short > 0) main.style.paddingBottom = `${Math.ceil(short)}px`;
+  };
+  room();
+  document.fonts.ready.then(room); // the fonts change the board's height
+  addEventListener("resize", room);
+  // A station scrolls its module to the top and flashes it. Scroll with window.scrollTo,
+  // never scrollIntoView, and the page sets no smooth scroll-behavior in CSS: in the Claude
+  // app's Android WebView (framed in the artifact viewer) either one makes a smooth scroll
+  // that sometimes never starts. Issue #162 has the bisect.
+  art.addEventListener("click", (e) => {
+    const target = document.getElementById(e.target.closest("a.station")?.getAttribute("href").slice(1) ?? "");
+    if (!target) return;
+    e.preventDefault();
+    scrollTo({ top: topOf(target), behavior: motion ? "smooth" : "auto" });
+    target.classList.add("flash");
+    setTimeout(() => target.classList.remove("flash"), 1400);
+  });
   art.insertAdjacentHTML("beforeend", scene(board, motion));
   art.classList.add("live");
 } catch (e) {
