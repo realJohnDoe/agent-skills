@@ -1,0 +1,156 @@
+name: Pages deploy and preview
+
+# Shared by every workshop repo that serves a site from a Pages branch: each
+# calls it from its own workflow (see skills/dispatcher/SKILL.md, Configuring)
+# after building the site and uploading it as an artifact. Production deploys
+# on the default branch; same-repo PRs get a preview under pr-preview/pr-<N>/.
+#
+# The caller must grant `contents: write` and `pull-requests: write`: a called
+# workflow can't raise its caller's permissions.
+
+on:
+  workflow_call:
+    inputs:
+      artifact:
+        description: Name of the artifact holding the built site, uploaded earlier in the caller's run.
+        type: string
+        required: true
+      previews:
+        description: "`label` (same-repo PRs labelled `preview`), `all` (every same-repo PR) or `off`."
+        type: string
+        default: label
+      branch:
+        description: Branch Pages serves from.
+        type: string
+        default: gh-pages
+      mode:
+        description: "Test override: `production`, `preview` or `remove`. Empty decides from the event."
+        type: string
+        default: ""
+      pr-number:
+        description: Test override for the preview folder. Empty uses the event's PR number.
+        type: string
+        default: ""
+
+jobs:
+  decide:
+    runs-on: ubuntu-latest
+    outputs:
+      mode: ${{ steps.decide.outputs.mode }}
+      pr: ${{ steps.decide.outputs.pr }}
+    steps:
+      - id: decide
+        run: |
+          mode=none
+          if [ -n "$INPUT_MODE" ]; then
+            mode=$INPUT_MODE
+          elif [ "$EVENT" = push ] || [ "$EVENT" = workflow_dispatch ]; then
+            [ "$REF" = "refs/heads/$DEFAULT_BRANCH" ] && mode=production
+          elif [ "$EVENT" = pull_request ] && [ "$HEAD_REPO" = "$REPO" ] && [ "$PREVIEWS" != off ]; then
+            case "$ACTION" in
+              closed) mode=remove ;;
+              unlabeled) [ "$LABEL" = preview ] && mode=remove ;;
+              opened | reopened | synchronize | labeled)
+                if [ "$ACTION" != labeled ] || [ "$LABEL" = preview ]; then
+                  if [ "$PREVIEWS" = all ] || [ "$HAS_PREVIEW" = true ]; then mode=preview; fi
+                fi ;;
+            esac
+          fi
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          echo "pr=${INPUT_PR:-$EVENT_PR}" >> "$GITHUB_OUTPUT"
+          echo "mode: $mode"
+        env:
+          INPUT_MODE: ${{ inputs.mode }}
+          INPUT_PR: ${{ inputs.pr-number }}
+          EVENT_PR: ${{ github.event.number }}
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          REPO: ${{ github.repository }}
+          ACTION: ${{ github.event.action }}
+          LABEL: ${{ github.event.label.name }}
+          PREVIEWS: ${{ inputs.previews }}
+          HAS_PREVIEW: ${{ contains(github.event.pull_request.labels.*.name, 'preview') }}
+
+  production:
+    needs: decide
+    if: needs.decide.outputs.mode == 'production'
+    runs-on: ubuntu-latest
+    # The deploy action rebases and retries a rejected push, so queue, never cancel.
+    concurrency:
+      group: pages-${{ inputs.branch }}
+      cancel-in-progress: false
+    steps:
+      # The deploy action pushes from a checkout.
+      - uses: actions/checkout@v7
+      - name: Create the branch if missing
+        run: |
+          if ! git ls-remote --exit-code --heads origin "$BRANCH" > /dev/null; then
+            git switch --orphan "$BRANCH"
+            touch .nojekyll
+            git add .nojekyll
+            git -c user.name=github-actions -c user.email=github-actions@users.noreply.github.com commit -m "Create $BRANCH"
+            git push origin "HEAD:refs/heads/$BRANCH"
+          fi
+        env:
+          BRANCH: ${{ inputs.branch }}
+      - uses: actions/download-artifact@v8
+        with:
+          name: ${{ inputs.artifact }}
+          path: site
+      - uses: JamesIves/github-pages-deploy-action@fa24774553152dd7873cd16ebd8d959b010c5445 # v4.9.0
+        with:
+          folder: site
+          branch: ${{ inputs.branch }}
+          clean-exclude: pr-preview/
+          force: false
+
+  preview:
+    needs: decide
+    if: needs.decide.outputs.mode == 'preview'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: preview-${{ needs.decide.outputs.pr }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v7
+      - name: Create the branch if missing
+        run: |
+          if ! git ls-remote --exit-code --heads origin "$BRANCH" > /dev/null; then
+            git switch --orphan "$BRANCH"
+            touch .nojekyll
+            git add .nojekyll
+            git -c user.name=github-actions -c user.email=github-actions@users.noreply.github.com commit -m "Create $BRANCH"
+            git push origin "HEAD:refs/heads/$BRANCH"
+          fi
+        env:
+          BRANCH: ${{ inputs.branch }}
+      - uses: actions/download-artifact@v8
+        with:
+          name: ${{ inputs.artifact }}
+          path: site
+      - uses: rossjrw/pr-preview-action@873417d2df72380da1f3978378fb58560bcde976 # v1.8.2
+        with:
+          action: deploy
+          source-dir: site
+          preview-branch: ${{ inputs.branch }}
+          pr-number: ${{ needs.decide.outputs.pr }}
+          comment: ${{ inputs.pr-number == '' }}
+
+  remove:
+    needs: decide
+    if: needs.decide.outputs.mode == 'remove'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: preview-${{ needs.decide.outputs.pr }}
+      cancel-in-progress: true
+    steps:
+      # Unconditionally: the action cleans up from a checkout.
+      - uses: actions/checkout@v7
+      - uses: rossjrw/pr-preview-action@873417d2df72380da1f3978378fb58560bcde976 # v1.8.2
+        with:
+          action: remove
+          preview-branch: ${{ inputs.branch }}
+          pr-number: ${{ needs.decide.outputs.pr }}
+          comment: ${{ inputs.pr-number == '' }}
