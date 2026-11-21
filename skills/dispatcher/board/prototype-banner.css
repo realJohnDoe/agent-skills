@@ -68,7 +68,7 @@
 
 /* the floating prototype bar: deliberately not part of the design */
 .pb-bar {
-  position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 99;
+  position: fixed; left: 50%; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 99;
   display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: center;
   max-width: calc(100vw - 16px); padding: 6px 10px; border-radius: 999px;
   background: #fff; color: #111; box-shadow: 0 6px 24px #000a;

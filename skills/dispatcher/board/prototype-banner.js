@@ -42,7 +42,9 @@ const FAKE = {
   paused: () => fake(BUSY, true),
 };
 
-/** The board for the current ?scenario=; live falls back to busy when there is no board.json. */
+let liveOk = true; // false once board.json is missing: then "live" leaves the scenario list
+
+/** The board for the current scenario; with no board.json, live becomes busy. */
 export const loadBoard = async () => {
   const s = param("scenario", "live");
   if (s !== "live" && s in FAKE) return FAKE[/** @type {keyof typeof FAKE} */ (s)]();
@@ -51,6 +53,8 @@ export const loadBoard = async () => {
     if (!res.ok) throw new Error();
     return /** @type {Board} */ (await res.json());
   } catch {
+    liveOk = false;
+    state.scenario = "busy";
     return FAKE.busy();
   }
 };
@@ -179,8 +183,14 @@ const variantC = (n) => {
 };
 
 // ---------- mounting ----------
+// The choice lives in the page: seeded from ?variant=&scenario= or a #B-stuck hash (an artifact
+// passes only a plain hash), and written back to both where the frame allows it.
+const q = new URLSearchParams(location.search);
+const [hv, hs] = location.hash.slice(1).split("-");
+/** @type {Record<string, string | undefined>} */
+const state = { variant: q.get("variant") ?? (hv || undefined), scenario: q.get("scenario") ?? (hs || undefined) };
 /** @param {string} k @param {string} d */
-const param = (k, d) => new URLSearchParams(location.search).get(k) ?? d;
+const param = (k, d) => state[k] ?? d;
 
 /** Puts the chosen variant's overlay over the banner image. @param {Board} board */
 export const mountBanner = (board) => {
@@ -211,9 +221,10 @@ export const mountSwitcher = (rerender) => {
   const keys = /** @type {(keyof typeof VARIANTS)[]} */ (Object.keys(VARIANTS));
   /** @param {string} k @param {string} v */
   const set = (k, v) => {
-    const u = new URL(location.href);
-    u.searchParams.set(k, v);
-    history.replaceState(null, "", u);
+    state[k] = v;
+    try {
+      history.replaceState(null, "", `#${param("variant", "A")}-${param("scenario", "live")}`);
+    } catch {} // a locked-down frame may refuse it; the page state still holds
     draw();
     rerender();
   };
@@ -226,7 +237,7 @@ export const mountSwitcher = (rerender) => {
     const v = /** @type {keyof typeof VARIANTS} */ (param("variant", "A"));
     const s = param("scenario", "live");
     bar.innerHTML = `<button data-d="-1" aria-label="Previous variant">◀</button><span class="pb-v">${v} · ${VARIANTS[v] ?? "?"}</span><button data-d="1" aria-label="Next variant">▶</button>
-<span class="pb-sep"></span>${SCENARIOS.map((x) => `<button data-s="${x}" class="${x === s ? "on" : ""}">${x}</button>`).join("")}`;
+<span class="pb-sep"></span>${SCENARIOS.filter((x) => liveOk || x !== "live").map((x) => `<button data-s="${x}" class="${x === s ? "on" : ""}">${x}</button>`).join("")}`;
   };
   bar.addEventListener("click", (e) => {
     const b = /** @type {HTMLElement} */ (e.target).closest("button");
