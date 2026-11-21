@@ -117,6 +117,11 @@ describe("render", () => {
     ]);
   });
 
+  test("the status strip leaves out empty stages", () => {
+    const strip = render({ ...board, stages: { ...stages, stuck: [], queue: [] } }, now).match(/<div class="status">[\s\S]*?<\/div>/)?.[0] ?? "";
+    assert.deepEqual([...strip.matchAll(/<span class="m-(\w+)">/g)].map((m) => m[1]), ["waiting", "pr", "behind"]);
+  });
+
   test("Closed lists every card, the first 10 shown, with Show more while any are hidden", () => {
     const many = Array.from({ length: 23 }, (_, i) => ({ ...closed[0], number: 100 + i, title: `C${i}` }));
     const sec = section(render({ ...board, stages: { ...stages, closed: many } }, now), "closed");

@@ -35,16 +35,18 @@ export const render = (board, now = new Date()) => {
 
   const stuck = s.stuck.map(askCard);
   const behind = s.behind ?? []; // a board.json from before this stage has none
-  // The open stages' counts, in the modules' order and each in its stage's colour.
-  const count = (/** @type {string} */ id, /** @type {string} */ name, /** @type {number} */ n) => `<span class="m-${id}">${name} <b>${n}</b></span>`;
+  // The open stages that hold cards, in the modules' order and each in its stage's colour.
+  const counts = /** @type {[string, string, number][]} */ ([
+    ["stuck", "stuck", stuck.length],
+    ["waiting", "waiting for human", s.waiting.length],
+    ["pr", "PR in progress", s.prInProgress.length],
+    ["queue", "queue", s.queue.length],
+    ["behind", "behind another issue", behind.length],
+  ]);
   const status = [
     `last update <b>${esc(when(board.generated))}</b>`,
     `repos <b>${board.repos.length}</b>`,
-    count("stuck", "stuck", stuck.length),
-    count("waiting", "waiting for human", s.waiting.length),
-    count("pr", "PR in progress", s.prInProgress.length),
-    count("queue", "queue", s.queue.length),
-    count("behind", "behind another issue", behind.length),
+    ...counts.filter(([, , n]) => n).map(([id, name, n]) => `<span class="m-${id}">${name} <b>${n}</b></span>`),
   ].join('<span class="sep"></span>');
 
   // Closed lists every completed issue, newest first: the first CLOSED_PAGE show, and
