@@ -1,7 +1,9 @@
-// The banner's live scene: an SVG laid over banner.jpg, in the image's own 2400x800
-// coordinates and cropped exactly like it (preserveAspectRatio "xMidYMax slice" is the
-// image's object-fit: cover; object-position: center bottom). The painted stations light up
-// with the board's stages, and the city in the background moves.
+// The banner's live scene: an SVG that draws banner.jpg itself, in the image's own 2400x800
+// coordinates, cropped by preserveAspectRatio "xMidYMax slice" (object-fit: cover;
+// object-position: center bottom). The image is inside the SVG, not an <img> underneath it,
+// so the two can never be cropped differently: in Firefox's installed app (no URL bar) the
+// <img> and an SVG laid over it got different boxes, and the scene drifted off the picture.
+// The painted stations light up with the board's stages, and the city in the background moves.
 // Everything that moves is an SVG animation of an attribute (a bar's width, a ship's
 // position), never a CSS transform: mobile Chrome places CSS transforms on scaled SVG in page
 // pixels, which shifted them off the screens on phones. CSS animates opacity only.
@@ -129,7 +131,7 @@ export const scene = (board, motion = true) => {
   const paused = board.state === "paused";
   const move = motion && !paused;
   const checks = s.prInProgress.slice(0, 6).map((c) => c.check ?? "pending");
-  const g = [city(busyness(board), move), pane(PR_A), pane(PR_B), pane(HEALTH)];
+  const g = [`<image href="banner.jpg" width="2400" height="800"/>`, city(busyness(board), move), pane(PR_A), pane(PR_B), pane(HEALTH)];
 
   if (checks.length) {
     const level = Math.min(1, 0.25 + checks.length * 0.15) * 0.3;
