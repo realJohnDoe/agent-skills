@@ -1,0 +1,169 @@
+<title>Code Throughput</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: single reading column; two full-width chart panels, each with legend above and a table view below */
+:root{
+  --page:#f9f9f7; --surface:#fcfcfb; --ink:#0b0b0b; --ink-2:#52514e; --muted:#6f6d68;
+  --grid:#e1e0d9; --axis:#c3c2b7; --ring:rgba(11,11,11,.10);
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4; --s6:#008300; --s7:#6250d6; --s8:#e34948;
+  --font:system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --page:#0d0d0d; --surface:#1a1a19; --ink:#f0efec; --ink-2:#c3c2b7; --muted:#9a988f;
+  --grid:#2c2c2a; --axis:#383835; --ring:rgba(255,255,255,.10);
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#0ca30c; --s7:#9085e9; --s8:#e66767; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --page:#0d0d0d; --surface:#1a1a19; --ink:#f0efec; --ink-2:#c3c2b7; --muted:#9a988f;
+  --grid:#2c2c2a; --axis:#383835; --ring:rgba(255,255,255,.10);
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#0ca30c; --s7:#9085e9; --s8:#e66767; color-scheme:dark}
+body{background:var(--page);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.55}
+main{max-width:980px;margin:0 auto;padding-block:40px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:28px}
+header{display:flex;flex-direction:column;gap:8px}
+.eyebrow{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-variant-numeric:tabular-nums}
+h1{font-size:30px;line-height:1.15;margin:0;font-weight:650;text-wrap:balance}
+h2{font-size:18px;margin:0;font-weight:620;text-wrap:balance}
+p{margin:0;max-width:68ch;color:var(--ink-2)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
+.tile{display:flex;flex-direction:column;gap:2px;padding:14px 16px;background:var(--surface);border:1px solid var(--ring);border-radius:10px}
+.tile .v{font-size:26px;font-weight:620;font-variant-numeric:tabular-nums}
+.tile .l{font-size:13px;color:var(--muted)}
+section.panel{background:var(--surface);border:1px solid var(--ring);border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px;color:var(--ink-2);list-style:none;margin:0;padding:0}
+.legend li{display:flex;align-items:center;gap:6px}
+.legend i{width:10px;height:10px;border-radius:2px;display:inline-block}
+.legend li.off{opacity:.45}
+.chart{position:relative;min-width:0}
+.chart svg{display:block;width:100%;height:auto;overflow:visible}
+.chart text{font-family:var(--font);font-size:11px;fill:var(--muted);font-variant-numeric:tabular-nums}
+.tip{position:absolute;pointer-events:none;background:var(--surface);color:var(--ink);border:1px solid var(--ring);border-radius:8px;padding:8px 10px;font-size:12px;box-shadow:0 4px 16px rgba(0,0,0,.12);min-width:180px;z-index:2}
+.tip b{display:block;margin-bottom:4px;font-weight:600}
+.tip .row{display:flex;align-items:center;gap:6px;justify-content:space-between;font-variant-numeric:tabular-nums}
+.tip .row span:first-child{display:flex;align-items:center;gap:6px;color:var(--ink-2)}
+.tip .row i{width:8px;height:8px;border-radius:2px;display:inline-block}
+.tip .tot{border-top:1px solid var(--grid);margin-top:4px;padding-top:4px}
+.note{font-size:13px;color:var(--muted);max-width:none}
+details{font-size:13px}
+summary{cursor:pointer;color:var(--ink-2)}
+summary:focus-visible{outline:2px solid var(--s1);outline-offset:2px;border-radius:4px}
+.tablewrap{overflow-x:auto;margin-top:8px}
+table{border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:12px;white-space:nowrap}
+th,td{padding:4px 8px;text-align:right;border-bottom:1px solid var(--grid)}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--muted);font-weight:500}
+.callout{border-left:3px solid var(--s2);padding:4px 0 4px 12px;font-size:13px;color:var(--ink-2)}
+footer p{font-size:12px;color:var(--muted)}
+</style>
+
+<main>
+<header>
+  <span class="eyebrow" id="eyebrow">Merged pull requests · weekly</span>
+  <h1 id="headline">Code throughput</h1>
+  <p>Every pull request you authored that was merged in the window, grouped by the week (Monday to Sunday) it merged in and stacked by repository.<span id="otherNote"></span></p>
+</header>
+
+<div class="tiles" id="tiles"></div>
+
+<section class="panel" aria-labelledby="h-prs">
+  <h2 id="h-prs">Merged PRs per week</h2>
+  <ul class="legend" id="lg-prs"></ul>
+  <div class="chart" id="c-prs"></div>
+  <details><summary>Show as table</summary><div class="tablewrap" id="t-prs"></div></details>
+</section>
+
+<section class="panel" aria-labelledby="h-add">
+  <h2 id="h-add">Lines added per week</h2>
+  <ul class="legend" id="lg-add"></ul>
+  <div class="chart" id="c-add"></div>
+  <p class="note" id="addNote"></p>
+  <details><summary>Show as table</summary><div class="tablewrap" id="t-add"></div></details>
+</section>
+
+<footer><p>Source: GitHub search (<code>is:pr author:@me is:merged</code>) for PR counts. Lines added come from the insertions in each PR’s merge or squash commit on the default branch, which matches GitHub’s “additions” for squash merges. PRs without a matching commit count in the PR chart only. Generated <span id="generated"></span>.</p></footer>
+</main>
+
+<script>
+const D = __DATA__;
+const COLORS = D.series.map((_,i)=>`var(--s${i+1})`);
+const colorOf = Object.fromEntries(D.series.map((s,i)=>[s,COLORS[i]]));
+const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const fmtD = iso => { const d=new Date(iso+'T00:00:00Z'); return `${d.getUTCDate()} ${MON[d.getUTCMonth()]}`; };
+const nf = new Intl.NumberFormat('en-US');
+const compact = v => v>=1000 ? (v/1000).toFixed(v%1000===0?0:1).replace(/\.0$/,'')+'k' : String(v);
+const esc = t => String(t).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]);
+const fmtLong = iso => `${fmtD(iso)} ${iso.slice(0,4)}`;
+const list = a => a.length < 2 ? a.join('') : a.slice(0,-1).join(', ') + ' and ' + a.at(-1);
+document.getElementById('eyebrow').textContent = `Merged pull requests · ${fmtLong(D.since)} – ${fmtLong(D.until)} · weekly`;
+document.getElementById('generated').textContent = fmtLong(D.generated);
+if (D.otherRepos.length) document.getElementById('otherNote').textContent = ` Smaller repos (${D.otherRepos.join(', ')}) are folded into “Other”.`;
+{
+  const notes = [];
+  const miss = Object.entries(D.missing).sort((a,b)=>b[1]-a[1]);
+  const nMiss = miss.reduce((t,[,n])=>t+n,0);
+  if (nMiss) notes.push(`${nf.format(nMiss)} PR${nMiss>1?'s':''} (${list(miss.map(([r,n])=>`${n} in ${esc(r)}`))}) have no matching commit on the default branch, most likely because they merged into another branch or the repo couldn’t be fetched, so they add no lines here.`);
+  if (D.excluded.length) notes.push(`Left out on purpose: ${list(D.excluded.map(e=>`${esc(e.repo)} #${e.number} “${esc(e.title)}” (+${compact(e.added)})`))}. They still count in the PR chart.`);
+  const el = document.getElementById('addNote'); if (notes.length) el.innerHTML = notes.join(' '); else el.hidden = true;
+}
+
+const sum = a => a.reduce((x,y)=>x+y,0);
+const totPR = sum(Object.values(D.prs).map(sum));
+const totAdd = sum(Object.values(D.adds).map(sum));
+const weeklyPR = D.weeks.map((_,i)=>sum(D.series.map(s=>D.prs[s][i])));
+const best = weeklyPR.indexOf(Math.max(...weeklyPR));
+document.getElementById('tiles').innerHTML = [
+  [nf.format(totPR),'merged PRs'],
+  [nf.format(Math.round(totPR/((Date.parse(D.until)-Date.parse(D.since))/6048e5+1/7))),'PRs per week, average'],
+  [`${weeklyPR[best]}`, `busiest week (${fmtD(D.weeks[best])})`],
+  [D.totals.repos,'repositories'],
+  [compact(D.totals.added),'lines added'],
+].map(([v,l])=>`<div class="tile"><span class="v">${v}</span><span class="l">${l}</span></div>`).join('');
+
+function niceMax(v){ const p=Math.pow(10,Math.floor(Math.log10(v))); for(const m of [1,1.5,2,2.5,3,4,5,6,8,10]) if(m*p>=v) return m*p; }
+function ticks(max){ const p=Math.pow(10,Math.floor(Math.log10(max))); let step=p; for(const m of [.2,.25,.5,1,2]) { if(max/(m*p)<=6){step=m*p;break;} } const t=[]; for(let v=0;v<=max+1e-9;v+=step) t.push(Math.round(v)); return t; }
+
+function chart(id, values, series, unit){
+  const el=document.getElementById(id); const tip=document.createElement('div'); tip.className='tip'; tip.hidden=true;
+  const lg=document.getElementById('lg-'+id.slice(2));
+  lg.innerHTML=series.map(s=>`<li><i style="background:${colorOf[s]}"></i>${s}</li>`).join('');
+  function draw(){
+    const W=Math.max(320,el.clientWidth), narrow=W<560, H=narrow?240:300;
+    const m={l:44,r:8,t:10,b:28}, iw=W-m.l-m.r, ih=H-m.t-m.b, n=D.weeks.length;
+    const totals=D.weeks.map((_,i)=>sum(series.map(s=>values[s][i])));
+    const ymax=niceMax(Math.max(...totals)); const y=v=>m.t+ih-(v/ymax)*ih;
+    const band=iw/n, bw=Math.max(3,band*0.7), gap=2;
+    let g='';
+    for(const t of ticks(ymax)){ g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${y(t)}" y2="${y(t)}" stroke="var(--${t===0?'axis':'grid'})" stroke-width="1"/>`;
+      g+=`<text x="${m.l-8}" y="${y(t)+4}" text-anchor="end">${compact(t)}</text>`; }
+    let lastMon=-1, lastX=-99;
+    D.weeks.forEach((w,i)=>{ const d=new Date(w+'T00:00:00Z'); const mo=new Date(d.getTime()+3*864e5).getUTCMonth();
+      if(mo!==lastMon){ lastMon=mo; const x=m.l+i*band+band/2; if(x-lastX<30) return; lastX=x; g+=`<text x="${x}" y="${H-8}" text-anchor="middle">${MON[mo]}</text>`; } });
+    D.weeks.forEach((w,i)=>{
+      const x=m.l+i*band+(band-bw)/2; let acc=0; const segs=series.filter(s=>values[s][i]>0);
+      segs.forEach((s,k)=>{ const v=values[s][i]; const y0=y(acc), y1=y(acc+v); acc+=v;
+        let top=y1, h=y0-y1; if(k>0){h-=gap;} if(h<1) h=1;
+        const r=(k===segs.length-1)?Math.min(4,bw/2,h):0;
+        const yb=y0-(k>0?gap:0);
+        g+= r? `<path d="M${x},${yb} V${top+r} Q${x},${top} ${x+r},${top} H${x+bw-r} Q${x+bw},${top} ${x+bw},${top+r} V${yb} Z" fill="${colorOf[s]}"/>`
+             : `<rect x="${x}" y="${top}" width="${bw}" height="${h}" fill="${colorOf[s]}"/>`; });
+      g+=`<rect class="hit" data-i="${i}" x="${m.l+i*band}" y="${m.t}" width="${band}" height="${ih}" fill="transparent"/>`;
+    });
+    el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Stacked weekly bars of ${unit} by repository">${g}</svg>`; el.appendChild(tip);
+    el.querySelectorAll('.hit').forEach(r=>{
+      const show=ev=>{ const i=+r.dataset.i; const rows=series.filter(s=>values[s][i]>0).reverse();
+        const end=new Date(new Date(D.weeks[i]+'T00:00:00Z').getTime()+6*864e5).toISOString().slice(0,10);
+        tip.innerHTML=`<b>Week of ${fmtD(D.weeks[i])} – ${fmtD(end)}</b>`+(rows.length?rows.map(s=>`<div class="row"><span><i style="background:${colorOf[s]}"></i>${s}</span><span>${nf.format(values[s][i])}</span></div>`).join(''):'<div class="row"><span>No merges</span></div>')+`<div class="row tot"><span>Total ${unit}</span><span>${nf.format(totals[i])}</span></div>`;
+        tip.hidden=false; const bx=el.getBoundingClientRect(); const px=(m.l+i*band+band/2)*(bx.width/W);
+        const tw=tip.offsetWidth; let left=px+12; if(left+tw>bx.width) left=px-tw-12; if(left<0) left=0; tip.style.left=left+'px'; tip.style.top='8px';
+        r.setAttribute('fill','var(--ring)'); };
+      r.addEventListener('mouseenter',show); r.addEventListener('click',show);
+      r.addEventListener('mouseleave',()=>{tip.hidden=true; r.setAttribute('fill','transparent');});
+    });
+  }
+  draw(); let t; addEventListener('resize',()=>{clearTimeout(t);t=setTimeout(draw,100);});
+  const tw=document.getElementById('t-'+id.slice(2));
+  tw.innerHTML=`<table><thead><tr><th>Week of</th>${series.map(s=>`<th>${s}</th>`).join('')}<th>Total</th></tr></thead><tbody>`+
+    D.weeks.map((w,i)=>`<tr><td>${fmtD(w)}</td>${series.map(s=>`<td>${values[s][i]?nf.format(values[s][i]):'–'}</td>`).join('')}<td>${nf.format(sum(series.map(s=>values[s][i])))}</td></tr>`).join('')+
+    `</tbody><tfoot><tr><th>Total</th>${series.map(s=>`<th>${nf.format(sum(values[s]))}</th>`).join('')}<th>${nf.format(sum(series.map(s=>sum(values[s]))))}</th></tr></tfoot></table>`;
+}
+chart('c-prs', D.prs, D.series, 'PRs');
+chart('c-add', D.adds, D.series, 'lines added');
+</script>

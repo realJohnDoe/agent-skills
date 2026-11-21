@@ -25,13 +25,19 @@ Claude Code skills shared across my repositories, as one plugin (`joes-workshop`
 
 A skill holds only what's true for every repo. Each repo's own rules (pins and why, package manager, labels beyond the workshop's) stay in that repo's `CLAUDE.md`/docs, and the skill reads them before it decides anything.
 
+## Tools
+
+Scripts that aren't part of the workshop and don't ship with the plugin.
+
+- [`tools/throughput`](tools/throughput/README.md): an HTML report of your merged PRs and the lines they added per week, stacked by repo.
+
 ## Developing
 
 The skills' scripts are TypeScript that Node runs directly, with no build step. CI ([`workshop-tests.yml`](.github/workflows/workshop-tests.yml)) runs both checks on every PR:
 
 ```
 npm ci && npx tsc
-node --test 'skills/**/*.test.ts'
+node --test 'skills/**/*.test.ts' 'tools/**/*.test.ts'
 ```
 
 How to preview the board locally, and what each script decides, is in the dispatcher's [Developing](skills/dispatcher/SKILL.md#developing) section. Issues for this repo follow [`conventions`](skills/conventions/SKILL.md); see [`docs/agents/`](docs/agents/).

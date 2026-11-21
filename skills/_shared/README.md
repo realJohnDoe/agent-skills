@@ -1,6 +1,6 @@
 # Shared script code
 
-Not a skill: there is no `SKILL.md`, so the plugin loads nothing from here. These are the modules more than one skill's scripts import, so no skill reaches into another's `scripts/`.
+Not a skill: there is no `SKILL.md`, so the plugin loads nothing from here. These are the modules more than one skill's scripts (or a script under `tools/`) import, so no skill reaches into another's `scripts/`.
 
 - `cli.ts`: arguments, child processes, and `main()`'s one-line failure.
 - `github.ts`: `gh api` calls and the narrow response types.
