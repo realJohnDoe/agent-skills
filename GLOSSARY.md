@@ -25,7 +25,7 @@ _Avoid_: Dashboard, kanban
 ### On the board
 
 **Stage**:
-Where an issue or PR stands in the workshop's flow: Stuck, Waiting for human, Closed, PR in progress, Queue or Behind another issue. Each item is in exactly one stage.
+Where an issue or PR stands in the workshop's flow: Stuck, Waiting for human, PR in progress, Queue, Behind another issue or Closed. Each item is in exactly one stage.
 _Avoid_: Column, status
 
 **Stuck**:

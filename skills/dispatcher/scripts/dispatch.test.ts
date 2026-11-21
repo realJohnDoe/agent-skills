@@ -371,6 +371,18 @@ describe("dispatch board, the board workflow's build", () => {
     assert.equal(r.plan.board.lastRun, "2026-11-13T17:00:00.000Z");
   });
 
+  test("reuses the live board's merged PRs for an issue closed the same day, and reads the rest", () => {
+    const { [`repos/${T}/issues/2/timeline`]: _, ...noTimeline } = { ...fixture, [`search/issues?q=repo:${M} repo:${T} is:issue is:closed reason:completed`]: closedMT } as Any;
+    const cached = (number: number, day: string, prs: number[]) => ({ repo: T, kind: "issue", number, title: "x", url: "u", prs, reason: `closed ${day}` });
+    const live = { ...fixture[`${PAGES}board.json`], stages: { closed: [cached(2, "2026-11-12", [99])] } };
+    const r = run("dispatch.ts", ["board", "--repos-covered", `${M} ${T}`, "--last-run", "2026-11-13T17:00:00.000Z"], { ...noTimeline, [`${PAGES}board.json`]: live }, { missing: [M, T] });
+    assert.equal(r.status, 0, r.stderr);
+    assert.deepEqual(r.plan.board.stages.closed.map((c: Any) => [c.number, c.prs]), [[2, [99]], [1, undefined]]);
+    // closed again on another day: read afresh, and the timeline it needs isn't there
+    const stale = { ...live, stages: { closed: [cached(2, "2026-11-01", [99])] } };
+    assert.notEqual(run("dispatch.ts", ["board", "--repos-covered", `${M} ${T}`, "--last-run", "2026-11-13T17:00:00.000Z"], { ...noTimeline, [`${PAGES}board.json`]: stale }, { missing: [M, T] }).status, 0);
+  });
+
   test("writes nothing, checks no push access, and prints no sessions", () => {
     assert.deepEqual(res.writes, []);
     assert.equal(res.gitCalls.some((c) => c.args.includes("--dry-run")), false);

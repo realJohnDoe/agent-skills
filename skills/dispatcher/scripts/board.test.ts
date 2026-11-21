@@ -92,7 +92,7 @@ describe("render", () => {
 
   test("one module per stage, each holding its cards", () => {
     const ids = [...html.matchAll(/class="module m-(\w+)"/g)].map((m) => m[1]);
-    assert.deepEqual(ids, ["stuck", "waiting", "closed", "pr", "queue", "behind"]);
+    assert.deepEqual(ids, ["stuck", "waiting", "pr", "queue", "behind", "closed"]);
     const cards = { stuck: stages.stuck, waiting: stages.waiting, closed: stages.closed, pr: stages.prInProgress, queue: stages.queue, behind: stages.behind };
     for (const [id, cs] of Object.entries(cards)) for (const c of cs) assert.match(section(html, id), new RegExp(`>${c.title}</a>`), `${id}: ${c.title}`);
     assert.match(section(html, "waiting"), />Plan<[\s\S]*>Tier\?<[\s\S]*>Assigned</);
@@ -101,7 +101,31 @@ describe("render", () => {
     assert.match(section(html, "waiting"), /href="https:\/\/github.com\/o\/r\/pull\/40"[^>]*>[\s\S]*?<\/svg>#40</);
     assert.match(section(html, "waiting"), />Needs review</);
     assert.doesNotMatch(section(html, "pr"), />Needs review</);
-    assert.match(html, /as of <b>2026-11-17 00:00 UTC<\/b>/);
+  });
+
+  test("the status strip shows the last update and each open stage's count, in order and colour", () => {
+    const strip = html.match(/<div class="status">[\s\S]*?<\/div>/)?.[0] ?? "";
+    assert.match(strip, /last update <b>2026-11-17 00:00 UTC<\/b>/);
+    assert.doesNotMatch(strip, /last run|closed/i);
+    const counts = [...strip.matchAll(/<span class="m-(\w+)">[^<]* <b>(\d+)<\/b>/g)].map((m) => [m[1], Number(m[2])]);
+    assert.deepEqual(counts, [
+      ["stuck", stages.stuck.length],
+      ["waiting", stages.waiting.length],
+      ["pr", stages.prInProgress.length],
+      ["queue", stages.queue.length],
+      ["behind", stages.behind.length],
+    ]);
+  });
+
+  test("Closed lists every card, the first 10 shown, with Show more while any are hidden", () => {
+    const many = Array.from({ length: 23 }, (_, i) => ({ ...closed[0], number: 100 + i, title: `C${i}` }));
+    const sec = section(render({ ...board, stages: { ...stages, closed: many } }, now), "closed");
+    assert.equal(sec.match(/<article /g)?.length, 23);
+    assert.equal(sec.match(/<article [^>]*hidden>/g)?.length, 13);
+    assert.doesNotMatch(sec.match(/<article [^>]*>[\s\S]*?C9</)?.[0] ?? "", /hidden>[\s\S]*C9</); // C9 is the 10th, shown
+    assert.match(sec, /<button class="more" type="button" data-step="10">Show more<\/button>/);
+    assert.match(sec, /class="readout">23</);
+    assert.doesNotMatch(section(html, "closed"), /class="more"|hidden>/);
   });
 
   test("a PR card leads with the PR and badges its open issue; an issue card leads with the issue", () => {
@@ -143,7 +167,7 @@ describe("render", () => {
       { generated: board.generated, repos: [R], closed: [] },
     );
     const h = render(empty, now);
-    assert.doesNotMatch(h, /m-stuck/);
+    assert.doesNotMatch(h, /module m-stuck/);
     assert.equal(h.match(/class="empty"/g)?.length, 5);
   });
 
@@ -159,10 +183,9 @@ describe("render", () => {
     assert.match(render(board, new Date("2026-11-18T01:00:00Z")), /class="notice stale">This board is 1 day\(s\) old/);
   });
 
-  test("a fresh board says when the dispatcher last ran, and warns after 2 days", () => {
+  test("a fresh board warns when the dispatcher last ran 2 days ago", () => {
     const fresh = { ...board, generated: "2026-11-19T00:00:00Z" };
     const at = new Date("2026-11-19T00:10:00Z");
-    assert.match(render(fresh, at), /last run <b>2026-11-16 20:00 UTC<\/b>/);
     assert.match(render(fresh, at), /class="notice stale">The workshop last ran 2 days ago/);
     assert.doesNotMatch(render({ ...fresh, lastRun: "2026-11-18T08:00:00Z" }, at), /stale/);
     assert.doesNotMatch(render({ ...fresh, state: "paused" as const }, at), /last ran/);

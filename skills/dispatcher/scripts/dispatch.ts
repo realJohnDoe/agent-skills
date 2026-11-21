@@ -25,7 +25,7 @@ import { isRetiredDigest, PAUSE_TITLE } from "../../_shared/markers.ts";
 import type { Repo } from "../../_shared/repos.ts";
 import { AUTOMERGE, DISPATCH, FOLLOWUP, linkedIssues } from "./decide.ts";
 import { FOOTER, homeArg, loadConfig, readPause, REPO_NAME, unpushable } from "./lib.ts";
-import { type LabelSync, WAITING_LABEL, buildBoard, labelSync } from "./board.ts";
+import { type Board, type LabelSync, WAITING_LABEL, buildBoard, labelSync } from "./board.ts";
 import { cantPushWrites, readCantPush, writeCantPush } from "./cantPush.ts";
 import { assemble, LABELS, type Merge, planRepo, type RepoPlan, type Session } from "./plan.ts";
 import { fetchClosed, fetchRepo, mergedSince, sleep } from "./snapshot.ts";
@@ -67,7 +67,10 @@ main(() => {
   // folder stops on that, not on a failed lookup. The board covers the repos the last
   // run did rather than attached clones.
   const attached = board ? [] : loadConfig().repos;
-  const last = board ? lastRun(HOME) : finish && !noRunMarker ? { repos: attached.map((r) => r.repo), lastRun: NOW } : undefined;
+  // The live board.json, read at most once: the covered repos and the Closed stage's merged PRs come from it.
+  let liveRead: Partial<Board> | undefined;
+  const live = () => (liveRead ??= liveBoard(HOME));
+  const last = board ? lastRun(live) : finish && !noRunMarker ? { repos: attached.map((r) => r.repo), lastRun: NOW } : undefined;
   const repos = board ? last!.repos.map((repo) => ({ repo, name: repo.split("/")[1], path: "" })) : attached;
   // A repo it can't push to gets no writes and an issue in the home repo, not a stopped run.
   // The board writes nothing, and runs on a token that can push to no other repo.
@@ -92,7 +95,7 @@ main(() => {
     generated: NOW,
     repos: repos.map((r) => r.repo),
     ...(last?.lastRun && { lastRun: last.lastRun }),
-    closed: fetchClosed(repos),
+    closed: fetchClosed(repos, live().stages?.closed),
   });
   // Read where the board is the output that matters: a paused board says so.
   const pause = board || finish ? readPause(HOME) : undefined;
@@ -257,10 +260,10 @@ function claim(sessions: Session[]) {
 // The board's covered repos and last run: from the flags, which the board workflow
 // passes from its inputs when a run's `finish` starts it, or else carried over from the
 // live board.json, so the workshop's repo list lives only in the Timetable routine.
-function lastRun(HOME: string): { repos: string[]; lastRun?: string } {
+function lastRun(liveBoard: () => Partial<Board>): { repos: string[]; lastRun?: string } {
   const given = arg("--repos-covered")?.split(/[\s,]+/).filter(Boolean) ?? [];
   const givenRun = arg("--last-run") || undefined;
-  const live: { repos?: string[]; lastRun?: string } = given.length && givenRun ? {} : liveBoard(HOME);
+  const live: { repos?: string[]; lastRun?: string } = given.length && givenRun ? {} : liveBoard();
   const repos = given.length ? given : (live.repos ?? []);
   if (!repos.length)
     throw new Error("no covered repos: pass --repos-covered, or run the dispatcher once first so the live board names them");
@@ -272,7 +275,7 @@ function lastRun(HOME: string): { repos: string[]; lastRun?: string } {
 }
 
 // The deployed board.json, or {} when there is none or it can't be read.
-function liveBoard(HOME: string): { repos?: string[]; lastRun?: string } {
+function liveBoard(HOME: string): Partial<Board> {
   try {
     const url = new URL("board.json", api<{ html_url: string }>(`repos/${HOME}/pages`).html_url);
     return JSON.parse(sh("curl", ["-fsS", url.href]));

@@ -28,6 +28,14 @@ try {
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const board = await res.json();
   main.innerHTML = render(board);
+  // Show more: reveal the next cards of its module, and go once none are left hidden.
+  main.addEventListener("click", (e) => {
+    const btn = e.target.closest("button.more");
+    if (!btn) return;
+    const hidden = btn.closest(".module").querySelectorAll(".card[hidden]");
+    [...hidden].slice(0, Number(btn.dataset.step)).forEach((c) => c.removeAttribute("hidden"));
+    if (hidden.length <= Number(btn.dataset.step)) btn.remove();
+  });
   const motion = !matchMedia("(prefers-reduced-motion: reduce)").matches;
   const art = document.getElementById("art");
   art.insertAdjacentHTML("beforeend", scene(board, motion));
