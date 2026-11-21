@@ -23,13 +23,12 @@
 /* ---- A: glow stations ---- */
 .pb-stuck { animation: pb-pulse 1.1s ease-in-out infinite alternate; }
 .pb-pr { animation: pb-flicker 3.2s infinite; }
-.pb-pr > rect:not(.pb-scan) { opacity: calc(var(--lvl) * .5); }
-.pb-scan { opacity: .35; animation: pb-scan 2.6s linear infinite; transform-box: fill-box; }
+.pb-pr > rect:not(.pb-scan) { opacity: calc(var(--lvl) * .3); }
+.pb-scan { opacity: .2; animation: pb-scan 2.6s linear infinite; transform-box: fill-box; }
 .pb-scan.d2 { animation-delay: -1.3s; }
 .pb-alarm { animation: pb-flash 1s steps(2, start) infinite; }
 .pb-wait { mix-blend-mode: screen; animation: pb-breathe 3s ease-in-out infinite; }
 .pb-sprout { animation: pb-breathe 2.4s ease-in-out infinite; }
-.pb-shimmer { animation: pb-sweep 3.5s ease-in-out infinite; }
 
 /* ---- B: holo readouts ---- */
 .pb-screen { animation: pb-flicker 4s infinite; }
@@ -54,7 +53,6 @@
 @keyframes pb-breathe { 50% { opacity: .5; } }
 @keyframes pb-flicker { 0%, 100% { opacity: 1; } 47% { opacity: 1; } 48% { opacity: .55; } 50% { opacity: 1; } 82% { opacity: .85; } }
 @keyframes pb-scan { from { transform: translateY(0); } to { transform: translateY(80px); opacity: 0; } }
-@keyframes pb-sweep { 0% { transform: translateX(0); } 60%, 100% { transform: translateX(240px); } }
 @keyframes pb-boot { from { opacity: 0; transform: translateY(6px); } }
 @keyframes pb-drift { 50% { transform: translateX(14px); } }
 @keyframes pb-shuttle { from { transform: translateX(-16px); } to { transform: translateX(16px); } }
