@@ -32,6 +32,14 @@
 .pb-alarm { animation: pb-flash 1s steps(2, start) infinite; }
 .pb-wait { mix-blend-mode: screen; animation: pb-breathe 3s ease-in-out infinite; }
 .pb-sprout { animation: pb-breathe 2.4s ease-in-out infinite; }
+.pb-screen-ui { opacity: .8; }
+.pb-screen-ui.idle { opacity: .5; }
+.pb-grow { transform-box: fill-box; transform-origin: left center; animation: pb-grow 7s ease-in-out infinite; }
+.pb-fail { animation: pb-pulse 1s ease-in-out infinite alternate; }
+.pb-wave { stroke-dasharray: 6 5; animation: pb-dash 2.5s linear infinite; }
+.pb-healthy { animation: pb-breathe 4s ease-in-out infinite; }
+@keyframes pb-grow { from { transform: scaleX(.12); } 85%, to { transform: scaleX(1); } }
+@keyframes pb-dash { to { stroke-dashoffset: -22; } }
 .pb-closed, .pb-behind { animation: pb-breathe 6s ease-in-out infinite; }
 
 /* ---- B: holo readouts ---- */

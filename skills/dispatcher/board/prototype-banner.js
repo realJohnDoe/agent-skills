@@ -29,7 +29,10 @@ const fake = (n, paused = false) => ({
     stuck: cards(n.stuck),
     waiting: cards(n.waiting, { sub: "review" }),
     queue: cards(n.queue, { tier: "sonnet" }),
-    prInProgress: [...cards(n.red, { kind: "pr", check: "red" }), ...cards(n.pr - n.red, { kind: "pr", check: "pending" })],
+    prInProgress: [
+      ...cards(n.red, { kind: "pr", check: "red" }),
+      ...cards(n.pr - n.red, { kind: "pr" }).map((c, i) => ({ ...c, check: /** @type {const} */ (i % 2 ? "green" : "pending") })),
+    ],
     closed: cards(n.closed),
     behind: cards(n.behind),
   },
@@ -66,6 +69,7 @@ const counts = (b) => ({
   queue: b.stages.queue.length,
   pr: b.stages.prInProgress.length,
   red: b.stages.prInProgress.filter((c) => c.check === "red").length,
+  checks: b.stages.prInProgress.map((c) => c.check ?? "pending"),
   behind: (b.stages.behind ?? []).length,
   closed: b.stages.closed.length,
   paused: b.state === "paused",
@@ -94,12 +98,42 @@ const S3 = [1500, 399, 140, 110]; // alone on its post
 // Left to right along the deck, in the order work flows:
 // Behind = the cold frame glows faintly, with a padlock per blocked issue (up to 3).
 // Queue = a sprout light over a pot per queued card (up to 5).
-// PR in progress = the two screens beside the robots flicker cyan, brighter with more PRs;
-//   a red PR adds a red light. Stuck = the lone screen turns red with a warning.
+// PR in progress = the two screens beside the robots flicker cyan, brighter with more PRs, and
+//   show a growth row per PR (leaf, bar, light in its CI colour); idle screens show a moisture wave.
+// Stuck = the lone screen turns red with a warning; otherwise it shows a healthy leaf.
 // Waiting = the lantern pulses amber and the bell glints. Closed = a warm glow over the baskets.
 const POTS = [[695, 540], [742, 540], [790, 540], [847, 540], [907, 540]];
 /** @param {number[]} r @param {string} fill @param {string} [cls] */
 const glass = ([x, y, w, h], fill, cls = "") => `<rect class="${cls}" x="${x}" y="${y}" width="${w}" height="${h}" rx="6" fill="${fill}" filter="url(#pb-glow)"/>`;
+// Screen content: plant-care graphics, no numbers or text.
+const LEAF = "M0 6 v-14 m0 4 q-9 -2 -10 -10 q9 1 10 10 m0 -2 q9 -2 10 -10 q-9 1 -10 10";
+/** @param {number} x @param {number} y @param {number} s @param {string} col @param {string} [cls] */
+const leaf = (x, y, s, col, cls = "") =>
+  `<path class="${cls}" d="${LEAF}" transform="translate(${x} ${y}) scale(${s})" stroke="${col}" stroke-width="2.5" vector-effect="non-scaling-stroke" fill="none" stroke-linecap="round"/>`;
+/** Three status lights along a screen's foot. @param {number[]} r @param {string} col */
+const lights = ([x, y, w, h], col) =>
+  [-1, 0, 1].map((d) => `<circle cx="${x + w / 2 + d * 16}" cy="${y + h - 12}" r="4.5" fill="${col}" opacity=".8"/>`).join("");
+const CHECK = { green: COL.pr, pending: COL.holo, red: COL.stuck };
+/** A growth monitor: one row per PR (a leaf, a growth bar, a status light), or idle with a
+ * faint leaf and a soil-moisture wave. @param {number[]} r @param {string[]} checks */
+const monitor = ([x, y, w, h], checks) => {
+  if (!checks.length)
+    return `<g class="pb-screen-ui idle">${leaf(x + w / 2, y + h / 2 - 4, 2, COL.holo)}<path class="pb-wave" d="M${x + 12} ${y + h - 16} q 12 -9 24 0 t 24 0 t 24 0 t 24 0" stroke="${COL.holo}" stroke-width="3" fill="none"/></g>`;
+  const rh = 26;
+  const rows = checks.map((c, i) => {
+    const col = CHECK[/** @type {keyof typeof CHECK} */ (c)] ?? COL.holo;
+    const cy = y + h / 2 + rh * (i - (checks.length - 1) / 2);
+    const bx = x + 30, bw = w - 58;
+    const fill = c === "green" ? "" : c === "red" ? "pb-fail" : "pb-grow";
+    const part = c === "red" ? 0.4 : 1;
+    return `${leaf(x + 15, cy + 3, 0.8, col)}
+<rect x="${bx}" y="${cy - 3}" width="${bw}" height="6" rx="3" fill="${COL.holo}" opacity=".25"/>
+<rect class="${fill}" x="${bx}" y="${cy - 3}" width="${bw * part}" height="6" rx="3" fill="${col}" style="animation-delay:${-i * 2.1}s"/>
+<circle class="${c === "red" ? "pb-fail" : ""}" cx="${x + w - 14}" cy="${cy}" r="5" fill="${col}"/>`;
+  });
+  return `<g class="pb-screen-ui">${rows.join("")}</g>`;
+};
+
 /** @param {Counts} n */
 const variantA = (n) => {
   const g = [];
@@ -115,18 +149,22 @@ const variantA = (n) => {
   POTS.slice(0, Math.min(n.queue, POTS.length)).forEach(([x, y], i) =>
     g.push(`<g class="pb-sprout" style="animation-delay:${i * 0.4}s"><circle cx="${x}" cy="${y}" r="16" fill="${COL.pr}" opacity=".5" filter="url(#pb-soft)"/><path d="M${x} ${y + 6} v-14 m0 4 q-9 -2 -10 -10 q9 1 10 10 m0 -2 q9 -2 10 -10 q-9 1 -10 10" stroke="#d8ffd9" stroke-opacity=".7" stroke-width="2.5" fill="none" filter="url(#pb-glow)"/></g>`),
   );
-  // PR in progress
+  // PR in progress: the screens glow, and each shows its share of the PRs as growth rows
   if (n.pr) {
     const lvl = Math.min(1, 0.25 + n.pr * 0.15);
     g.push(`<g class="pb-pr" style="--lvl:${lvl}">${glass(S1, COL.holo)}${glass(S2, COL.holo)}
 <rect class="pb-scan" x="${S1[0]}" y="${S1[1]}" width="${S1[2]}" height="6" fill="#fff"/>
 <rect class="pb-scan d2" x="${S2[0]}" y="${S2[1]}" width="${S2[2]}" height="6" fill="#fff"/></g>`);
-    if (n.red) g.push(`<circle class="pb-alarm" cx="1436" cy="514" r="12" fill="${COL.stuck}" opacity=".6" filter="url(#pb-glow)"/>`);
   }
-  // Stuck
+  const shown = n.checks.slice(0, 6);
+  g.push(monitor(S1, shown.filter((_, i) => i % 2 === 0)), monitor(S2, shown.filter((_, i) => i % 2 === 1)));
+  // Stuck: the lone screen shows the garden's health
   if (n.stuck)
     g.push(`<g class="pb-stuck"><rect x="1494" y="393" width="152" height="122" rx="8" fill="${COL.stuck}" opacity=".45" filter="url(#pb-glow)"/>
-<path d="M1570 426 L1599 478 L1541 478 Z" fill="none" stroke="#fff" stroke-opacity=".8" stroke-width="5" stroke-linejoin="round"/><rect x="1567.5" y="442" width="5" height="19" fill="#fff" fill-opacity=".8"/><circle cx="1570" cy="469" r="3.5" fill="#fff" fill-opacity=".8"/></g>`);
+<path d="M1570 426 L1599 478 L1541 478 Z" fill="none" stroke="#fff" stroke-opacity=".8" stroke-width="5" stroke-linejoin="round"/><rect x="1567.5" y="442" width="5" height="19" fill="#fff" fill-opacity=".8"/><circle cx="1570" cy="469" r="3.5" fill="#fff" fill-opacity=".8"/>
+${lights(S3, COL.stuck)}</g>`);
+  else
+    g.push(`<g class="pb-screen-ui">${leaf(1570, 462, 2.6, COL.pr, "pb-healthy")}${lights(S3, COL.pr)}</g>`);
   // Waiting for human
   if (n.waiting)
     g.push(`<g class="pb-wait"><circle cx="1492" cy="605" r="${40 + Math.min(n.waiting, 6) * 7}" fill="${COL.waiting}" opacity=".4" filter="url(#pb-soft)"/><circle cx="1665" cy="640" r="20" fill="${COL.waiting}" opacity=".4" filter="url(#pb-soft)"/></g>`);
