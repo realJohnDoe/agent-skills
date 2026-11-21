@@ -64,6 +64,7 @@ h1, h2 { font-family: var(--f-display); text-wrap: balance; margin: 0; }
 /* the scene: CSS animates only opacity (and the ring's dash); scene.js moves things with
    SVG attributes, which stay put on phones where CSS transforms on scaled SVG drift */
 .scene { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.art.live img { visibility: hidden; } /* the scene draws the image itself; the <img> is the fallback */
 .scene .pr { animation: flicker 3.2s infinite; }
 .scene .warning, .scene .fail { animation: pulse 1.1s ease-in-out infinite alternate; }
 .scene .wait { mix-blend-mode: screen; animation: breathe 3s ease-in-out infinite; }

@@ -29,7 +29,9 @@ try {
   const board = await res.json();
   main.innerHTML = render(board);
   const motion = !matchMedia("(prefers-reduced-motion: reduce)").matches;
-  document.getElementById("art").insertAdjacentHTML("beforeend", scene(board, motion));
+  const art = document.getElementById("art");
+  art.insertAdjacentHTML("beforeend", scene(board, motion));
+  art.classList.add("live");
 } catch (e) {
   main.innerHTML = `<p class="notice error">Couldn't load board.json (${String(e.message ?? e).replace(/[&<>]/g, "")}).</p>`;
 }
