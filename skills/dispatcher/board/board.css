@@ -19,9 +19,8 @@
   --warn: #ffd34d;
   --bad: #ff5d76;
   --bad-dim: rgba(255, 93, 118, .12);
-  --indigo: #9d8cff;
-  --issue: #6fd38a;         /* an issue's mark and card edge */
-  --pr: #b99cff;            /* a PR's */
+  --pr: #b99cff;            /* a merged PR's or closed issue's badge, and the Closed stage */
+  --blue: #7fb2ff;          /* the Queue stage */
   --f-display: "Chakra Petch", "Segoe UI", system-ui, sans-serif;
   --f-body: "Atkinson Hyperlegible", system-ui, -apple-system, sans-serif;
   --f-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -135,9 +134,9 @@ main { max-width: 1080px; margin: 0 auto; }
 .m-stuck .led { animation: blink 1.2s steps(2, start) infinite; }
 @keyframes blink { 50% { opacity: .25; } }
 .m-waiting { --c: var(--warn); }
-.m-closed { --c: var(--ok); }
-.m-pr { --c: var(--holo); }
-.m-queue { --c: var(--indigo); }
+.m-closed { --c: var(--pr); }
+.m-pr { --c: var(--ok); }
+.m-queue { --c: var(--blue); }
 .m-behind { --c: var(--muted); }
 
 /* ---------- readout cards ---------- */
@@ -148,11 +147,8 @@ main { max-width: 1080px; margin: 0 auto; }
   border: 1px solid #000;
   box-shadow: inset 0 0 0 1px var(--holo-dim), inset 0 0 18px rgba(94, 231, 242, .05);
 }
-.card { --edge: var(--c); }
-.card.issue { --edge: var(--issue); }
-.card.pr { --edge: var(--pr); }
-.card::before { /* the kind's colour as a thin lit edge: green for an issue, purple for a PR */
-  content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 2px; background: var(--edge); box-shadow: 0 0 6px var(--edge);
+.card::before { /* the stage's colour as a thin lit edge */
+  content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 2px; background: var(--c); box-shadow: 0 0 6px var(--c);
 }
 .card .title { font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
 .card .title a { text-decoration: none; }
