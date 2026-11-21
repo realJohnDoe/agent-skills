@@ -71,18 +71,39 @@ const scan = ([x, y, w, h], begin) =>
 const SHIP = `<path d="M-60 0 H-16" stroke="${C.holo}" stroke-opacity=".35" stroke-width="2"/><circle cx="-15" cy="0" r="4" fill="${C.lamp}" filter="url(#glow)"/><path d="M-15 -1 q4 -6 15 -5 l11 5 l-11 4 q-11 1 -15 -4z" fill="#e8e6ff"/><circle cx="3" cy="-2" r="2.2" fill="${C.holo}"/>`;
 // Desktop crops the sky above y ≈ 220, so the ships fly low, around the ring.
 // [x0, y0, x1, y1, seconds, begin, scale]; a negative scale flies right to left.
-const LANES = [[-150, 250, 2550, 242, 40, 0, 0.8], [2550, 272, -150, 262, 55, -20, -1], [-150, 232, 2550, 228, 75, -45, 0.55], [1650, 330, 2550, 228, 30, -8, 0.7]];
-// The tallest spire for phones, which show the full height; the rest low enough for desktop.
-const BEACONS = [[1448, 85], [1017, 228], [1265, 262], [1600, 218], [1762, 272]];
+// In the order they join as the workshop gets busier.
+const LANES = [
+  [-150, 250, 2550, 242, 40, 0, 0.8],
+  [2550, 272, -150, 262, 55, -20, -1],
+  [1650, 330, 2550, 228, 30, -8, 0.7],
+  [-150, 232, 2550, 228, 75, -45, 0.55],
+  [2550, 240, -150, 236, 65, -30, -0.6],
+  [-150, 290, 2550, 284, 48, -12, 0.9],
+];
+// In the order they light up; the tallest spire, last, only shows on phones (full height).
+const BEACONS = [[1017, 228], [1600, 218], [1265, 262], [1762, 272], [1448, 85]];
 
-/** @param {boolean} motion */
-const city = (motion) =>
+/**
+ * How busy the workshop is, from 0 (nothing open) to 1 (ten or more PRs and queued cards):
+ * it sets the city's traffic.
+ * @param {Board} board
+ */
+export const busyness = (board) => Math.min(1, (board.stages.prInProgress.length + board.stages.queue.length) / 10);
+
+/**
+ * The city: one ship and one beacon when the workshop is quiet, up to six ships and five
+ * beacons when it is busy, and the ring's light runs faster. Ships and the ring only move.
+ * @param {number} busy @param {boolean} motion
+ */
+const city = (busy, motion) =>
   [
-    ...BEACONS.map(([x, y], i) => `<circle class="beacon" cx="${x}" cy="${y}" r="4" fill="#ff8a9b" filter="url(#glow)" style="animation-delay:${-i * 0.7}s"/>`),
+    ...BEACONS.slice(0, 1 + Math.round(busy * 4)).map(
+      ([x, y], i) => `<circle class="beacon" cx="${x}" cy="${y}" r="4" fill="#ff8a9b" filter="url(#glow)" style="animation-delay:${-i * 0.7}s"/>`,
+    ),
     ...(motion
       ? [
-          `<path class="ring" d="M700 345 A640 43 0 0 0 1980 335" stroke="#d8fbff" stroke-width="5" fill="none" filter="url(#glow)"/>`,
-          ...LANES.map(
+          `<path class="ring" d="M700 345 A640 43 0 0 0 1980 335" stroke="#d8fbff" stroke-width="5" fill="none" filter="url(#glow)" style="animation-duration:${(14 - 6 * busy).toFixed(1)}s"/>`,
+          ...LANES.slice(0, 1 + Math.round(busy * 5)).map(
             ([x0, y0, x1, y1, t, begin, s]) =>
               `<g class="ship"><animateTransform attributeName="transform" type="translate" values="${x0} ${y0};${x1} ${y1}" dur="${t}s" begin="${begin}s" repeatCount="indefinite"/><g transform="scale(${s} ${Math.abs(s)})">${SHIP}</g></g>`,
           ),
@@ -95,9 +116,10 @@ const city = (motion) =>
  * - PR in progress: the two right panels glow cyan, brighter with more PRs, and show a growth
  *   row per PR (up to 6), split between them.
  * - Stuck: the left panel turns red with a warning; otherwise it shows a healthy leaf.
- * - Waiting for human: the floor lantern and its lamp post glow amber.
+ * - Waiting for human: the floor lantern and its lamp post glow amber, brighter with more cards.
  * - Queue: a sprout lights up over a pot per queued card (up to 6).
  * - Behind another issue: a padlock over the green tool box per blocked issue (up to 3).
+ * - The city's traffic follows how busy the workshop is (`busyness`).
  * - Paused: the scene dims and stands still, the robots' eyes shut, and the ships are gone.
  * @param {Board} board
  * @param {boolean} [motion] false for reduced motion: nothing moves, no ships
@@ -107,7 +129,7 @@ export const scene = (board, motion = true) => {
   const paused = board.state === "paused";
   const move = motion && !paused;
   const checks = s.prInProgress.slice(0, 6).map((c) => c.check ?? "pending");
-  const g = [city(move), pane(PR_A), pane(PR_B), pane(HEALTH)];
+  const g = [city(busyness(board), move), pane(PR_A), pane(PR_B), pane(HEALTH)];
 
   if (checks.length) {
     const level = Math.min(1, 0.25 + checks.length * 0.15) * 0.3;
@@ -121,8 +143,12 @@ export const scene = (board, motion = true) => {
 <path d="M775 470 L800 512 L750 512 Z" fill="none" stroke="#fff" stroke-opacity=".8" stroke-width="5" stroke-linejoin="round"/><rect x="772.5" y="483" width="5" height="16" fill="#fff" fill-opacity=".8"/><circle cx="775" cy="506" r="3" fill="#fff" fill-opacity=".8"/>${lights(HEALTH, C.bad)}</g>`);
   else g.push(`<g class="ui">${leaf(775, 494, 2, C.ok, "healthy")}${lights(HEALTH, C.ok)}</g>`);
 
-  if (s.waiting.length)
-    g.push(`<g class="wait"><circle cx="1257" cy="625" r="${45 + Math.min(s.waiting.length, 6) * 8}" fill="${C.warn}" opacity=".4" filter="url(#soft)"/><circle cx="1227" cy="425" r="45" fill="${C.warn}" opacity=".4" filter="url(#soft)"/></g>`);
+  if (s.waiting.length) {
+    // brighter and wider with each waiting card, up to 6
+    const k = Math.min(s.waiting.length, 6) / 6;
+    const o = (0.2 + 0.3 * k).toFixed(2);
+    g.push(`<g class="wait"><circle cx="1257" cy="625" r="${Math.round(45 + 48 * k)}" fill="${C.warn}" opacity="${o}" filter="url(#soft)"/><circle cx="1227" cy="425" r="${Math.round(30 + 15 * k)}" fill="${C.warn}" opacity="${o}" filter="url(#soft)"/></g>`);
+  }
 
   POTS.slice(0, s.queue.length).forEach(([x, y], i) =>
     g.push(`<g class="sprout" style="animation-delay:${i * 0.4}s"><circle cx="${x}" cy="${y}" r="16" fill="${C.ok}" opacity=".5" filter="url(#soft)"/><path d="M${x} ${y + 6}${LEAF.slice(4)}" stroke="#d8ffd9" stroke-opacity=".7" stroke-width="2.5" fill="none" filter="url(#glow)"/></g>`),

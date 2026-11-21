@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { render } from "../board/render.js";
-import { scene } from "../board/components/scene.js";
+import { busyness, scene } from "../board/components/scene.js";
 import { type BoardPlan, buildBoard, labelSync } from "./board.ts";
 import type { Item } from "./lib.ts";
 
@@ -225,6 +225,21 @@ describe("scene", () => {
     assert.doesNotMatch(h, /<animate/);
     assert.doesNotMatch(h, /class="(ship|ring)"/);
     assert.match(scene(board), /class="ship"/);
+  });
+
+  test("the city's traffic grows with the workshop's workload", () => {
+    const withWork = (n: number) => ({ ...quiet, stages: { ...quiet.stages, queue: Array.from({ length: n }, () => stages.queue[0]) } });
+    assert.deepEqual([0, 5, 10, 30].map((n) => busyness(withWork(n))), [0, 0.5, 1, 1]);
+    const traffic = (n: number) => [count(scene(withWork(n)), /class="ship"/g), count(scene(withWork(n)), /class="beacon"/g)];
+    assert.deepEqual(traffic(0), [1, 1]); // a quiet workshop still has a ship and a light
+    assert.deepEqual(traffic(5), [4, 3]);
+    assert.deepEqual(traffic(10), [6, 5]);
+  });
+
+  test("the lantern glows brighter with each waiting card, up to six", () => {
+    const glow = (n: number) => Number(scene({ ...quiet, stages: { ...quiet.stages, waiting: Array.from({ length: n }, () => stages.waiting[0]) } }).match(/class="wait"><circle[^>]*opacity="([\d.]+)"/)?.[1]);
+    assert.ok(glow(1) < glow(3) && glow(3) < glow(6));
+    assert.equal(glow(6), glow(9));
   });
 
   test("moves only by SVG attributes, never by a CSS transform", () => assert.doesNotMatch(scene(board), /style="[^"]*transform/));
