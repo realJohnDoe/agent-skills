@@ -18,4 +18,4 @@ jobs:
           node-version: 26
       - run: npm ci
       - run: npx tsc
-      - run: node --test 'skills/**/*.test.ts'
+      - run: node --test 'skills/**/*.test.ts' 'tools/**/*.test.ts'

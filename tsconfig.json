@@ -12,5 +12,5 @@
     "allowJs": true,
     "checkJs": true
   },
-  "include": ["skills/**/*.ts"]
+  "include": ["skills/**/*.ts", "tools/**/*.ts"]
 }

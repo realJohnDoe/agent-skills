@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 // Builds the throughput report: your merged PRs per week and the lines they added,
-// stacked by repo, as one HTML page. See ../SKILL.md.
+// stacked by repo, as one HTML page. See README.md.
 // Usage: node throughput.ts [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--out FILE]
 //          [--top N] [--exclude owner/repo#N,...] [--cache DIR]
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { arg, main, run } from "../../_shared/cli.ts";
-import { api } from "../../_shared/github.ts";
+import { arg, main, run } from "../../skills/_shared/cli.ts";
+import { api } from "../../skills/_shared/github.ts";
 import { build, halve, isoDay, type Lines, months, parseLog, type Pr } from "./weekly.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
