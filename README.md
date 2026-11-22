@@ -1,14 +1,16 @@
 ![Robots tending a rooftop garden above a floating city](docs/images/banner.jpg)
 
-# agent-skills
+# joes-workshop
 
 Claude Code skills shared across my repositories, as one plugin (`joes-workshop`) in a marketplace at the repo root. Together they run the **workshop**: scheduled runs that work through issues in several repos, follow up on their PRs and merge them, and report to one maintainer. See [`GLOSSARY.md`](GLOSSARY.md) for the terms.
 
-**[Workshop board](https://realjohndoe.github.io/agent-skills/)**: a read-only page with every open issue and PR of the workshop by stage, rebuilt every half hour by [`board.yml`](.github/workflows/board.yml).
+This repo was called `agent-skills` until it was renamed to `joes-workshop`; the marketplace carries the new name.
+
+**[Workshop board](https://realjohndoe.github.io/joes-workshop/)**: a read-only page with every open issue and PR of the workshop by stage, rebuilt every half hour by [`board.yml`](.github/workflows/board.yml).
 
 ```
-/plugin marketplace add realJohnDoe/agent-skills
-/plugin install joes-workshop@agent-skills
+/plugin marketplace add realJohnDoe/joes-workshop
+/plugin install joes-workshop@joes-workshop
 ```
 
 ## Skills

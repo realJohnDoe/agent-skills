@@ -11,7 +11,7 @@ The whole system of scheduled runs that dispatches issues to agent sessions, fol
 _Avoid_: Factory, pipeline
 
 **Home repo**:
-The workshop's own repo, `realJohnDoe/agent-skills`, which the scripts take as `--home`: it holds the pause issue, the can't-push issues and the workshop board. What waits on the maintainer is on the board, and they decide on each issue itself.
+The workshop's own repo, `realJohnDoe/joes-workshop`, which the scripts take as `--home`: it holds the pause issue, the can't-push issues and the workshop board. What waits on the maintainer is on the board, and they decide on each issue itself.
 _Avoid_: Digest repo
 
 **Pause issue**:
