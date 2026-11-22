@@ -23,7 +23,7 @@ import { all, api, type GhIssue, names, post } from "../../_shared/github.ts";
 import { arg, flag, main, run as sh } from "../../_shared/cli.ts";
 import { isRetiredDigest, PAUSE_TITLE } from "../../_shared/markers.ts";
 import type { Repo } from "../../_shared/repos.ts";
-import { AUTOMERGE, DISPATCH, FOLLOWUP, linkedIssues } from "./decide.ts";
+import { AUTOMERGE, DISPATCH, FOLLOWUP, linkedIssues, mergeRefusedBody, refusalText } from "./decide.ts";
 import { FOOTER, homeArg, loadConfig, readPause, REPO_NAME, unpushable } from "./lib.ts";
 import { type Board, type LabelSync, WAITING_LABEL, buildBoard, labelSync } from "./board.ts";
 import { cantPushWrites, readCantPush, writeCantPush } from "./cantPush.ts";
@@ -89,7 +89,8 @@ main(() => {
 
   const run = assemble(plans, {
     ...(cmd === "plan" || cmd === "apply" ? { maxSessions: MAX_SESSIONS } : {}),
-    automerge: automerge.filter((m) => !merged.includes(m)).map((m) => m.item),
+    // A refused merge is Stuck instead (plan.ts, or applyMerges for this run's own refusals).
+    automerge: automerge.filter((m) => !merged.includes(m) && !m.refused).map((m) => m.item),
   });
   const boardOut = buildBoard(run.board, {
     generated: NOW,
@@ -196,8 +197,10 @@ main(() => {
 
 // `apply`'s first writes: labels, then every `automerge` PR, which already has finished,
 // green CI: merge it now, pinned to the head commit that was checked. (GitHub refuses to
-// *enable* auto-merge on a PR that is already mergeable.) A refused merge is logged and
-// retried on the next run, not fatal. A repo where something merged is read again, so
+// *enable* auto-merge on a PR that is already mergeable.) A refused merge is not fatal:
+// it is tried again on the next run, and the PR gets the merge-refused marker with
+// GitHub's reason (once per head commit), which puts it in Stuck from then on, on every
+// board, until a merge goes through. A repo where something merged is read again, so
 // the sessions see it.
 function applyMerges(
   first: RepoPlan[],
@@ -217,6 +220,13 @@ function applyMerges(
     } catch (e) {
       const err = e as { stderr?: string; message: string };
       console.error(`merge ${m.repo}#${m.pr} refused: ${err.stderr ?? err.message}`);
+      if (m.refused) continue; // already marked and Stuck
+      m.refused = refusalText(err.stderr || err.message);
+      try {
+        post(`repos/${m.repo}/issues/${m.pr}/comments`, { body: `${mergeRefusedBody(m.refused)}${FOOTER}` });
+      } catch (e2) {
+        console.error(`marking ${m.repo}#${m.pr} merge-refused failed: ${(e2 as Error).message}`);
+      }
     }
   // GitHub closes the merged PR's issues and indexes it for search a moment
   // after the merge, so wait for that before reading again (bounded; on timeout
@@ -232,7 +242,21 @@ function applyMerges(
     sleep(3000);
   }
   const mergedIn = new Set(merged.map((m) => m.repo));
-  return { plans: first.map((p, k) => (mergedIn.has(p.repo) ? read(repos[k]) : p)), merged };
+  const plans = first.map((p, k) => (mergedIn.has(p.repo) ? read(repos[k]) : p));
+  // Every merge still refused in Stuck: the plan already has those marked before this run.
+  const refused = automerge.filter((m) => m.refused && !merged.includes(m));
+  return {
+    plans: plans.map((p) => ({
+      ...p,
+      unstick: [
+        ...p.unstick,
+        ...refused
+          .filter((m) => m.repo === p.repo && !p.unstick.some((u) => u.ref === m.item.ref))
+          .map((m) => ({ ...m.item, why: `merge refused: ${m.refused}` })),
+      ],
+    })),
+    merged,
+  };
 }
 
 // `apply`'s last writes: assign each dispatched issue and leave a marker on it, and on

@@ -58,6 +58,8 @@ export type Merge = {
   created: string;
   body: string | null;
   item: Item;
+  /** GitHub's reason, when a merge of this head commit was already refused. */
+  refused?: string;
 };
 export type RepoPlan = {
   repo: string;
@@ -182,7 +184,12 @@ export function planRepo(s: RepoSnapshot, opts: PlanOptions): RepoPlan {
         out.review.push(v.why ? { ...it, why: v.why } : it);
         break;
       case "merge":
-        out.automerge.push({ repo, pr: pr.number, sha: pr.head.sha, title: pr.title, created: pr.created_at, body: pr.body, item: it });
+        // A refused merge is tried again, but shown as Stuck: it needs the maintainer.
+        out.automerge.push({
+          repo, pr: pr.number, sha: pr.head.sha, title: pr.title, created: pr.created_at, body: pr.body, item: it,
+          ...(v.refused && { refused: v.refused }),
+        });
+        if (v.refused) out.unstick.push({ ...it, why: `merge refused: ${v.refused}` });
         break;
       case "unstick":
         out.unstick.push({ ...it, why: v.why });

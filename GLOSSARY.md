@@ -29,7 +29,7 @@ Where an issue or PR stands in the workshop's flow: Stuck, Waiting for human, PR
 _Avoid_: Column, status
 
 **Stuck**:
-The stage for work the workshop can't move without the maintainer stepping in. That covers a PR at its follow-up cap, a stale follow-up, a dispatched issue with no PR, and the issue the dispatcher files in the home repo for a repo it can't push to.
+The stage for work the workshop can't move without the maintainer stepping in. That covers a PR at its follow-up cap, a stale follow-up, a dispatched issue with no PR, an `automerge` PR whose merge GitHub refused, and the issue the dispatcher files in the home repo for a repo it can't push to.
 _Avoid_: Blocked, failed
 
 **Waiting for human**:
