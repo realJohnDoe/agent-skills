@@ -10,6 +10,7 @@
 //   writes fails loudly. A write answers `{"number": 900}`.
 //   A merge (PUT .../pulls/N/merge) also moves PR N to the fixture's closed list, closes
 //   the issues it closes and adds it to the merged-PR search, so the dispatcher's wait settles at once.
+//   A fixture key `refuse <path>` instead makes that merge fail (after logging it), with its value on stderr.
 // git: `remote get-url origin` answers from $FAKE_GIT_REMOTES ({path: url});
 //   `push --dry-run` fails for paths listed in $FAKE_GIT_NOPUSH; `rev-parse
 //   --show-toplevel` answers the working directory. The board push's commands
@@ -66,6 +67,7 @@ const gh = (args: string[]) => {
     if (merge) {
       const file = process.env.FAKE_GH_FIXTURE!;
       const f = JSON.parse(readFileSync(file, "utf8"));
+      if (f[`refuse ${path}`]) fail(f[`refuse ${path}`]);
       const [, r, n] = merge;
       const pr = f[`${r}/pulls`].find((p: { number: number }) => p.number === +n);
       f[`${r}/pulls`] = f[`${r}/pulls`].filter((p: unknown) => p !== pr);
