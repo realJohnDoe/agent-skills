@@ -9,9 +9,9 @@ Dependabot already proposes every available version and can auto-merge the non-m
 
 **Scope:** the repos the user names. If they name none, use the current repo. Use every repo attached to the session if they asked for "all", or if the working directory isn't a repo but holds several. With several repos, a dependency they share gets one decision, applied in each repo that has it.
 
-**Previous runs:** each run's parent is a `Dependency maintenance <date>` issue in realJohnDoe/agent-skills, filed per `../conventions/batch-findings.md`, which this pass follows for searching, fields, tiers and closing. The newest parent, open or closed, is the last run. The open sub-issues of every open parent are decisions already made: re-check their facts and update an issue only when a fact has changed.
+**Previous runs:** each run's parent is a `Dependency maintenance <date>` issue in realJohnDoe/joes-workshop, filed per `../conventions/batch-findings.md`, which this pass follows for searching, fields, tiers and closing. The newest parent, open or closed, is the last run. The open sub-issues of every open parent are decisions already made: re-check their facts and update an issue only when a fact has changed.
 
-**Start** by closing the finished parents in realJohnDoe/agent-skills, per **Closing** there. They carry the `dependencies` label, or, filed before it, are found by title.
+**Start** by closing the finished parents in realJohnDoe/joes-workshop, per **Closing** there. They carry the `dependencies` label, or, filed before it, are found by title.
 
 ## 1. Read each repo's own rules first
 
@@ -79,6 +79,6 @@ Publish one Artifact page per run, titled `Dependency maintenance <YYYY-MM-DD>`,
 
 Link the previous run's report at the top.
 
-Then, if the run filed or updated at least one issue, file the run's parent in realJohnDoe/agent-skills, titled like the report and labelled `dependencies`. Its body holds the report link, the previous run's parent, the per-repo table and the cross-repo decisions. Add every issue filed or updated as a sub-issue. A run with no findings files no parent.
+Then, if the run filed or updated at least one issue, file the run's parent in realJohnDoe/joes-workshop, titled like the report and labelled `dependencies`. Its body holds the report link, the previous run's parent, the per-repo table and the cross-repo decisions. Add every issue filed or updated as a sub-issue. A run with no findings files no parent.
 
 End your reply with the report link, the parent if there is one, and the issue count per repo.

@@ -1,5 +1,5 @@
 {
-  "name": "agent-skills",
+  "name": "joes-workshop",
   "description": "Agent skills shared across realJohnDoe's repositories",
   "owner": { "name": "realJohnDoe", "url": "https://github.com/realJohnDoe" },
   "plugins": [
@@ -8,7 +8,7 @@
       "source": "./skills",
       "description": "Recurring maintenance passes that run over several repositories at once",
       "category": "development",
-      "homepage": "https://github.com/realJohnDoe/agent-skills"
+      "homepage": "https://github.com/realJohnDoe/joes-workshop"
     }
   ]
 }

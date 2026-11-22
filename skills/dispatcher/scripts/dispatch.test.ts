@@ -12,7 +12,7 @@ import { fileURLToPath } from "node:url";
 import { fakeBin } from "../../_shared/fake-bin.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const HOME = "realJohnDoe/agent-skills";
+const HOME = "realJohnDoe/joes-workshop";
 const M = "realJohnDoe/meridian";
 const T = "realJohnDoe/tracemap";
 const TODAY = "2026-11-13"; // a Friday
@@ -339,10 +339,10 @@ describe("dispatch finish", () => {
 });
 
 describe("dispatch board, the board workflow's build", () => {
-  // As in the workflow: only agent-skills is checked out, nothing can be pushed to, and
+  // As in the workflow: only joes-workshop is checked out, nothing can be pushed to, and
   // the live board, as the last build left it, names the repos to cover. The workshop is paused.
   const snapshot = { body: "<!-- workshop-snapshot -->\nWorkshop paused.", created_at: "2026-11-13T00:00:00Z", html_url: "https://github.com/x/issues/50#c1", user: { login: "b", type: "User" } };
-  const PAGES = "https://realjohndoe.github.io/agent-skills/";
+  const PAGES = "https://realjohndoe.github.io/joes-workshop/";
   const { [`search/issues?q=repo:${M} repo:${T} is:issue is:closed reason:completed`]: closedMT, ...w } = world({ homeComments: { 50: [snapshot] } }) as Any;
   // No merged-since search in the fixture: the board reads none.
   const fixture = {

@@ -2,7 +2,7 @@
 
 ### Issue tracker
 
-Issues live in this repo's GitHub Issues (realJohnDoe/agent-skills). See `docs/agents/issue-tracker.md`.
+Issues live in this repo's GitHub Issues (realJohnDoe/joes-workshop). See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 

@@ -42,7 +42,7 @@ const FLAGS = [
   "--followups-only", "--no-run-marker", "--dry-run", "--last-run", "--repos-covered",
   "--no-digest", "--apply", "--digest-only", "--board-only", "--board-refresh",
 ];
-const BOARD_REPO = "realJohnDoe/agent-skills";
+const BOARD_REPO = "realJohnDoe/joes-workshop";
 const BOARD_WORKFLOW = "board.yml"; // builds the board and deploys it to Pages
 // The label that paused the workshop on the retired digest issue.
 const RETIRED_PAUSE_LABEL = "workshop-paused";
