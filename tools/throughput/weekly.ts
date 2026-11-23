@@ -130,3 +130,12 @@ export const build = (
   }
   return r;
 };
+
+// PR references from `exclude.txt`: one `owner/repo#N` or `repo#N` per line, lowercased.
+// Blank lines are skipped, and `#` followed by a space starts a comment, so `repo#12` is
+// a reference and `repo#12  # vendored data` is the same reference with a reason.
+export const parseExcludes = (text: string): string[] =>
+  text
+    .split("\n")
+    .map((l) => l.replace(/(^|\s)#\s.*$/, "").trim().toLowerCase())
+    .filter(Boolean);

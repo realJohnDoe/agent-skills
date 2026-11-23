@@ -1,0 +1,7 @@
+# PRs left out of the lines chart on every run (they still count as PRs), because their
+# line counts would swamp the weeks around them. One `owner/repo#N` per line; text after
+# ` # ` is the reason. Pass more for a single run with `--exclude`.
+realJohnDoe/kenpo-notes#90  # Quartz v4 to v5 upgrade, 36.9k lines
+realJohnDoe/structra#56  # example repo artifacts (requests, numpy, django), 18.9k lines
+realJohnDoe/structra#59  # C parser example repo artifacts (redis, git), 10.4k lines
+realJohnDoe/structra#61  # TS/JS parser example repos (express, vite, react), 25.8k lines
