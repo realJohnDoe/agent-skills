@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { build, halve, mondayOf, months, parseLog, type Pr } from "./weekly.ts";
+import { build, halve, mondayOf, months, parseExcludes, parseLog, type Pr } from "./weekly.ts";
 
 describe("parseLog", () => {
   test("reads squash merges and merge commits, and skips commits that name no PR", () => {
@@ -94,5 +94,12 @@ describe("build", () => {
 
   test("doesn't fold a single repo into Other", () => {
     assert.deepEqual(build(prs, lines, { ...opts, top: 3 }).series, ["big", "mid", "small", "tiny"]);
+  });
+});
+
+describe("parseExcludes", () => {
+  test("reads one reference per line, dropping comments and blank lines", () => {
+    const text = ["# header comment", "", "realJohnDoe/Structra#61  # 25.8k lines", "kenpo-notes#90", "  "].join("\n");
+    assert.deepEqual(parseExcludes(text), ["realjohndoe/structra#61", "kenpo-notes#90"]);
   });
 });

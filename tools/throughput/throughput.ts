@@ -9,7 +9,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { arg, main, run } from "../../skills/_shared/cli.ts";
 import { api } from "../../skills/_shared/github.ts";
-import { build, halve, isoDay, type Lines, months, parseLog, type Pr } from "./weekly.ts";
+import { build, halve, isoDay, type Lines, months, parseExcludes, parseLog, type Pr } from "./weekly.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 // The search API allows 30 requests a minute.
@@ -67,8 +67,11 @@ main(() => {
   const top = Number(arg("--top", 7));
   const out = resolve(arg("--out", "throughput.html"));
   const cache = resolve(arg("--cache") ?? join(tmpdir(), "throughput-cache"));
-  // owner/repo#N or repo#N
-  const excludes = (arg("--exclude") ?? "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+  // owner/repo#N or repo#N: the checked-in list in exclude.txt, plus any passed for this run.
+  const excludes = [
+    ...parseExcludes(readFileSync(join(here, "exclude.txt"), "utf8")),
+    ...(arg("--exclude") ?? "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean),
+  ];
   const isExcluded = (pr: Pr) =>
     excludes.includes(`${pr.repo}#${pr.number}`.toLowerCase()) ||
     excludes.includes(`${pr.repo.split("/")[1]}#${pr.number}`.toLowerCase());
@@ -93,7 +96,7 @@ main(() => {
     excluded: isExcluded,
   });
   const unmatched = excludes.filter((x) => !report.excluded.some((e) => x.endsWith(`${e.repo}#${e.number}`.toLowerCase())));
-  if (unmatched.length) console.error(`throughput: --exclude matched no merged PR: ${unmatched.join(", ")}`);
+  if (unmatched.length) console.error(`throughput: exclusion matched no merged PR in the window: ${unmatched.join(", ")}`);
 
   const page = readFileSync(join(here, "report.html"), "utf8").replace(
     "__DATA__",
